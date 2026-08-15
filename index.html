@@ -523,6 +523,74 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+/* v21 · sugerencias de reubicación */
+.movePlan{
+  margin-top:12px;
+  border-top:1px solid #2d3744;
+  padding-top:10px;
+}
+.movePlanTitle{
+  font-size:12px;
+  font-weight:900;
+  color:#f1f5f9;
+  margin-bottom:7px;
+}
+.moveCard{
+  border:1px solid #31404e;
+  background:#111923;
+  border-radius:8px;
+  padding:9px;
+  margin:7px 0;
+}
+.moveCard.keep{
+  border-color:#355b48;
+  background:#101b17;
+}
+.moveCard.move{
+  border-color:#5a4530;
+  background:#1a1611;
+}
+.moveHead{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  align-items:flex-start;
+  margin-bottom:5px;
+}
+.moveHead b{font-size:11px}
+.moveBadge{
+  font-size:8px;
+  font-weight:900;
+  border-radius:9px;
+  padding:2px 6px;
+  white-space:nowrap;
+}
+.moveBadge.keep{background:#234c39;color:#9ce5ba}
+.moveBadge.move{background:#6b4728;color:#ffd399}
+.moveDest{
+  font-size:14px;
+  font-weight:900;
+  color:#67dcff;
+  margin:3px 0;
+}
+.moveMeta{
+  font-size:9px;
+  color:#8e9aa8;
+  line-height:1.35;
+}
+.moveAlt{
+  margin-top:5px;
+  font-size:9px;
+  color:#aab5c1;
+}
+.noDest{
+  color:#ff9da7;
+  font-weight:800;
+}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -725,6 +793,147 @@ function rebuild(){
  }
  setKPIs(rows,allCells);
 }
+
+function allActiveRows(){
+  return DATA.map(normalizeRow).filter(Boolean);
+}
+
+function locationCode(prefix,mod,sub,pos){
+  const modTxt=(prefix==='A'||prefix==='B')?String(mod).padStart(2,'0'):String(mod);
+  return prefix+modTxt+sub+String(pos).padStart(2,'0');
+}
+
+function allPhysicalSlots(){
+  // Devuelve todos los huecos físicos que maneja el dashboard, ocupados o vacíos.
+  const slots=[];
+  const rows=allActiveRows();
+  const configs=[
+    {prefix:'MFCA',zones:['MFCAL','MFCAR'],maxPos:12},
+    {prefix:'MFCB',zones:['MFCBL','MFCBR'],maxPos:12},
+    {prefix:'MFCC',zones:['MFCCL','MFCCR'],maxPos:12},
+    {prefix:'A',zones:['AR'],maxPos:8},
+    {prefix:'B',zones:['BR'],maxPos:8}
+  ];
+
+  configs.forEach(cfg=>{
+    const mods=[...new Set(rows.filter(x=>x.prefix===cfg.prefix && cfg.zones.includes(x.zona)).map(x=>x.modulo))].sort((a,b)=>a-b);
+    mods.forEach(mod=>{
+      for(let pos=1;pos<=cfg.maxPos;pos++){
+        slots.push({
+          prefix:cfg.prefix,modulo:mod,sub:'01',pos,
+          ubicacion:locationCode(cfg.prefix,mod,'01',pos),
+          grupo:LOCATION_GROUP[cfg.prefix+String(mod)]||''
+        });
+      }
+    });
+  });
+  return slots;
+}
+
+function occupiedLocationSet(){
+  return new Set(allActiveRows().filter(x=>Number(x.saldo||0)!==0).map(x=>String(x.ubicacion||'').toUpperCase()));
+}
+
+function aisleRank(prefix){
+  // Orden físico aproximado para desempatar cercanía entre calles.
+  return {MFCA:0,MFCB:1,MFCC:2,A:3,B:4}[prefix] ?? 99;
+}
+
+function physicalDistance(from,to){
+  // Prioriza misma calle; luego módulo cercano; luego posición cercana.
+  const aislePenalty=Math.abs(aisleRank(from.prefix)-aisleRank(to.prefix))*10000;
+  const samePrefix=from.prefix===to.prefix;
+  const modPenalty=Math.abs(Number(from.modulo)-Number(to.modulo))*100;
+  const posPenalty=Math.abs(Number(from.pos)-Number(to.pos))*2;
+  // fuerte preferencia por misma calle física
+  return (samePrefix?0:aislePenalty+5000)+modPenalty+posPenalty;
+}
+
+function candidateDestinations(item,from,reserved){
+  const skuGroup=item.grupoSku||SKU_GROUP[item.ean]||'';
+  if(!skuGroup || skuGroup==='SIN GRUPO') return [];
+
+  const occupied=occupiedLocationSet();
+  return allPhysicalSlots()
+    .filter(s=>!occupied.has(s.ubicacion.toUpperCase()))
+    .filter(s=>!reserved.has(s.ubicacion.toUpperCase()))
+    .filter(s=>s.grupo && s.grupo===skuGroup)
+    .map(s=>({...s,distance:physicalDistance(from,s)}))
+    .sort((a,b)=>a.distance-b.distance || a.modulo-b.modulo || a.pos-b.pos);
+}
+
+function buildRelocationPlan(mod,sub,pos,items){
+  const cfg=VIEWS[view];
+  const from={prefix:cfg.prefix,modulo:mod,sub,pos};
+  const currentGroup=LOCATION_GROUP[cfg.prefix+String(mod)]||'';
+
+  // Agrupar registros por SKU.
+  const skuMap=new Map();
+  items.forEach(x=>{
+    const key=skuKey(x);
+    if(!key)return;
+    if(!skuMap.has(key))skuMap.set(key,{key,ean:x.ean,referencia:x.referencia,descripcion:x.descripcion,grupoSku:x.grupoSku||SKU_GROUP[x.ean]||'',saldo:0,rows:[]});
+    const g=skuMap.get(key);
+    g.saldo+=Number(x.saldo||0);
+    g.rows.push(x);
+  });
+  const skus=[...skuMap.values()];
+  if(skus.length<=1)return null;
+
+  // Qué SKU conviene dejar:
+  // 1) uno cuyo grupo coincide con la ubicación actual;
+  // 2) entre ellos, el de mayor saldo, para mover menos mercadería.
+  const matching=skus.filter(s=>s.grupoSku && currentGroup && s.grupoSku===currentGroup);
+  const keepPool=matching.length?matching:skus;
+  keepPool.sort((a,b)=>b.saldo-a.saldo);
+  const keep=keepPool[0];
+
+  const reserved=new Set();
+  const moves=[];
+  skus.filter(s=>s.key!==keep.key)
+    .sort((a,b)=>{
+      const aBad=(a.grupoSku!==currentGroup)?0:1;
+      const bBad=(b.grupoSku!==currentGroup)?0:1;
+      return aBad-bBad || a.saldo-b.saldo;
+    })
+    .forEach(s=>{
+      const representative=s.rows[0];
+      const candidates=candidateDestinations(representative,from,reserved);
+      const recommended=candidates[0]||null;
+      if(recommended)reserved.add(recommended.ubicacion.toUpperCase());
+      moves.push({sku:s,recommended,alternatives:candidates.slice(1,4)});
+    });
+
+  return {keep,moves,currentGroup};
+}
+
+function relocationPlanHtml(mod,sub,pos,items){
+  const plan=buildRelocationPlan(mod,sub,pos,items);
+  if(!plan)return '';
+
+  let h='<div class="movePlan"><div class="movePlanTitle">📍 Sugerencia de reubicación</div>';
+  h+='<div class="moveCard keep"><div class="moveHead"><b>'+esc(plan.keep.descripcion||plan.keep.ean||plan.keep.referencia)+'</b><span class="moveBadge keep">DEJAR</span></div>';
+  h+='<div class="moveMeta">SKU '+esc(plan.keep.ean||plan.keep.referencia)+' · Grupo '+esc(plan.keep.grupoSku||'SIN GRUPO')+' · Saldo '+Number(plan.keep.saldo).toLocaleString('es-AR')+'</div></div>';
+
+  plan.moves.forEach(m=>{
+    h+='<div class="moveCard move"><div class="moveHead"><b>'+esc(m.sku.descripcion||m.sku.ean||m.sku.referencia)+'</b><span class="moveBadge move">MOVER</span></div>';
+    h+='<div class="moveMeta">SKU '+esc(m.sku.ean||m.sku.referencia)+' · Grupo '+esc(m.sku.grupoSku||'SIN GRUPO')+' · Saldo '+Number(m.sku.saldo).toLocaleString('es-AR')+'</div>';
+    if(m.recommended){
+      h+='<div class="moveDest">→ '+esc(m.recommended.ubicacion)+'</div>';
+      h+='<div class="moveMeta">Destino VACÍO · Grupo '+esc(m.recommended.grupo)+' · módulo '+m.recommended.modulo+' · posición '+String(m.recommended.pos).padStart(2,'0')+'</div>';
+      if(m.alternatives.length){
+        h+='<div class="moveAlt">Alternativas: '+m.alternatives.map(a=>esc(a.ubicacion)).join(' · ')+'</div>';
+      }
+    }else{
+      h+='<div class="moveDest noDest">Sin destino vacío compatible</div>';
+      h+='<div class="moveMeta">No encontré un hueco vacío del mismo grupo logístico para este SKU.</div>';
+    }
+    h+='</div>';
+  });
+  h+='<div class="moveMeta">Criterio: destino vacío + mismo grupo del SKU + mayor cercanía física. Si varios SKU son válidos en la posición actual, se deja el de mayor saldo para minimizar movimientos.</div></div>';
+  return h;
+}
+
 function showDetail(mod,sub,pos,items,st){
  const cfg=VIEWS[view],gkey=cfg.prefix+String(mod);
  selected=view+'-'+mod+'-'+sub+'-'+pos;rebuild();
@@ -735,6 +944,7 @@ function showDetail(mod,sub,pos,items,st){
  if(st==='multi')h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div>';
  if(st==='bad')h+='<div class="alert bad">⚠ SKU almacenado fuera de su grupo</div>';
  if(!items.length)h+='<div class="notice">Posición vacía.</div>';
+ if(st==='multi')h+=relocationPlanHtml(mod,sub,pos,items);
  items.forEach(x=>{
    const sg=x.grupoSku||SKU_GROUP[x.ean]||'SIN GRUPO',ok=lg!=='SIN DEFINIR'&&sg!=='SIN GRUPO'&&sg===lg;
    h+='<div class="item"><b>'+esc(x.descripcion||'(sin descripción)')+'</b><div class="muted">SKU '+esc(x.ean)+' · Ref. '+esc(x.referencia)+'</div><div class="groups"><div class="gbox"><small>Grupo SKU (VL)</small><b>'+esc(sg)+'</b></div><div class="gbox"><small>Validación</small><b>'+(ok?'✓ CORRECTO':(sg==='SIN GRUPO'||lg==='SIN DEFINIR'?'? SIN CLASIFICAR':'✕ INCORRECTO'))+'</b></div></div><div>Saldo: <b>'+Number(x.saldo||0).toLocaleString('es-AR')+'</b> '+esc(x.unidad)+'</div><div class="muted">Caja '+esc(x.caja)+' · Últ. mov. '+esc(x.ultimo)+'</div></div>';
