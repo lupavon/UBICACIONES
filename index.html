@@ -802,8 +802,8 @@ function currentRows(){
  return DATA.map(normalizeRow).filter(Boolean).filter(x=>{
    const zoneOk=String(x.zona).toUpperCase()===String(cfg.zona).toUpperCase();
    const prefixOk=x.prefix===cfg.prefix;
-   const evenA=(cfg.zona==='AR') ? (Number(x.modulo)%2===0) : true;
-   return zoneOk && prefixOk && evenA;
+   const evenAB=(cfg.zona==='AR' || cfg.zona==='BR') ? (Number(x.modulo)%2===0) : true;
+   return zoneOk && prefixOk && evenAB;
  });
 }
 function applyVisual(s,text,st){
@@ -907,8 +907,8 @@ function allPhysicalSlots(){
     const mods=[...new Set(rows.filter(x=>{
       const zoneOk=cfg.zones.includes(String(x.zona).toUpperCase());
       const prefixOk=x.prefix===cfg.prefix;
-      const evenA=(cfg.prefix==='A') ? (Number(x.modulo)%2===0) : true;
-      return prefixOk && zoneOk && evenA;
+      const evenAB=(cfg.prefix==='A' || cfg.prefix==='B') ? (Number(x.modulo)%2===0) : true;
+      return prefixOk && zoneOk && evenAB;
     }).map(x=>x.modulo))].sort((a,b)=>a-b);
     mods.forEach(mod=>{
       for(let pos=1;pos<=cfg.maxPos;pos++){
@@ -1144,7 +1144,7 @@ function buildHeatmap(){
   const q=norm(query);
 
   LAYOUT_CELLS.forEach(cell=>{
-    if(/^A\d+$/i.test(cell.label)){
+    if(/^[AB]\d+$/i.test(cell.label)){
       const nmod=parseInt(String(cell.label).replace(/\D/g,''),10);
       if(Number.isFinite(nmod) && nmod%2!==0) return;
     }
@@ -1200,7 +1200,7 @@ function occupancyByModule(){
     } else if(x.prefix==='A'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0) return;
     } else if(x.prefix==='B'){
-      if(x.sub!=='01'||x.pos<1||x.pos>8) return;
+      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0) return;
     } else return;
 
     const mod=moduleKeyFromRow(x);
@@ -1234,7 +1234,7 @@ function buildOccupancyMap(){
 
   LAYOUT_CELLS.forEach(cell=>{
     // Calle A: mostrar solo módulos pares.
-    if(/^A\d+$/i.test(cell.label)){
+    if(/^[AB]\d+$/i.test(cell.label)){
       const nmod=parseInt(String(cell.label).replace(/\D/g,''),10);
       if(Number.isFinite(nmod) && nmod%2!==0) return;
     }
