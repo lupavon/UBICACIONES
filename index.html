@@ -189,6 +189,39 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 @media(max-width:480px){
 }
+
+.rack.abfront{
+  grid-template-columns:repeat(2,1fr);
+  grid-template-rows:repeat(4,52px);
+  gap:3px;
+}
+.rackrow.abfrontrow{
+  width:154px;
+  min-width:154px;
+}
+.abloc{
+  position:absolute;
+  left:4px;
+  bottom:4px;
+  font-size:8px;
+  opacity:.72;
+  font-weight:700;
+}
+.rack.abfront .pnum{
+  font-size:9px;
+  color:#7d8794;
+  max-width:90%;
+}
+@media(max-width:900px){
+  .rackrow.abfrontrow{width:154px;min-width:154px}
+  .rack.abfront{grid-template-rows:repeat(4,52px)}
+}
+@media(max-width:480px){
+  .rackrow.abfrontrow{width:142px;min-width:142px}
+  .rack.abfront{grid-template-rows:repeat(4,49px)}
+  .abloc{font-size:7px}
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -233,7 +266,7 @@ html,body{max-width:100%;overflow-x:hidden}
 <aside class="side">
   <h2>Detalle de posición</h2>
   <div class="muted">Hacé clic en un hueco para ver el cruce Stock ↔ VL ↔ Layout.</div>
-  <div id="detail"><div class="notice">Incluye MFCA, MFCB, MFCC, AR y BR (AR/BR: solo nivel 01 · misma visual de estantería MFC). El grupo del SKU sale de VL.xlsx y el permitido de Layout Zonas almacen Julio.xlsx.</div></div>
+  <div id="detail"><div class="notice">Incluye MFCA, MFCB, MFCC, AR y BR (AR/BR: solo nivel 01 · vista frontal 2 posiciones × 4 niveles). El grupo del SKU sale de VL.xlsx y el permitido de Layout Zonas almacen Julio.xlsx.</div></div>
 </aside>
 </div>
 <script>
@@ -337,17 +370,17 @@ function rebuild(){
      wrap.appendChild(rack);const rail=document.createElement('div');rail.className='rail';wrap.appendChild(rail);root.appendChild(wrap);
    });
  } else {
-   // AR/BR: estanterías con la MISMA visual que MFC.
-   // Nomenclatura A 64 01 01 = calle A · módulo 64 · nivel 01 · posición 01.
-   // Mostrar únicamente nivel 01 y 3 posiciones por fila.
-   const levelRows=rows.filter(x=>x.sub==='01' && x.pos>=1 && x.pos<=12);
+   // AR/BR: vista frontal real de estantería.
+   // Ejemplo módulo A40: arriba 08 | 07, luego 06 | 05, 04 | 03, abajo 02 | 01.
+   // Nomenclatura A 40 01 08 = calle A · módulo 40 · nivel 01 · posición 08.
+   const levelRows=rows.filter(x=>x.sub==='01' && x.pos>=1 && x.pos<=8);
    const by={};levelRows.forEach(x=>(by[x.modulo+'-'+x.pos]??=[]).push(x));
    const levelMods=[...new Set(levelRows.map(x=>x.modulo))].sort((a,b)=>a-b);
    levelMods.forEach(mod=>{
-     const wrap=document.createElement('div');wrap.className='rackrow';
+     const wrap=document.createElement('div');wrap.className='rackrow abfrontrow';
      const title=document.createElement('div');title.className='modlabel';title.textContent=cfg.prefix+String(mod).padStart(2,'0');wrap.appendChild(title);
-     const rack=document.createElement('div');rack.className='rack';
-     [10,11,12,7,8,9,4,5,6,1,2,3].forEach(pos=>{
+     const rack=document.createElement('div');rack.className='rack abfront';
+     [8,7,6,5,4,3,2,1].forEach(pos=>{
        const items=by[mod+'-'+pos]||[],gkey=cfg.prefix+String(mod),st=status(items,gkey);
        allCells.push({items,st});
        const saldo=items.reduce((a,x)=>a+x.saldo,0),skus=[...new Set(items.map(skuKey).filter(Boolean))];
@@ -356,8 +389,8 @@ function rebuild(){
        if(selected===view+'-'+mod+'-01-'+pos)s.classList.add('selected');
        const text=norm([loc,...items.flatMap(x=>[x.ean,x.referencia,x.descripcion,x.ubicacion,x.grupoSku]),LOCATION_GROUP[gkey]].join(' '));
        applyVisual(s,text,st);
-       if(!items.length)s.innerHTML='<span class="pnum">'+String(pos).padStart(2,'0')+'</span>';
-       else s.innerHTML='<span class="skuLabel">'+skus.length+' SKU</span><span class="qty">'+(Math.round(saldo*100)/100).toLocaleString('es-AR')+'</span>';
+       if(!items.length)s.innerHTML='<span class="pnum">'+esc(loc)+'</span>';
+       else s.innerHTML='<span class="skuLabel">'+skus.length+' SKU</span><span class="qty">'+(Math.round(saldo*100)/100).toLocaleString('es-AR')+'</span><span class="abloc">'+esc(loc)+'</span>';
        s.title=loc+' · Nivel 01 · '+(LOCATION_GROUP[gkey]||'SIN GRUPO');
        s.onclick=()=>showDetail(mod,'01',pos,items,st);
        rack.appendChild(s);
