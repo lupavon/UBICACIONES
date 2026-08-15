@@ -698,7 +698,12 @@ function parseLoc(loc){
 function groupKey(p){return p.prefix+String(p.module)}
 function normalizeRow(r){
  const loc=String(r.Ubicacion??r.ubicacion??'').trim(),p=parseLoc(loc);if(!p)return null;
- const zona=String(r.Zona??r.zona??'').trim(),ean=String(r.EAN??r.ean??'').trim();
+ let zona=String(r.Zona??r.zona??r.zonapiso??'').trim().toUpperCase();
+ // A/B are the right-side rack views only in this dashboard.
+ // Never allow AL/BL records to leak into AR/BR.
+ if(p.prefix==='A' && zona!=='AR') zona='';
+ if(p.prefix==='B' && zona!=='BR') zona='';
+ const ean=String(r.EAN??r.ean??'').trim();
  return {zona,ubicacion:loc,prefix:p.prefix,modulo:p.module,sub:p.sub,pos:p.pos,
  saldo:+(r.Saldo??r.saldo??0)||0,ean,
  referencia:String(r.referencia??r.Referencia??'').trim(),
@@ -722,7 +727,7 @@ function status(items,gkey){
 }
 function currentRows(){
  const cfg=VIEWS[view];
- return DATA.map(normalizeRow).filter(Boolean).filter(x=>x.zona===cfg.zona && x.prefix===cfg.prefix);
+ return DATA.map(normalizeRow).filter(Boolean).filter(x=>String(x.zona).toUpperCase()===String(cfg.zona).toUpperCase() && x.prefix===cfg.prefix);
 }
 function applyVisual(s,text,st){
  if(query)s.classList.add(text.includes(norm(query))?'match':'dim');
@@ -822,7 +827,7 @@ function allPhysicalSlots(){
   ];
 
   configs.forEach(cfg=>{
-    const mods=[...new Set(rows.filter(x=>x.prefix===cfg.prefix && cfg.zones.includes(x.zona)).map(x=>x.modulo))].sort((a,b)=>a-b);
+    const mods=[...new Set(rows.filter(x=>x.prefix===cfg.prefix && cfg.zones.includes(String(x.zona).toUpperCase())).map(x=>x.modulo))].sort((a,b)=>a-b);
     mods.forEach(mod=>{
       for(let pos=1;pos<=cfg.maxPos;pos++){
         slots.push({
