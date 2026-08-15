@@ -240,7 +240,7 @@ html,body{max-width:100%;overflow-x:hidden}
 <aside class="side">
   <h2>Detalle de posición</h2>
   <div class="muted">Hacé clic en un hueco para ver el cruce Stock ↔ VL ↔ Layout.</div>
-  <div id="detail"><div class="notice">Incluye MFCA, MFCB, MFCC, AR y BR. El grupo del SKU sale de VL.xlsx y el permitido de Layout Zonas almacen Julio.xlsx.</div></div>
+  <div id="detail"><div class="notice">Incluye MFCA, MFCB, MFCC, AR y BR (AR/BR: solo nivel 01). El grupo del SKU sale de VL.xlsx y el permitido de Layout Zonas almacen Julio.xlsx.</div></div>
 </aside>
 </div>
 <script>
@@ -344,32 +344,32 @@ function rebuild(){
      wrap.appendChild(rack);const rail=document.createElement('div');rail.className='rail';wrap.appendChild(rail);root.appendChild(wrap);
    });
  } else {
-   // AR/BR: each module is shown as a rack, levels 05→01; level 01 can contain up to 16 positions.
-   const by={};rows.forEach(x=>(by[x.modulo+'-'+x.sub+'-'+x.pos]??=[]).push(x));
-   mods.forEach(mod=>{
+   // AR/BR: nomenclatura A 64 01 01 = calle A · módulo 64 · nivel 01 · posición 01.
+   // Mostrar únicamente nivel 01.
+   const levelRows=rows.filter(x=>x.sub==='01');
+   const by={};levelRows.forEach(x=>(by[x.modulo+'-'+x.pos]??=[]).push(x));
+   const levelMods=[...new Set(levelRows.map(x=>x.modulo))].sort((a,b)=>a-b);
+   levelMods.forEach(mod=>{
      const wrap=document.createElement('div');wrap.className='rackrow abrow';
      const title=document.createElement('div');title.className='modlabel';title.textContent=cfg.prefix+String(mod).padStart(2,'0');wrap.appendChild(title);
      const rack=document.createElement('div');rack.className='rack ab';
-     const subs=[...new Set(rows.filter(x=>x.modulo===mod).map(x=>x.sub))].sort((a,b)=>+b-+a);
-     const maxPos=Math.max(2,...rows.filter(x=>x.modulo===mod).map(x=>x.pos));
-     subs.forEach(sub=>{
-       const cols=Math.max(8,maxPos);
-       for(let pos=1;pos<=cols;pos++){
-         const items=by[mod+'-'+sub+'-'+pos]||[],gkey=cfg.prefix+String(mod),st=status(items,gkey);
-         allCells.push({items,st});
-         const saldo=items.reduce((a,x)=>a+x.saldo,0),skus=[...new Set(items.map(skuKey).filter(Boolean))];
-         const loc=cfg.prefix+String(mod).padStart(2,'0')+sub+String(pos).padStart(2,'0');
-         const s=document.createElement('div');s.className='slot '+(st==='ok'?'occupied':st);
-         if(selected===view+'-'+mod+'-'+sub+'-'+pos)s.classList.add('selected');
-         const text=norm([loc,...items.flatMap(x=>[x.ean,x.referencia,x.descripcion,x.ubicacion,x.grupoSku]),LOCATION_GROUP[gkey]].join(' '));
-         applyVisual(s,text,st);
-         if(!items.length)s.innerHTML='<span class="pnum">'+String(pos).padStart(2,'0')+'</span><span class="leveltag">N'+sub+'</span>';
-         else s.innerHTML='<span class="skuLabel">'+skus.length+' SKU</span><span class="qty">'+(Math.round(saldo*100)/100).toLocaleString('es-AR')+'</span><span class="leveltag">N'+sub+'</span>';
-         s.title=loc+' · '+(LOCATION_GROUP[gkey]||'SIN GRUPO');
-         s.onclick=()=>showDetail(mod,sub,pos,items,st);
-         rack.appendChild(s);
-       }
-     });
+     const maxPos=Math.max(1,...levelRows.filter(x=>x.modulo===mod).map(x=>x.pos));
+     const cols=Math.max(8,maxPos);
+     for(let pos=1;pos<=cols;pos++){
+       const items=by[mod+'-'+pos]||[],gkey=cfg.prefix+String(mod),st=status(items,gkey);
+       allCells.push({items,st});
+       const saldo=items.reduce((a,x)=>a+x.saldo,0),skus=[...new Set(items.map(skuKey).filter(Boolean))];
+       const loc=cfg.prefix+String(mod).padStart(2,'0')+'01'+String(pos).padStart(2,'0');
+       const s=document.createElement('div');s.className='slot '+(st==='ok'?'occupied':st);
+       if(selected===view+'-'+mod+'-01-'+pos)s.classList.add('selected');
+       const text=norm([loc,...items.flatMap(x=>[x.ean,x.referencia,x.descripcion,x.ubicacion,x.grupoSku]),LOCATION_GROUP[gkey]].join(' '));
+       applyVisual(s,text,st);
+       if(!items.length)s.innerHTML='<span class="pnum">'+String(pos).padStart(2,'0')+'</span>';
+       else s.innerHTML='<span class="skuLabel">'+skus.length+' SKU</span><span class="qty">'+(Math.round(saldo*100)/100).toLocaleString('es-AR')+'</span>';
+       s.title=loc+' · Nivel 01 · '+(LOCATION_GROUP[gkey]||'SIN GRUPO');
+       s.onclick=()=>showDetail(mod,'01',pos,items,st);
+       rack.appendChild(s);
+     }
      wrap.appendChild(rack);const rail=document.createElement('div');rail.className='rail';wrap.appendChild(rail);root.appendChild(wrap);
    });
  }
