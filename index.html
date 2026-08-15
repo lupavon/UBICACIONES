@@ -745,7 +745,13 @@ function rebuild(){
      const wrap=document.createElement('div');wrap.className='rackrow';
      const title=document.createElement('div');title.className='modlabel';title.textContent=mod;wrap.appendChild(title);
      const rack=document.createElement('div');rack.className='rack';
-     [10,11,12,7,8,9,4,5,6,1,2,3].forEach(pos=>{
+     // En lados L, las posiciones chicas quedan a la derecha:
+     // 12 11 10 / 09 08 07 / 06 05 04 / 03 02 01.
+     // Los lados R conservan la orientación anterior.
+     const posOrder=cfg.zona.endsWith('L')
+       ? [12,11,10,9,8,7,6,5,4,3,2,1]
+       : [10,11,12,7,8,9,4,5,6,1,2,3];
+     posOrder.forEach(pos=>{
        const items=by[mod+'-'+pos]||[],gkey=cfg.prefix+String(mod),st=status(items,gkey);
        allCells.push({items,st});
        const saldo=items.reduce((a,x)=>a+x.saldo,0),skus=[...new Set(items.map(skuKey).filter(Boolean))];
@@ -840,12 +846,12 @@ function aisleRank(prefix){
 }
 
 function physicalDistance(from,to){
-  // Prioriza misma calle; luego módulo cercano; luego posición cercana.
+  // Prioriza misma calle, módulo cercano y posición física cercana.
+  // La inversión visual de los lados L no altera la distancia entre números consecutivos.
   const aislePenalty=Math.abs(aisleRank(from.prefix)-aisleRank(to.prefix))*10000;
   const samePrefix=from.prefix===to.prefix;
   const modPenalty=Math.abs(Number(from.modulo)-Number(to.modulo))*100;
   const posPenalty=Math.abs(Number(from.pos)-Number(to.pos))*2;
-  // fuerte preferencia por misma calle física
   return (samePrefix?0:aislePenalty+5000)+modPenalty+posPenalty;
 }
 
