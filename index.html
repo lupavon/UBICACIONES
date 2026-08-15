@@ -636,6 +636,150 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+/* v28 productivo · panel KPI */
+.opsKpiGrid{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(120px,1fr));
+  gap:8px;
+  margin:10px 0 14px;
+}
+.opsKpiCard{
+  background:#111821;
+  border:1px solid #2b3541;
+  border-radius:8px;
+  padding:11px 12px;
+  min-height:72px;
+}
+.opsKpiCard small{
+  display:block;
+  color:#7f8b98;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+.opsKpiCard b{
+  display:block;
+  margin-top:6px;
+  color:#eef3f8;
+  font-size:25px;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.opsKpiCard span{
+  display:block;
+  margin-top:5px;
+  color:#8c98a5;
+  font-size:9px;
+}
+.opsSection{
+  background:#0f151c;
+  border:1px solid #28323d;
+  border-radius:8px;
+  margin:10px 0;
+  overflow:hidden;
+}
+.opsSectionHead{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 12px;
+  border-bottom:1px solid #27313b;
+  background:#121921;
+}
+.opsSectionHead b{display:block;font-size:12px;color:#e4eaf1}
+.opsSectionHead span{display:block;font-size:9px;color:#7f8b98;margin-top:2px}
+.opsGroupTableWrap{overflow-x:auto}
+.opsGroupTable{
+  width:100%;
+  border-collapse:collapse;
+  min-width:720px;
+  font-size:10px;
+}
+.opsGroupTable th{
+  color:#7f8b98;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  text-align:right;
+  padding:8px 10px;
+  border-bottom:1px solid #252e38;
+}
+.opsGroupTable th:first-child,.opsGroupTable td:first-child{text-align:left}
+.opsGroupTable td{
+  text-align:right;
+  padding:8px 10px;
+  border-bottom:1px solid #202831;
+  color:#cbd3dc;
+  font-variant-numeric:tabular-nums;
+}
+.opsGroupTable tbody tr:hover{background:#151e27}
+.opsPctBar{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+}
+.opsPctTrack{
+  width:76px;height:6px;border-radius:4px;background:#252e37;overflow:hidden;
+}
+.opsPctFill{height:100%;border-radius:4px;background:#58a6ff}
+.opsPctFill.warn{background:#d29922}
+.opsPctFill.hot{background:#f85149}
+.opsZoneGrid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(150px,1fr));
+  gap:8px;
+  padding:10px;
+}
+.opsZoneCard{
+  border:1px solid #29333e;
+  background:#121921;
+  border-radius:7px;
+  padding:10px;
+}
+.opsZoneCard .ztitle{font-size:11px;font-weight:900;color:#e3e9ef}
+.opsZoneCard .zval{font-size:20px;font-weight:800;margin-top:6px}
+.opsZoneCard .zmeta{font-size:9px;color:#84909d;margin-top:4px}
+.opsAlerts{padding:8px 10px 11px}
+.opsAlertRow{
+  display:grid;
+  grid-template-columns:90px 1fr 80px 80px;
+  gap:8px;
+  align-items:center;
+  padding:8px 6px;
+  border-bottom:1px solid #222b35;
+  font-size:10px;
+}
+.opsAlertRow:last-child{border-bottom:0}
+.opsAlertRow b{color:#edf2f7}
+.opsAlertRow span{color:#8d99a6}
+.opsAlertTag{
+  justify-self:end;
+  padding:3px 6px;
+  border-radius:10px;
+  font-size:8px;
+  font-weight:900;
+}
+.opsAlertTag.red{background:#542a30;color:#ffadb5}
+.opsAlertTag.amber{background:#56431f;color:#ffd987}
+@media(max-width:1100px){
+  .opsKpiGrid{grid-template-columns:repeat(3,1fr)}
+  .opsZoneGrid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:650px){
+  .opsKpiGrid{grid-template-columns:repeat(2,1fr)}
+  .opsKpiCard{padding:9px;min-height:66px}
+  .opsKpiCard b{font-size:21px}
+  .opsZoneGrid{grid-template-columns:1fr}
+  .opsAlertRow{grid-template-columns:72px 1fr 60px}
+  .opsAlertRow .hideMobile{display:none}
+}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -659,6 +803,7 @@ html,body{max-width:100%;overflow-x:hidden}
     <button class="btn active" id="rackModeBtn">Vista racks</button>
     <button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
     <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
+    <button class="btn" id="kpiModeBtn">📊 KPIs</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -726,6 +871,49 @@ html,body{max-width:100%;overflow-x:hidden}
     <div class="layoutHeatViewport">
       <div class="layoutHeatSectionLabel">SECO MFC ACTUAL · OCUPACIÓN</div>
       <div id="occupancyMap" class="layoutHeatGrid"></div>
+    </div>
+  </div>
+
+  <div id="kpiView" style="display:none">
+    <div class="layoutHeatTitle">Panel de KPIs</div>
+    <div class="layoutHeatSubtitle">Indicadores de ocupación, calidad de almacenamiento y capacidad por grupo logístico.</div>
+
+    <div class="opsKpiGrid">
+      <div class="opsKpiCard"><small>OCUPACIÓN TOTAL</small><b id="kpiOccPct">0%</b><span id="kpiOccDetail">0 / 0 posiciones</span></div>
+      <div class="opsKpiCard"><small>POSICIONES VACÍAS</small><b id="kpiEmpty">0</b><span>capacidad disponible</span></div>
+      <div class="opsKpiCard"><small>MEZCLA DE SKU</small><b id="kpiMixed">0</b><span id="kpiMixedPct">0% de ocupadas</span></div>
+      <div class="opsKpiCard"><small>MAL UBICADAS</small><b id="kpiBad">0</b><span id="kpiBadPct">0% de ocupadas</span></div>
+      <div class="opsKpiCard"><small>MÓDULOS ≥ 90%</small><b id="kpiSaturated">0</b><span>riesgo de saturación</span></div>
+      <div class="opsKpiCard"><small>GRUPOS ACTIVOS</small><b id="kpiGroups">0</b><span>según layout</span></div>
+    </div>
+
+    <div class="opsSection">
+      <div class="opsSectionHead">
+        <div><b>Ocupación por grupo logístico</b><span>Capacidad física vs. posiciones ocupadas</span></div>
+        <button class="btn" id="sortGroupBtn" type="button">Ordenar por ocupación</button>
+      </div>
+      <div class="opsGroupTableWrap">
+        <table class="opsGroupTable">
+          <thead><tr>
+            <th>Grupo</th><th>Ocupadas</th><th>Capacidad</th><th>Vacías</th><th>Ocupación</th><th>Mezclas</th><th>Incorrectas</th>
+          </tr></thead>
+          <tbody id="kpiGroupBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="opsSection">
+      <div class="opsSectionHead">
+        <div><b>Ocupación por zona</b><span>Resumen operativo por sector</span></div>
+      </div>
+      <div id="kpiZoneGrid" class="opsZoneGrid"></div>
+    </div>
+
+    <div class="opsSection">
+      <div class="opsSectionHead">
+        <div><b>Alertas prioritarias</b><span>Módulos con mayor presión de ocupación o desvíos</span></div>
+      </div>
+      <div id="kpiAlerts" class="opsAlerts"></div>
     </div>
   </div>
 </main>
@@ -1060,7 +1248,7 @@ $('fileInput').onchange=async e=>{
    const n=rows.map(normalizeRow).filter(x=>x&&Object.values(VIEWS).some(v=>v.zona===x.zona));
    if(!n.length)throw new Error('No encontré stock de MFCA/MFCB/MFCC/AR/BR.');
    DATA=rows;$('sourceText').textContent='Stock: '+f.name+' · VL + Layout Julio integrados';
-   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();
+   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();
  }catch(err){alert(err.message||String(err))}
 };
 
@@ -1071,11 +1259,14 @@ function setDisplayMode(mode){
   $('rackView').style.display=mode==='rack'?'block':'none';
   $('heatmapView').style.display=mode==='heat'?'block':'none';
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
+  $('kpiView').style.display=mode==='kpi'?'block':'none';
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
   $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
+  $('kpiModeBtn').classList.toggle('active',mode==='kpi');
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
+  if(mode==='kpi') buildKpiPanel();
 }
 
 
@@ -1291,9 +1482,167 @@ function showOccupancyDetail(moduleKey,displayLabel,data){
   $('detail').innerHTML=h;
 }
 
+
+let kpiGroupSort='occupancy';
+
+function validLayoutModules(){
+  return LAYOUT_CELLS.filter(cell=>{
+    if(/^[AB]\d+$/i.test(cell.label)){
+      const n=parseInt(String(cell.label).replace(/\D/g,''),10);
+      if(Number.isFinite(n) && n%2!==0)return false;
+    }
+    return true;
+  });
+}
+
+function moduleCapacity(label){
+  return /^(MFCA|MFCB|MFCC)/i.test(label)?12:8;
+}
+
+function moduleZone(label){
+  let m=String(label).match(/^(MFCA|MFCB|MFCC)(\d+)$/i);
+  if(m){
+    const n=Number(m[2]);
+    return m[1].toUpperCase()+(n%2===1?'L':'R');
+  }
+  if(/^A\d+$/i.test(label))return 'AR';
+  if(/^B\d+$/i.test(label))return 'BR';
+  return 'OTROS';
+}
+
+function moduleStockStats(){
+  const rows=allNormalizedRows();
+  const slotMap={};
+
+  rows.forEach(x=>{
+    if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
+      if(x.sub!=='01'||x.pos<1||x.pos>12)return;
+    }else if(x.prefix==='A'||x.prefix==='B'){
+      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0)return;
+    }else return;
+
+    const module=moduleKeyFromRow(x);
+    const key=module+'|'+x.sub+'|'+x.pos;
+    (slotMap[key]??=[]).push(x);
+  });
+
+  const mods={};
+  validLayoutModules().forEach(cell=>{
+    mods[cell.label]={
+      module:cell.label,
+      group:LOCATION_GROUP[cell.label]||'SIN GRUPO',
+      zone:moduleZone(cell.label),
+      capacity:moduleCapacity(cell.label),
+      occupied:0,mixed:0,bad:0,unknown:0
+    };
+  });
+
+  Object.entries(slotMap).forEach(([key,items])=>{
+    const module=key.split('|')[0];
+    if(!mods[module])return;
+    if(items.some(x=>Number(x.saldo||0)!==0))mods[module].occupied++;
+    const st=status(items,module);
+    if(st==='multi')mods[module].mixed++;
+    else if(st==='bad')mods[module].bad++;
+    else if(st==='unknown')mods[module].unknown++;
+  });
+  return mods;
+}
+
+function pctClass(p){
+  return p>=90?'hot':(p>=75?'warn':'');
+}
+
+function buildKpiPanel(){
+  const mods=moduleStockStats();
+  const arr=Object.values(mods);
+
+  const totalCapacity=arr.reduce((a,m)=>a+m.capacity,0);
+  const totalOccupied=arr.reduce((a,m)=>a+m.occupied,0);
+  const totalMixed=arr.reduce((a,m)=>a+m.mixed,0);
+  const totalBad=arr.reduce((a,m)=>a+m.bad,0);
+  const totalEmpty=Math.max(0,totalCapacity-totalOccupied);
+  const occPct=totalCapacity?totalOccupied/totalCapacity*100:0;
+  const saturated=arr.filter(m=>m.capacity && m.occupied/m.capacity>=.9).length;
+
+  $('kpiOccPct').textContent=Math.round(occPct)+'%';
+  $('kpiOccDetail').textContent=totalOccupied.toLocaleString('es-AR')+' / '+totalCapacity.toLocaleString('es-AR')+' posiciones';
+  $('kpiEmpty').textContent=totalEmpty.toLocaleString('es-AR');
+  $('kpiMixed').textContent=totalMixed.toLocaleString('es-AR');
+  $('kpiMixedPct').textContent=(totalOccupied?((totalMixed/totalOccupied)*100).toFixed(1):'0.0')+'% de ocupadas';
+  $('kpiBad').textContent=totalBad.toLocaleString('es-AR');
+  $('kpiBadPct').textContent=(totalOccupied?((totalBad/totalOccupied)*100).toFixed(1):'0.0')+'% de ocupadas';
+  $('kpiSaturated').textContent=saturated.toLocaleString('es-AR');
+
+  const groups={};
+  arr.forEach(m=>{
+    const g=m.group||'SIN GRUPO';
+    groups[g]??={group:g,capacity:0,occupied:0,mixed:0,bad:0,modules:0};
+    groups[g].capacity+=m.capacity;
+    groups[g].occupied+=m.occupied;
+    groups[g].mixed+=m.mixed;
+    groups[g].bad+=m.bad;
+    groups[g].modules++;
+  });
+  let grows=Object.values(groups).map(g=>({...g,pct:g.capacity?g.occupied/g.capacity*100:0,empty:Math.max(0,g.capacity-g.occupied)}));
+  $('kpiGroups').textContent=grows.filter(g=>g.group!=='SIN GRUPO').length;
+
+  if(kpiGroupSort==='occupancy')grows.sort((a,b)=>b.pct-a.pct||b.occupied-a.occupied);
+  else grows.sort((a,b)=>a.group.localeCompare(b.group));
+
+  $('kpiGroupBody').innerHTML=grows.map(g=>
+    '<tr>'+
+    '<td><b>'+esc(g.group)+'</b><div style="font-size:8px;color:#6f7b88;margin-top:2px">'+g.modules+' módulos</div></td>'+
+    '<td>'+g.occupied.toLocaleString('es-AR')+'</td>'+
+    '<td>'+g.capacity.toLocaleString('es-AR')+'</td>'+
+    '<td>'+g.empty.toLocaleString('es-AR')+'</td>'+
+    '<td><div class="opsPctBar"><div class="opsPctTrack"><div class="opsPctFill '+pctClass(g.pct)+'" style="width:'+Math.min(100,g.pct)+'%"></div></div><b>'+Math.round(g.pct)+'%</b></div></td>'+
+    '<td>'+g.mixed.toLocaleString('es-AR')+'</td>'+
+    '<td>'+g.bad.toLocaleString('es-AR')+'</td>'+
+    '</tr>'
+  ).join('');
+
+  const zones={};
+  arr.forEach(m=>{
+    zones[m.zone]??={zone:m.zone,capacity:0,occupied:0,mixed:0,bad:0};
+    zones[m.zone].capacity+=m.capacity;
+    zones[m.zone].occupied+=m.occupied;
+    zones[m.zone].mixed+=m.mixed;
+    zones[m.zone].bad+=m.bad;
+  });
+
+  const zoneOrder=['MFCAL','MFCAR','MFCBL','MFCBR','MFCCL','MFCCR','AR','BR'];
+  $('kpiZoneGrid').innerHTML=zoneOrder.filter(z=>zones[z]).map(z=>{
+    const x=zones[z],p=x.capacity?x.occupied/x.capacity*100:0;
+    return '<div class="opsZoneCard">'+
+      '<div class="ztitle">'+esc(z)+'</div>'+
+      '<div class="zval">'+Math.round(p)+'%</div>'+
+      '<div class="opsPctTrack" style="width:100%;margin-top:7px"><div class="opsPctFill '+pctClass(p)+'" style="width:'+Math.min(100,p)+'%"></div></div>'+
+      '<div class="zmeta">'+x.occupied+' / '+x.capacity+' · '+(x.capacity-x.occupied)+' vacías · '+x.mixed+' mezclas · '+x.bad+' incorrectas</div>'+
+    '</div>';
+  }).join('');
+
+  const alerts=arr.map(m=>({...m,pct:m.capacity?m.occupied/m.capacity*100:0,score:(m.capacity?m.occupied/m.capacity*100:0)+(m.mixed*12)+(m.bad*10)}))
+    .filter(m=>m.pct>=80||m.mixed>0||m.bad>0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,12);
+
+  $('kpiAlerts').innerHTML=alerts.length?alerts.map(m=>
+    '<div class="opsAlertRow">'+
+      '<b>'+esc(m.module)+'</b>'+
+      '<span>'+esc(m.group)+' · '+esc(m.zone)+'</span>'+
+      '<span>'+Math.round(m.pct)+'% occ.</span>'+
+      '<span class="hideMobile">'+m.mixed+' mix / '+m.bad+' bad</span>'+
+      '<span class="opsAlertTag '+(m.mixed||m.bad?'red':'amber')+'">'+(m.mixed||m.bad?'REVISAR':'SATURADO')+'</span>'+
+    '</div>'
+  ).join(''):'<div class="notice">Sin alertas prioritarias.</div>';
+}
+
 $('rackModeBtn').onclick=()=>setDisplayMode('rack');
 $('heatModeBtn').onclick=()=>setDisplayMode('heat');
 $('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
+$('kpiModeBtn').onclick=()=>setDisplayMode('kpi');
+$('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'occupancy';$('sortGroupBtn').textContent=kpiGroupSort==='occupancy'?'Ordenar por ocupación':'Ordenar por nombre';buildKpiPanel();};
 
 
 async function loadPublishedStock(){
@@ -1307,7 +1656,7 @@ async function loadPublishedStock(){
     const whenTxt=when && !isNaN(when) ? when.toLocaleString('es-AR') : (payload.updated_at||'');
     $('sourceText').textContent='Stock publicado: '+(whenTxt||'sin fecha')+' · '+(payload.source_file||'stock.json')+' · VL + Layout integrados';
     rebuild();
-    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();
+    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();
   }catch(err){
     $('sourceText').textContent='No se pudo cargar stock.json · Podés usar “Cargar stock XLSX” como respaldo';
     console.error(err);
