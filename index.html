@@ -1006,7 +1006,7 @@ function setKPIs(rows,cells){
 function rebuild(){
  const cfg=VIEWS[view],rows=currentRows(),root=$('racks');root.innerHTML='';
  $('viewTitle').textContent=cfg.label;
- const mods=[...new Set(rows.map(x=>x.modulo))].sort((a,b)=>a-b);
+ const mods=[...new Set(rows.map(x=>x.modulo))].sort((a,b)=>cfg.zona.endsWith('L') ? b-a : a-b);
  const allCells=[];
  if(cfg.kind==='mfc'){
    const use=rows.filter(x=>x.pos>=1&&x.pos<=12&&x.sub==='01');
