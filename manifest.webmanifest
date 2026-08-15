@@ -1,12 +1,11 @@
 {
-  "name": "Dashboard MFCA",
-  "short_name": "MFCA",
+  "name": "UBICACIONES · Dashboard de Depósito",
+  "short_name": "UBICACIONES",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",
-  "description": "Dashboard visual de racks MFCA para PC, teléfono y PDA.",
   "icons": [
     {
       "src": "icon-192.png",
