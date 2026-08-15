@@ -591,6 +591,51 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+/* v25 · Mapa de calor de ocupación */
+.occCell{
+  position:relative;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:4px;
+  font-family:Arial,sans-serif;
+  font-size:9px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  cursor:pointer;
+  overflow:hidden;
+  white-space:nowrap;
+  touch-action:manipulation;
+  transition:transform .08s ease, box-shadow .08s ease;
+}
+.occCell.o0{background:#29313b;color:#aab4c0}
+.occCell.o1{background:#315f4b;color:#eaf6ef}
+.occCell.o2{background:#66844a;color:#f4f8e9}
+.occCell.o3{background:#a3873e;color:#fff8e7}
+.occCell.o4{background:#b34b3e;color:#fff}
+.occCell:hover,.occCell.selected{outline:2px solid #62d8ff;outline-offset:1px;z-index:6;transform:translateY(-1px) scale(1.02)}
+.occPct{
+  position:absolute;
+  right:2px;
+  top:2px;
+  min-width:25px;
+  height:14px;
+  padding:0 3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:7px;
+  font-weight:900;
+  background:rgba(0,0,0,.68);
+  color:#fff;
+  border-radius:8px;
+  line-height:1;
+}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -612,7 +657,8 @@ html,body{max-width:100%;overflow-x:hidden}
 <main class="main">
   <div class="modebar">
     <button class="btn active" id="rackModeBtn">Vista racks</button>
-    <button class="btn" id="heatModeBtn">🔥 Mapa de calor · vista superior</button>
+    <button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
+    <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -654,6 +700,32 @@ html,body{max-width:100%;overflow-x:hidden}
     <div class="layoutHeatViewport">
       <div class="layoutHeatSectionLabel">SECO MFC ACTUAL</div>
       <div id="heatmap" class="layoutHeatGrid"></div>
+    </div>
+  </div>
+
+  <div id="occupancyView" style="display:none">
+    <div class="layoutHeatTitle">Mapa de calor · ocupación</div>
+    <div class="layoutHeatSubtitle">Vista superior del mismo Layout Secos MFC. El color muestra qué porcentaje de posiciones físicas del módulo están ocupadas.</div>
+
+    <div class="layoutHeatToolbar">
+      <div class="layoutHeatLegend">
+        <span><i style="background:#29313b"></i> 0%</span>
+        <span><i style="background:#315f4b"></i> Baja</span>
+        <span><i style="background:#66844a"></i> Media</span>
+        <span><i style="background:#a3873e"></i> Alta</span>
+        <span><i style="background:#b34b3e"></i> Saturada</span>
+      </div>
+      <div class="layoutHeatStats">
+        <div class="layoutHeatStat"><b id="occModules">0</b><small>módulos</small></div>
+        <div class="layoutHeatStat"><b id="occAvg">0%</b><small>ocupación media</small></div>
+        <div class="layoutHeatStat"><b id="occFull">0</b><small>≥ 90%</small></div>
+      </div>
+    </div>
+
+    <div class="layoutHeatHint">Cada bloque representa un módulo. El porcentaje indica posiciones ocupadas / posiciones físicas disponibles.</div>
+    <div class="layoutHeatViewport">
+      <div class="layoutHeatSectionLabel">SECO MFC ACTUAL · OCUPACIÓN</div>
+      <div id="occupancyMap" class="layoutHeatGrid"></div>
     </div>
   </div>
 </main>
@@ -988,7 +1060,7 @@ $('fileInput').onchange=async e=>{
    const n=rows.map(normalizeRow).filter(x=>x&&Object.values(VIEWS).some(v=>v.zona===x.zona));
    if(!n.length)throw new Error('No encontré stock de MFCA/MFCB/MFCC/AR/BR.');
    DATA=rows;$('sourceText').textContent='Stock: '+f.name+' · VL + Layout Julio integrados';
-   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();
+   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();
  }catch(err){alert(err.message||String(err))}
 };
 
@@ -998,9 +1070,12 @@ function setDisplayMode(mode){
   displayMode=mode;
   $('rackView').style.display=mode==='rack'?'block':'none';
   $('heatmapView').style.display=mode==='heat'?'block':'none';
+  $('occupancyView').style.display=mode==='occupancy'?'block':'none';
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
+  $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
   if(mode==='heat') buildHeatmap();
+  if(mode==='occupancy') buildOccupancyMap();
 }
 
 
@@ -1112,8 +1187,113 @@ function showLayoutHeatDetail(moduleKey,displayLabel,mixes){
   $('detail').innerHTML=h;
 }
 
+
+function occupancyByModule(){
+  const rows=allNormalizedRows();
+  const occupiedSlots={};
+
+  rows.forEach(x=>{
+    if(Number(x.saldo||0)===0) return;
+
+    if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
+      if(x.sub!=='01'||x.pos<1||x.pos>12) return;
+    } else if(x.prefix==='A'){
+      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0) return;
+    } else if(x.prefix==='B'){
+      if(x.sub!=='01'||x.pos<1||x.pos>8) return;
+    } else return;
+
+    const mod=moduleKeyFromRow(x);
+    (occupiedSlots[mod]??=new Set()).add(x.sub+'|'+x.pos);
+  });
+
+  const result={};
+  Object.entries(occupiedSlots).forEach(([mod,set])=>{
+    const cap=/^(MFCA|MFCB|MFCC)/.test(mod)?12:8;
+    result[mod]={occupied:set.size,capacity:cap,pct:(set.size/cap)*100};
+  });
+  return result;
+}
+
+function occClass(pct){
+  if(pct<=0) return 'o0';
+  if(pct<40) return 'o1';
+  if(pct<70) return 'o2';
+  if(pct<90) return 'o3';
+  return 'o4';
+}
+
+function buildOccupancyMap(){
+  const root=$('occupancyMap');
+  root.innerHTML='';
+  root.style.gridTemplateColumns='repeat(10,56px)';
+  root.style.gridTemplateRows='repeat(69,20px)';
+
+  const occ=occupancyByModule();
+  let totalPct=0, counted=0, full=0;
+
+  LAYOUT_CELLS.forEach(cell=>{
+    // Calle A: mostrar solo módulos pares.
+    if(/^A\d+$/i.test(cell.label)){
+      const nmod=parseInt(String(cell.label).replace(/\D/g,''),10);
+      if(Number.isFinite(nmod) && nmod%2!==0) return;
+    }
+
+    const cap=/^(MFCA|MFCB|MFCC)/i.test(cell.label)?12:8;
+    const data=occ[cell.label]||{occupied:0,capacity:cap,pct:0};
+    totalPct+=data.pct;
+    counted++;
+    if(data.pct>=90) full++;
+
+    const d=document.createElement('div');
+    d.className='occCell '+occClass(data.pct);
+    d.style.gridRow=cell.r;
+    d.style.gridColumn=cell.c;
+    d.innerHTML='<span>'+esc(cell.raw)+'</span><span class="occPct">'+Math.round(data.pct)+'%</span>';
+    d.title=cell.raw+' · '+data.occupied+'/'+data.capacity+' posiciones ocupadas · '+Math.round(data.pct)+'%';
+
+    d.onclick=()=>{
+      document.querySelectorAll('.occCell').forEach(x=>x.classList.remove('selected'));
+      d.classList.add('selected');
+      showOccupancyDetail(cell.label,cell.raw,data);
+    };
+    root.appendChild(d);
+  });
+
+  $('occModules').textContent=counted;
+  $('occAvg').textContent=(counted?Math.round(totalPct/counted):0)+'%';
+  $('occFull').textContent=full;
+}
+
+function showOccupancyDetail(moduleKey,displayLabel,data){
+  const rows=allNormalizedRows().filter(x=>moduleKeyFromRow(x)===moduleKey);
+  const maxPos=/^(MFCA|MFCB|MFCC)/.test(moduleKey)?12:8;
+  const occupied=new Set(
+    rows.filter(x=>Number(x.saldo||0)!==0 && x.sub==='01' && x.pos>=1 && x.pos<=maxPos)
+        .map(x=>x.pos)
+  );
+  const empties=[];
+  for(let pos=1;pos<=maxPos;pos++){
+    if(!occupied.has(pos)) empties.push(pos);
+  }
+
+  let h='<div class="detailCard"><div class="loc">'+esc(displayLabel)+'</div>';
+  h+='<div class="muted">Mapa superior · ocupación física</div>';
+  h+='<div class="groups"><div class="gbox"><small>Ocupación</small><b>'+Math.round(data.pct)+'%</b></div>';
+  h+='<div class="gbox"><small>Posiciones</small><b>'+data.occupied+' / '+data.capacity+'</b></div></div>';
+  h+='<div class="item"><b>Vacías: '+empties.length+'</b>';
+  if(empties.length){
+    h+='<div class="muted">'+empties.map(p=>String(p).padStart(2,'0')).join(' · ')+'</div>';
+  }else{
+    h+='<div class="muted">Sin posiciones vacías.</div>';
+  }
+  h+='</div></div>';
+  $('detail').innerHTML=h;
+}
+
 $('rackModeBtn').onclick=()=>setDisplayMode('rack');
 $('heatModeBtn').onclick=()=>setDisplayMode('heat');
+$('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
 
 
 async function loadPublishedStock(){
@@ -1127,7 +1307,7 @@ async function loadPublishedStock(){
     const whenTxt=when && !isNaN(when) ? when.toLocaleString('es-AR') : (payload.updated_at||'');
     $('sourceText').textContent='Stock publicado: '+(whenTxt||'sin fecha')+' · '+(payload.source_file||'stock.json')+' · VL + Layout integrados';
     rebuild();
-    if(displayMode==='heat')buildHeatmap();
+    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();
   }catch(err){
     $('sourceText').textContent='No se pudo cargar stock.json · Podés usar “Cargar stock XLSX” como respaldo';
     console.error(err);
