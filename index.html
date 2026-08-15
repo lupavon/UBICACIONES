@@ -990,8 +990,8 @@ function currentRows(){
  return DATA.map(normalizeRow).filter(Boolean).filter(x=>{
    const zoneOk=String(x.zona).toUpperCase()===String(cfg.zona).toUpperCase();
    const prefixOk=x.prefix===cfg.prefix;
-   const evenAB=(cfg.zona==='AR' || cfg.zona==='BR') ? (Number(x.modulo)%2===0) : true;
-   return zoneOk && prefixOk && evenAB;
+   const validRange=(cfg.zona==='AR' || cfg.zona==='BR') ? validABModule(cfg.prefix,Number(x.modulo)) : true;
+   return zoneOk && prefixOk && validRange;
  });
 }
 function applyVisual(s,text,st){
@@ -1095,8 +1095,8 @@ function allPhysicalSlots(){
     const mods=[...new Set(rows.filter(x=>{
       const zoneOk=cfg.zones.includes(String(x.zona).toUpperCase());
       const prefixOk=x.prefix===cfg.prefix;
-      const evenAB=(cfg.prefix==='A' || cfg.prefix==='B') ? (Number(x.modulo)%2===0) : true;
-      return prefixOk && zoneOk && evenAB;
+      const validRange=(cfg.prefix==='A' || cfg.prefix==='B') ? validABModule(cfg.prefix,Number(x.modulo)) : true;
+      return prefixOk && zoneOk && validRange;
     }).map(x=>x.modulo))].sort((a,b)=>a-b);
     mods.forEach(mod=>{
       for(let pos=1;pos<=cfg.maxPos;pos++){
@@ -1290,7 +1290,7 @@ function mixedSlotsByModule(){
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
       if(x.sub!=='01'||x.pos<1||x.pos>12)return;
     }else if(x.prefix==='A'||x.prefix==='B'){
-      if(x.sub!=='01'||x.pos<1||x.pos>8)return;
+      if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
     const key=moduleKeyFromRow(x)+'|'+x.sub+'|'+x.pos;
     (slots[key]??=[]).push(x);
@@ -1336,8 +1336,9 @@ function buildHeatmap(){
 
   LAYOUT_CELLS.forEach(cell=>{
     if(/^[AB]\d+$/i.test(cell.label)){
+      const prefix=String(cell.label).charAt(0).toUpperCase();
       const nmod=parseInt(String(cell.label).replace(/\D/g,''),10);
-      if(Number.isFinite(nmod) && nmod%2!==0) return;
+      if(Number.isFinite(nmod) && !validABModule(prefix,nmod)) return;
     }
     const arr=mixes[cell.label]||[];
     const n=arr.length;
@@ -1389,9 +1390,9 @@ function occupancyByModule(){
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
       if(x.sub!=='01'||x.pos<1||x.pos>12) return;
     } else if(x.prefix==='A'){
-      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0) return;
+      if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule('A',x.modulo)) return;
     } else if(x.prefix==='B'){
-      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0) return;
+      if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule('B',x.modulo)) return;
     } else return;
 
     const mod=moduleKeyFromRow(x);
@@ -1424,10 +1425,11 @@ function buildOccupancyMap(){
   let totalPct=0, counted=0, full=0;
 
   LAYOUT_CELLS.forEach(cell=>{
-    // Calle A: mostrar solo módulos pares.
+    // Calle A: A40–A64 pares. Calle B: B08–B38 pares.
     if(/^[AB]\d+$/i.test(cell.label)){
+      const prefix=String(cell.label).charAt(0).toUpperCase();
       const nmod=parseInt(String(cell.label).replace(/\D/g,''),10);
-      if(Number.isFinite(nmod) && nmod%2!==0) return;
+      if(Number.isFinite(nmod) && !validABModule(prefix,nmod)) return;
     }
 
     const cap=/^(MFCA|MFCB|MFCC)/i.test(cell.label)?12:8;
@@ -1488,11 +1490,20 @@ let kpiGroupSort='occupancy';
 function validLayoutModules(){
   return LAYOUT_CELLS.filter(cell=>{
     if(/^[AB]\d+$/i.test(cell.label)){
+      const prefix=String(cell.label).charAt(0).toUpperCase();
       const n=parseInt(String(cell.label).replace(/\D/g,''),10);
-      if(Number.isFinite(n) && n%2!==0)return false;
+      if(Number.isFinite(n) && !validABModule(prefix,n))return false;
     }
     return true;
   });
+}
+
+
+function validABModule(prefix,mod){
+  mod=Number(mod);
+  if(prefix==='A') return mod>=40 && mod<=64 && mod%2===0;
+  if(prefix==='B') return mod>=8 && mod<=38 && mod%2===0;
+  return true;
 }
 
 function moduleCapacity(label){
@@ -1518,7 +1529,7 @@ function moduleStockStats(){
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
       if(x.sub!=='01'||x.pos<1||x.pos>12)return;
     }else if(x.prefix==='A'||x.prefix==='B'){
-      if(x.sub!=='01'||x.pos<1||x.pos>8||Number(x.modulo)%2!==0)return;
+      if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
 
     const module=moduleKeyFromRow(x);
