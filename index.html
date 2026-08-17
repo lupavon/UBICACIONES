@@ -2373,6 +2373,9 @@ $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'o
 let stockLoadInFlight=false;
 let lastGoodStockAt=0;
 
+let stockLoadInFlight=false;
+let lastGoodStockAt=0;
+
 async function loadPublishedStock(){
   if(stockLoadInFlight) return;
   stockLoadInFlight=true;
@@ -2384,36 +2387,17 @@ async function loadPublishedStock(){
   const timeout=setTimeout(()=>controller.abort(),20000);
 
   try{
-    const headers={
-      'Accept':'application/vnd.github+json',
-      'X-GitHub-Api-Version':'2022-11-28'
-    };
+    // Lectura pública directa de la rama stock.
+    // IMPORTANTE: request simple, sin headers personalizados, para evitar preflight/CORS.
+    const url='https://raw.githubusercontent.com/lupavon/UBICACIONES/stock/stock.json?v='+Date.now();
+    const res=await fetch(url,{
+      cache:'no-store',
+      signal:controller.signal
+    });
 
-    const metaRes=await fetch(
-      'https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now(),
-      {cache:'no-store',headers,signal:controller.signal}
-    );
-    if(!metaRes.ok) throw new Error('GitHub metadata '+metaRes.status);
+    if(!res.ok) throw new Error('stock.json '+res.status);
 
-    const meta=await metaRes.json();
-    if(!meta?.sha) throw new Error('GitHub no devolvió SHA de stock.json');
-
-    const blobRes=await fetch(
-      'https://api.github.com/repos/lupavon/UBICACIONES/git/blobs/'+encodeURIComponent(meta.sha)+'?_='+Date.now(),
-      {cache:'no-store',headers,signal:controller.signal}
-    );
-    if(!blobRes.ok) throw new Error('GitHub blob '+blobRes.status);
-
-    const blob=await blobRes.json();
-    if(blob?.encoding!=='base64' || !blob?.content) throw new Error('GitHub no devolvió stock.json en base64');
-
-    const clean=blob.content.replace(/\s/g,'');
-    const bin=atob(clean);
-    const bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-    const text=new TextDecoder('utf-8').decode(bytes);
-    const payload=JSON.parse(text);
-
+    const payload=await res.json();
     const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
     if(!rows.length) throw new Error('stock.json no contiene filas');
 
