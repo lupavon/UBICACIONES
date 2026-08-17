@@ -8,7 +8,7 @@
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock(); },300000);
+  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },300000);
 }
 const refreshBtn=document.getElementById('refreshStockBtn');
 if(refreshBtn){
@@ -1085,7 +1085,7 @@ html,body{max-width:100%;overflow-x:hidden}
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Cargando stock publicado… · VL + Layout Julio integrados</small></div>
+  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Preparando stock… · VL + Layout Julio integrados</small></div>
   <div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
   <div class="controls">
     <button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
@@ -2371,20 +2371,72 @@ $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'o
 
 let stockLoadInFlight=false;
 let lastGoodStockAt=0;
+const STOCK_CACHE_KEY='ubicaciones_stock_cache_v1';
+const STOCK_CACHE_META_KEY='ubicaciones_stock_cache_meta_v1';
 
-async function loadPublishedStock(){
+function applyStockPayload(payload,{fromCache=false}={}){
+  const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+  if(!rows.length) throw new Error('stock.json no contiene filas');
+
+  DATA=rows;
+
+  const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+  const stamp=updatedAt ? new Date(updatedAt) : null;
+  const validStamp=stamp && !isNaN(stamp);
+
+  const status=$('loadStatus');
+  if(status){
+    if(fromCache){
+      status.textContent='Stock disponible'+(validStamp?' · '+stamp.toLocaleString('es-AR'):'')+' · verificando…';
+    }else{
+      status.textContent='Stock actualizado'+(validStamp?' · '+stamp.toLocaleString('es-AR'):'')+' ✓';
+    }
+  }
+
+  rebuild();
+  if(displayMode==='heat')buildHeatmap();
+  if(displayMode==='occupancy')buildOccupancyMap();
+  if(displayMode==='kpi')buildKpiPanel();
+  if(displayMode==='sanitation')buildSanitationPanel();
+
+  return updatedAt;
+}
+
+function loadCachedStock(){
+  try{
+    const raw=localStorage.getItem(STOCK_CACHE_KEY);
+    if(!raw) return false;
+    const payload=JSON.parse(raw);
+    applyStockPayload(payload,{fromCache:true});
+    lastGoodStockAt=Date.now();
+    return true;
+  }catch(err){
+    console.warn('No pude leer cache de stock',err);
+    return false;
+  }
+}
+
+function saveStockCache(payload){
+  try{
+    localStorage.setItem(STOCK_CACHE_KEY,JSON.stringify(payload));
+    const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+    localStorage.setItem(STOCK_CACHE_META_KEY,updatedAt||String(Date.now()));
+  }catch(err){
+    console.warn('No pude guardar cache de stock',err);
+  }
+}
+
+async function loadPublishedStock({silent=false}={}){
   if(stockLoadInFlight) return;
   stockLoadInFlight=true;
 
   const status=$('loadStatus');
-  if(status && !DATA.length) status.textContent='Cargando stock publicado…';
+  if(status && !DATA.length && !silent) status.textContent='Cargando stock…';
 
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),20000);
 
   try{
-    // Lectura pública directa de la rama stock.
-    // IMPORTANTE: request simple, sin headers personalizados, para evitar preflight/CORS.
     const url='https://raw.githubusercontent.com/lupavon/UBICACIONES/stock/stock.json?v='+Date.now();
     const res=await fetch(url,{
       cache:'no-store',
@@ -2394,29 +2446,28 @@ async function loadPublishedStock(){
     if(!res.ok) throw new Error('stock.json '+res.status);
 
     const payload=await res.json();
-    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-    if(!rows.length) throw new Error('stock.json no contiene filas');
-
-    DATA=rows;
-    lastGoodStockAt=Date.now();
-
     const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
-    if(status){
-      const when=updatedAt ? new Date(updatedAt) : null;
-      status.textContent='Stock cargado'+(when&&!isNaN(when)?' · '+when.toLocaleString('es-AR'):'');
+    const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
+
+    // Si es la misma versión y ya tenemos datos renderizados, no redibujar todo.
+    if(DATA.length && updatedAt && cachedMeta===updatedAt){
+      if(status){
+        const stamp=new Date(updatedAt);
+        status.textContent='Stock actualizado'+(!isNaN(stamp)?' · '+stamp.toLocaleString('es-AR'):'')+' ✓';
+      }
+      lastGoodStockAt=Date.now();
+      return;
     }
 
-    rebuild();
-    if(displayMode==='heat')buildHeatmap();
-    if(displayMode==='occupancy')buildOccupancyMap();
-    if(displayMode==='kpi')buildKpiPanel();
-    if(displayMode==='sanitation')buildSanitationPanel();
+    applyStockPayload(payload,{fromCache:false});
+    saveStockCache(payload);
+    lastGoodStockAt=Date.now();
+
   }catch(err){
     console.error('loadPublishedStock',err);
     if(status){
       if(DATA.length){
-        const mins=Math.max(0,Math.floor((Date.now()-lastGoodStockAt)/60000));
-        status.textContent='Usando último stock válido'+(mins?' · hace '+mins+' min':'');
+        status.textContent='Mostrando último stock válido · actualización pendiente';
       }else{
         status.textContent='No se pudo cargar stock.json · '+(err?.message||err);
       }
@@ -2433,10 +2484,20 @@ rebuild();
 
 
 
-window.addEventListener('DOMContentLoaded',()=>{
-  loadPublishedStock();
+
+
+
+function initDashboardStock(){
+  const hadCache=loadCachedStock();
+  loadPublishedStock({silent:hadCache});
   startAutoStockRefresh();
-});
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',initDashboardStock,{once:true});
+}else{
+  initDashboardStock();
+}
 
 </script>
 
