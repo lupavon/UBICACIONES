@@ -2347,7 +2347,13 @@ $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'o
 
 async function loadPublishedStock(){
   try{
-    const res=await fetch('https://raw.githubusercontent.com/lupavon/UBICACIONES/stock/stock.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    const res=await fetch('https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now(),{
+    cache:'no-store',
+    headers:{
+      'Accept':'application/vnd.github.raw+json',
+      'X-GitHub-Api-Version':'2022-11-28'
+    }
+  });
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json();
     if(!payload || !Array.isArray(payload.rows))throw new Error('Formato inválido');
@@ -2371,7 +2377,7 @@ function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer=setInterval(()=>{
     loadPublishedStock();
-  },30000);
+  },300000);
 }
 const refreshBtn=document.getElementById('refreshStockBtn');
 if(refreshBtn){
