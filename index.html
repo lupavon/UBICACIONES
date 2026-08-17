@@ -2347,7 +2347,7 @@ $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'o
 
 async function loadPublishedStock(){
   try{
-    const res=await fetch('./stock.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    const res=await fetch('https://raw.githubusercontent.com/lupavon/UBICACIONES/stock/stock.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json();
     if(!payload || !Array.isArray(payload.rows))throw new Error('Formato inválido');
