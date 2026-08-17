@@ -2350,30 +2350,40 @@ async function loadPublishedStock(){
   if(status) status.textContent='Cargando stock publicado…';
 
   try{
-    const metaUrl='https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now();
-    const metaRes=await fetch(metaUrl,{
-      cache:'no-store',
-      headers:{
-        'Accept':'application/vnd.github+json',
-        'X-GitHub-Api-Version':'2022-11-28'
-      }
-    });
+    const headers={
+      'Accept':'application/vnd.github+json',
+      'X-GitHub-Api-Version':'2022-11-28'
+    };
 
-    if(!metaRes.ok) throw new Error('GitHub API '+metaRes.status);
+    // 1. Get metadata from the stock branch. This endpoint is CORS-friendly.
+    const metaRes=await fetch(
+      'https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now(),
+      {cache:'no-store',headers}
+    );
+    if(!metaRes.ok) throw new Error('GitHub metadata '+metaRes.status);
 
     const meta=await metaRes.json();
-    if(!meta?.download_url) throw new Error('GitHub no devolvió download_url para stock.json');
+    if(!meta?.sha) throw new Error('GitHub no devolvió SHA de stock.json');
 
-    const dataRes=await fetch(meta.download_url+'?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache'}
-    });
+    // 2. Fetch the blob through api.github.com too, avoiding raw.githubusercontent.com CORS.
+    const blobRes=await fetch(
+      'https://api.github.com/repos/lupavon/UBICACIONES/git/blobs/'+encodeURIComponent(meta.sha)+'?_='+Date.now(),
+      {cache:'no-store',headers}
+    );
+    if(!blobRes.ok) throw new Error('GitHub blob '+blobRes.status);
 
-    if(!dataRes.ok) throw new Error('Descarga stock.json '+dataRes.status);
+    const blob=await blobRes.json();
+    if(blob?.encoding!=='base64' || !blob?.content) throw new Error('GitHub no devolvió stock.json en base64');
 
-    const payload=await dataRes.json();
+    const clean=blob.content.replace(/\s/g,'');
+    const bin=atob(clean);
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    const text=new TextDecoder('utf-8').decode(bytes);
+    const payload=JSON.parse(text);
+
     const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-    if(!rows.length) throw new Error('stock.json no contiene filas.');
+    if(!rows.length) throw new Error('stock.json no contiene filas');
 
     DATA=rows;
 
@@ -2390,7 +2400,7 @@ async function loadPublishedStock(){
     if(displayMode==='sanitation')buildSanitationPanel();
   }catch(err){
     console.error('loadPublishedStock',err);
-    if(status) status.textContent='No se pudo cargar stock.json';
+    if(status) status.textContent='No se pudo cargar stock.json · '+(err?.message||err);
   }
 }
 
