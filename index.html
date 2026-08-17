@@ -1074,7 +1074,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
     <div class="opsSection">
       <div class="opsSectionHead">
-        <div><b>Plan de movimientos</b><span>Un destino vacío se reserva una sola vez dentro del plan para evitar duplicados.</span></div>
+        <div><b>Plan de movimientos</b><span>Solo se sugieren posiciones que no aparecen en el stock publicado. Un destino se reserva una sola vez dentro del plan para evitar duplicados.</span></div>
       </div>
       <div class="sanTableWrap">
         <table class="sanTable">
@@ -1859,7 +1859,9 @@ function sanitationSlotMap(){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
 
-    const key=String(x.ubicacion||'').toUpperCase();
+    // Canonicalizar el código. Evita que A080101 y A80101, espacios, etc.
+    // se interpreten como posiciones distintas.
+    const key=locationCode(x.prefix,x.modulo,x.sub,x.pos).toUpperCase();
     (map[key]??=[]).push(x);
   });
   return map;
@@ -1877,10 +1879,11 @@ function sanitationPhysicalSlots(){
 function sanitationPlanForGroup(group){
   const slotMap=sanitationSlotMap();
   const physical=sanitationPhysicalSlots();
+  // Para saneamiento, una posición solo es destino si NO aparece en absoluto
+  // en el stock publicado. Si existe cualquier registro en esa ubicación,
+  // aunque el saldo venga 0 o con un formato distinto, se considera ocupada.
   const occupied=new Set(
-    Object.entries(slotMap)
-      .filter(([loc,items])=>items.some(x=>Number(x.saldo||0)!==0))
-      .map(([loc])=>loc.toUpperCase())
+    Object.keys(slotMap).map(loc=>String(loc).toUpperCase())
   );
 
   // Orígenes: posiciones físicas cuyo grupo de ubicación es el seleccionado y tienen >1 SKU.
