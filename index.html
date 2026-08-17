@@ -780,6 +780,137 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+/* v32 · saneamiento 1 SKU por posición */
+.sanControls{
+  display:flex;
+  align-items:end;
+  gap:10px;
+  flex-wrap:wrap;
+  background:#111821;
+  border:1px solid #2b3541;
+  border-radius:8px;
+  padding:10px 12px;
+  margin:10px 0 12px;
+}
+.sanControls label{
+  display:block;
+  color:#8793a0;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  margin-bottom:5px;
+}
+.sanControls select{
+  min-width:220px;
+  height:36px;
+  background:#0e141b;
+  border:1px solid #34404d;
+  border-radius:6px;
+  color:#eef3f8;
+  padding:0 9px;
+}
+.sanControlActions{display:flex;align-items:center}
+.sanKpiGrid{grid-template-columns:repeat(6,minmax(120px,1fr))}
+.sanTableWrap{overflow-x:auto}
+.sanTable{
+  width:100%;
+  min-width:980px;
+  border-collapse:collapse;
+  font-size:10px;
+}
+.sanTable th{
+  text-align:left;
+  color:#7f8b98;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  padding:8px 10px;
+  border-bottom:1px solid #27313b;
+}
+.sanTable td{
+  padding:9px 10px;
+  border-bottom:1px solid #202831;
+  color:#cbd3dc;
+  vertical-align:top;
+}
+.sanTable tbody tr:hover{background:#151e27}
+.sanLoc{
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-weight:900;
+  color:#eaf1f8;
+  white-space:nowrap;
+}
+.sanSkuTitle{font-weight:800;color:#e7edf4}
+.sanSkuSub{font-size:8px;color:#7f8b98;margin-top:2px}
+.sanAction{
+  display:inline-flex;
+  align-items:center;
+  padding:3px 7px;
+  border-radius:10px;
+  font-size:8px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.sanAction.keep{background:#234c39;color:#9ce5ba}
+.sanAction.move{background:#654424;color:#ffd49b}
+.sanAction.review{background:#5c2d36;color:#ffb0ba}
+.sanDest{
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-weight:900;
+  color:#67dcff;
+  white-space:nowrap;
+}
+.sanAlt{
+  color:#93a0ad;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:9px;
+  line-height:1.45;
+}
+.sanSourceGrid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(170px,1fr));
+  gap:8px;
+  padding:10px;
+}
+.sanSourceCard{
+  background:#121921;
+  border:1px solid #29333e;
+  border-radius:7px;
+  padding:9px 10px;
+}
+.sanSourceCard .loc{
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:11px;
+  font-weight:900;
+  color:#eef3f8;
+}
+.sanSourceCard .meta{
+  margin-top:4px;
+  font-size:9px;
+  color:#85919e;
+}
+.sanSourceCard .line{
+  margin-top:6px;
+  padding-top:6px;
+  border-top:1px solid #242d37;
+  font-size:9px;
+  color:#c5ced8;
+}
+@media(max-width:1100px){
+  .sanKpiGrid{grid-template-columns:repeat(3,1fr)}
+  .sanSourceGrid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:650px){
+  .sanKpiGrid{grid-template-columns:repeat(2,1fr)}
+  .sanSourceGrid{grid-template-columns:1fr}
+  .sanControls select{min-width:100%;width:100%}
+  .sanControls>div:first-child{width:100%}
+}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -804,6 +935,7 @@ html,body{max-width:100%;overflow-x:hidden}
     <button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
     <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
     <button class="btn" id="kpiModeBtn">📊 KPIs</button>
+    <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -914,6 +1046,59 @@ html,body{max-width:100%;overflow-x:hidden}
         <div><b>Alertas prioritarias</b><span>Módulos con mayor presión de ocupación o desvíos</span></div>
       </div>
       <div id="kpiAlerts" class="opsAlerts"></div>
+    </div>
+  </div>
+
+  <div id="sanitationView" style="display:none">
+    <div class="layoutHeatTitle">Saneamiento · 1 SKU por posición</div>
+    <div class="layoutHeatSubtitle">Seleccioná un grupo logístico para generar un plan de movimientos desde posiciones mezcladas hacia posiciones vacías compatibles.</div>
+
+    <div class="sanControls">
+      <div>
+        <label for="sanGroupSelect">Código de grupo</label>
+        <select id="sanGroupSelect"></select>
+      </div>
+      <div class="sanControlActions">
+        <button class="btn" id="sanRefreshBtn" type="button">Recalcular plan</button>
+      </div>
+    </div>
+
+    <div class="opsKpiGrid sanKpiGrid">
+      <div class="opsKpiCard"><small>POSICIONES A SANEAR</small><b id="sanMixedPositions">0</b><span>con más de 1 SKU</span></div>
+      <div class="opsKpiCard"><small>MOVIMIENTOS PROPUESTOS</small><b id="sanMoves">0</b><span>SKU a reubicar</span></div>
+      <div class="opsKpiCard"><small>UNIDADES A MOVER</small><b id="sanUnits">0</b><span>según saldo actual</span></div>
+      <div class="opsKpiCard"><small>DESTINOS DISPONIBLES</small><b id="sanDestinations">0</b><span>vacíos y compatibles</span></div>
+      <div class="opsKpiCard"><small>SIN DESTINO</small><b id="sanNoDest">0</b><span>requieren revisión</span></div>
+      <div class="opsKpiCard"><small>GRUPO SELECCIONADO</small><b id="sanGroupLabel">—</b><span id="sanGroupMeta">sin selección</span></div>
+    </div>
+
+    <div class="opsSection">
+      <div class="opsSectionHead">
+        <div><b>Plan de movimientos</b><span>Un destino vacío se reserva una sola vez dentro del plan para evitar duplicados.</span></div>
+      </div>
+      <div class="sanTableWrap">
+        <table class="sanTable">
+          <thead>
+            <tr>
+              <th>Origen</th>
+              <th>SKU / descripción</th>
+              <th>Unidades</th>
+              <th>Grupo SKU</th>
+              <th>Acción</th>
+              <th>Destino sugerido</th>
+              <th>Alternativas</th>
+            </tr>
+          </thead>
+          <tbody id="sanPlanBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="opsSection">
+      <div class="opsSectionHead">
+        <div><b>Posiciones mezcladas del grupo</b><span>Resumen por ubicación antes de ejecutar movimientos.</span></div>
+      </div>
+      <div id="sanSourceCards" class="sanSourceGrid"></div>
     </div>
   </div>
 </main>
@@ -1248,7 +1433,7 @@ $('fileInput').onchange=async e=>{
    const n=rows.map(normalizeRow).filter(x=>x&&Object.values(VIEWS).some(v=>v.zona===x.zona));
    if(!n.length)throw new Error('No encontré stock de MFCA/MFCB/MFCC/AR/BR.');
    DATA=rows;$('sourceText').textContent='Stock: '+f.name+' · VL + Layout Julio integrados';
-   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();
+   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();
  }catch(err){alert(err.message||String(err))}
 };
 
@@ -1260,13 +1445,16 @@ function setDisplayMode(mode){
   $('heatmapView').style.display=mode==='heat'?'block':'none';
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
   $('kpiView').style.display=mode==='kpi'?'block':'none';
+  $('sanitationView').style.display=mode==='sanitation'?'block':'none';
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
   $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
   $('kpiModeBtn').classList.toggle('active',mode==='kpi');
+  $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
+  if(mode==='sanitation') buildSanitationPanel();
 }
 
 
@@ -1649,10 +1837,223 @@ function buildKpiPanel(){
   ).join(''):'<div class="notice">Sin alertas prioritarias.</div>';
 }
 
+
+function sanitationGroups(){
+  return [...new Set(Object.values(LOCATION_GROUP).map(x=>String(x||'').trim()).filter(x=>x && x!=='SIN GRUPO'))]
+    .sort((a,b)=>a.localeCompare(b));
+}
+
+function ensureSanGroupOptions(){
+  const sel=$('sanGroupSelect');
+  if(!sel || sel.options.length>0)return;
+  const groups=sanitationGroups();
+  sel.innerHTML='<option value="">Seleccionar grupo…</option>'+groups.map(g=>'<option value="'+esc(g)+'">'+esc(g)+'</option>').join('');
+}
+
+function sanitationSlotMap(){
+  const map={};
+  allNormalizedRows().forEach(x=>{
+    if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
+      if(x.sub!=='01'||x.pos<1||x.pos>12)return;
+    }else if(x.prefix==='A'||x.prefix==='B'){
+      if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
+    }else return;
+
+    const key=String(x.ubicacion||'').toUpperCase();
+    (map[key]??=[]).push(x);
+  });
+  return map;
+}
+
+function sanitationPhysicalSlots(){
+  // Misma capacidad física que usa el productivo para racks / KPIs.
+  const slots=allPhysicalSlots().filter(s=>{
+    if(s.prefix==='A'||s.prefix==='B')return validABModule(s.prefix,s.modulo);
+    return true;
+  });
+  return slots;
+}
+
+function sanitationPlanForGroup(group){
+  const slotMap=sanitationSlotMap();
+  const physical=sanitationPhysicalSlots();
+  const occupied=new Set(
+    Object.entries(slotMap)
+      .filter(([loc,items])=>items.some(x=>Number(x.saldo||0)!==0))
+      .map(([loc])=>loc.toUpperCase())
+  );
+
+  // Orígenes: posiciones físicas cuyo grupo de ubicación es el seleccionado y tienen >1 SKU.
+  const sourceSlots=[];
+  Object.entries(slotMap).forEach(([loc,items])=>{
+    const parsed=parseLoc(loc);
+    if(!parsed)return;
+    const moduleKey=parsed.prefix+String(parsed.module);
+    const locGroup=LOCATION_GROUP[moduleKey]||'';
+    const skus=[...new Set(items.map(skuKey).filter(Boolean))];
+    if(locGroup===group && skus.length>1){
+      sourceSlots.push({loc,items,parsed,moduleKey,locGroup});
+    }
+  });
+
+  // Agrupar cada origen por SKU.
+  const reserved=new Set();
+  const rows=[];
+  const sourceCards=[];
+
+  sourceSlots.sort((a,b)=>a.loc.localeCompare(b.loc)).forEach(src=>{
+    const skuMap=new Map();
+    src.items.forEach(x=>{
+      const key=skuKey(x);
+      if(!key)return;
+      if(!skuMap.has(key)){
+        skuMap.set(key,{
+          key,
+          ean:x.ean,
+          referencia:x.referencia,
+          descripcion:x.descripcion,
+          grupoSku:x.grupoSku||SKU_GROUP[x.ean]||'',
+          saldo:0,
+          rows:[]
+        });
+      }
+      const s=skuMap.get(key);
+      s.saldo+=Number(x.saldo||0);
+      s.rows.push(x);
+    });
+    const skus=[...skuMap.values()];
+
+    // Mantener 1 SKU: preferir uno cuyo grupo coincide con la ubicación; si hay varios, mayor saldo.
+    const matching=skus.filter(s=>s.grupoSku===src.locGroup);
+    const keepPool=matching.length?matching:skus;
+    keepPool.sort((a,b)=>b.saldo-a.saldo);
+    const keep=keepPool[0];
+
+    rows.push({
+      origin:src.loc,
+      sku:keep,
+      action:'keep',
+      destination:null,
+      alternatives:[]
+    });
+
+    const sourceSummary={loc:src.loc,group:src.locGroup,skus:[]};
+    sourceSummary.skus.push({sku:keep,action:'keep'});
+
+    // Mover todos los demás.
+    skus.filter(s=>s.key!==keep.key).forEach(s=>{
+      const targetGroup=s.grupoSku||'';
+      const candidates=physical
+        .filter(dest=>!occupied.has(String(dest.ubicacion).toUpperCase()))
+        .filter(dest=>!reserved.has(String(dest.ubicacion).toUpperCase()))
+        .filter(dest=>dest.grupo && dest.grupo===targetGroup)
+        .map(dest=>({
+          ...dest,
+          distance:physicalDistance(
+            {prefix:src.parsed.prefix,modulo:src.parsed.module,pos:src.parsed.pos},
+            dest
+          )
+        }))
+        .sort((a,b)=>a.distance-b.distance||a.modulo-b.modulo||a.pos-b.pos);
+
+      const destination=candidates[0]||null;
+      if(destination)reserved.add(String(destination.ubicacion).toUpperCase());
+
+      const item={
+        origin:src.loc,
+        sku:s,
+        action:destination?'move':'review',
+        destination,
+        alternatives:candidates.slice(1,4)
+      };
+      rows.push(item);
+      sourceSummary.skus.push({sku:s,action:item.action,destination});
+    });
+
+    sourceCards.push(sourceSummary);
+  });
+
+  return {rows,sourceSlots,sourceCards,reserved};
+}
+
+function buildSanitationPanel(){
+  ensureSanGroupOptions();
+  const group=$('sanGroupSelect').value;
+
+  if(!group){
+    $('sanMixedPositions').textContent='0';
+    $('sanMoves').textContent='0';
+    $('sanUnits').textContent='0';
+    $('sanDestinations').textContent='0';
+    $('sanNoDest').textContent='0';
+    $('sanGroupLabel').textContent='—';
+    $('sanGroupMeta').textContent='seleccioná un grupo';
+    $('sanPlanBody').innerHTML='<tr><td colspan="7" style="padding:18px;color:#7f8b98">Seleccioná un código de grupo para generar el plan.</td></tr>';
+    $('sanSourceCards').innerHTML='';
+    return;
+  }
+
+  const plan=sanitationPlanForGroup(group);
+  const moves=plan.rows.filter(x=>x.action!=='keep');
+  const units=moves.reduce((a,x)=>a+Number(x.sku.saldo||0),0);
+  const withDest=moves.filter(x=>x.destination).length;
+  const noDest=moves.filter(x=>!x.destination).length;
+
+  $('sanMixedPositions').textContent=plan.sourceSlots.length.toLocaleString('es-AR');
+  $('sanMoves').textContent=moves.length.toLocaleString('es-AR');
+  $('sanUnits').textContent=units.toLocaleString('es-AR');
+  $('sanDestinations').textContent=withDest.toLocaleString('es-AR');
+  $('sanNoDest').textContent=noDest.toLocaleString('es-AR');
+  $('sanGroupLabel').textContent=group;
+  $('sanGroupMeta').textContent='grupo de ubicación seleccionado';
+
+  $('sanPlanBody').innerHTML=plan.rows.length?plan.rows.map(r=>{
+    const actionHtml=r.action==='keep'
+      ? '<span class="sanAction keep">DEJAR</span>'
+      : (r.action==='move'
+        ? '<span class="sanAction move">MOVER</span>'
+        : '<span class="sanAction review">SIN DESTINO</span>');
+
+    const dest=r.destination
+      ? '<span class="sanDest">'+esc(r.destination.ubicacion)+'</span><div class="sanSkuSub">Vacía · grupo '+esc(r.destination.grupo)+'</div>'
+      : '<span style="color:#ff9da7;font-weight:800">Revisar manualmente</span>';
+
+    const alts=r.alternatives?.length
+      ? '<div class="sanAlt">'+r.alternatives.map(a=>esc(a.ubicacion)).join('<br>')+'</div>'
+      : '—';
+
+    return '<tr>'+
+      '<td><span class="sanLoc">'+esc(r.origin)+'</span></td>'+
+      '<td><div class="sanSkuTitle">'+esc(r.sku.descripcion||'(sin descripción)')+'</div><div class="sanSkuSub">EAN '+esc(r.sku.ean||'')+' · Ref '+esc(r.sku.referencia||'')+'</div></td>'+
+      '<td><b>'+Number(r.sku.saldo||0).toLocaleString('es-AR')+'</b></td>'+
+      '<td>'+esc(r.sku.grupoSku||'SIN GRUPO')+'</td>'+
+      '<td>'+actionHtml+'</td>'+
+      '<td>'+dest+'</td>'+
+      '<td>'+alts+'</td>'+
+      '</tr>';
+  }).join(''):'<tr><td colspan="7" style="padding:18px;color:#7f8b98">No hay posiciones con mezcla para este grupo.</td></tr>';
+
+  $('sanSourceCards').innerHTML=plan.sourceCards.map(card=>
+    '<div class="sanSourceCard">'+
+      '<div class="loc">'+esc(card.loc)+'</div>'+
+      '<div class="meta">Grupo ubicación: '+esc(card.group)+' · '+card.skus.length+' SKU</div>'+
+      card.skus.map(x=>
+        '<div class="line"><b>'+esc(x.sku.descripcion||x.sku.ean||x.sku.referencia)+'</b><br>'+
+        Number(x.sku.saldo||0).toLocaleString('es-AR')+' un · Grupo '+esc(x.sku.grupoSku||'SIN GRUPO')+
+        ' · '+(x.action==='keep'?'DEJAR':(x.destination?'→ '+esc(x.destination.ubicacion):'SIN DESTINO'))+
+        '</div>'
+      ).join('')+
+    '</div>'
+  ).join('');
+}
+
 $('rackModeBtn').onclick=()=>setDisplayMode('rack');
 $('heatModeBtn').onclick=()=>setDisplayMode('heat');
 $('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
 $('kpiModeBtn').onclick=()=>setDisplayMode('kpi');
+$('sanitationModeBtn').onclick=()=>setDisplayMode('sanitation');
+$('sanGroupSelect').onchange=()=>buildSanitationPanel();
+$('sanRefreshBtn').onclick=()=>buildSanitationPanel();
 $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'occupancy';$('sortGroupBtn').textContent=kpiGroupSort==='occupancy'?'Ordenar por ocupación':'Ordenar por nombre';buildKpiPanel();};
 
 
@@ -1667,7 +2068,7 @@ async function loadPublishedStock(){
     const whenTxt=when && !isNaN(when) ? when.toLocaleString('es-AR') : (payload.updated_at||'');
     $('sourceText').textContent='Stock publicado: '+(whenTxt||'sin fecha')+' · '+(payload.source_file||'stock.json')+' · VL + Layout integrados';
     rebuild();
-    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();
+    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();
   }catch(err){
     $('sourceText').textContent='No se pudo cargar stock.json · Podés usar “Cargar stock XLSX” como respaldo';
     console.error(err);
