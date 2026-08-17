@@ -23,8 +23,12 @@ if(refreshBtn){
     }
   };
 }
-loadPublishedStock();
-startAutoStockRefresh();
+
+
+window.addEventListener('DOMContentLoaded',()=>{
+  loadPublishedStock();
+  startAutoStockRefresh();
+});
 
 </script>
 <style>
