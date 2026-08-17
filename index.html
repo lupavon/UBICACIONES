@@ -2346,26 +2346,51 @@ $('sortGroupBtn').onclick=()=>{kpiGroupSort=kpiGroupSort==='occupancy'?'name':'o
 
 
 async function loadPublishedStock(){
+  const status=$('loadStatus');
+  if(status) status.textContent='Cargando stock publicado…';
+
   try{
-    const res=await fetch('https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now(),{
-    cache:'no-store',
-    headers:{
-      'Accept':'application/vnd.github.raw+json',
-      'X-GitHub-Api-Version':'2022-11-28'
+    const metaUrl='https://api.github.com/repos/lupavon/UBICACIONES/contents/stock.json?ref=stock&_='+Date.now();
+    const metaRes=await fetch(metaUrl,{
+      cache:'no-store',
+      headers:{
+        'Accept':'application/vnd.github+json',
+        'X-GitHub-Api-Version':'2022-11-28'
+      }
+    });
+
+    if(!metaRes.ok) throw new Error('GitHub API '+metaRes.status);
+
+    const meta=await metaRes.json();
+    if(!meta?.download_url) throw new Error('GitHub no devolvió download_url para stock.json');
+
+    const dataRes=await fetch(meta.download_url+'?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+
+    if(!dataRes.ok) throw new Error('Descarga stock.json '+dataRes.status);
+
+    const payload=await dataRes.json();
+    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    if(!rows.length) throw new Error('stock.json no contiene filas.');
+
+    DATA=rows;
+
+    const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+    if(status){
+      const when=updatedAt ? new Date(updatedAt) : null;
+      status.textContent='Stock publicado cargado'+(when&&!isNaN(when)?' · '+when.toLocaleString('es-AR'):'');
     }
-  });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json();
-    if(!payload || !Array.isArray(payload.rows))throw new Error('Formato inválido');
-    DATA=payload.rows;
-    const when=payload.updated_at ? new Date(payload.updated_at) : null;
-    const whenTxt=when && !isNaN(when) ? when.toLocaleString('es-AR') : (payload.updated_at||'');
-    $('sourceText').textContent='Stock publicado: '+(whenTxt||'sin fecha')+' · '+(payload.source_file||'stock.json')+' · VL + Layout integrados';
+
     rebuild();
-    if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();
+    if(displayMode==='heat')buildHeatmap();
+    if(displayMode==='occupancy')buildOccupancyMap();
+    if(displayMode==='kpi')buildKpiPanel();
+    if(displayMode==='sanitation')buildSanitationPanel();
   }catch(err){
-    $('sourceText').textContent='No se pudo cargar stock.json · Podés usar “Cargar stock XLSX” como respaldo';
-    console.error(err);
+    console.error('loadPublishedStock',err);
+    if(status) status.textContent='No se pudo cargar stock.json';
   }
 }
 
