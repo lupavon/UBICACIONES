@@ -4,30 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>UBICACIONES · Dashboard de Depósito</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
-let autoRefreshTimer=null;
-function startAutoStockRefresh(){
-  if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },300000);
-}
-const refreshBtn=document.getElementById('refreshStockBtn');
-if(refreshBtn){
-  refreshBtn.onclick=async()=>{
-    refreshBtn.disabled=true;
-    const prev=refreshBtn.textContent;
-    refreshBtn.textContent='Actualizando…';
-    try{ await loadPublishedStock(); }
-    finally{
-      refreshBtn.disabled=false;
-      refreshBtn.textContent=prev;
-    }
-  };
-}
-
-
-
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0d1117;color:#eef1f5;font-family:Arial,Helvetica,sans-serif}.top{position:sticky;top:0;z-index:20;background:#151922;border-bottom:1px solid #303642;padding:12px 18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}.brand h1{margin:0;font-size:21px}.brand small{color:#9aa3af}.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn,.filelabel{border:1px solid #3b4350;background:#202630;color:#eef1f5;padding:8px 11px;border-radius:7px;cursor:pointer;font-weight:700}.btn.active{background:#eef1f5;color:#11151b}.filelabel input{display:none}.search{background:#0b0f14;border:1px solid #3b4350;color:#fff;border-radius:7px;padding:8px 11px;min-width:280px}.kpis{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}.kpi{background:#202630;border:1px solid #343c48;border-radius:8px;padding:7px 11px;min-width:102px}.kpi b{font-size:18px;display:block}.kpi span{font-size:10px;color:#aab2bd}.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;min-height:calc(100vh - 74px)}.main{padding:18px;overflow:auto}.side{border-left:1px solid #303642;background:#151922;padding:18px;position:sticky;top:74px;height:calc(100vh - 74px);overflow:auto}.legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 14px;color:#d1d7df;font-size:12px}.dot{width:12px;height:12px;display:inline-block;border-radius:2px;margin-right:5px;vertical-align:-2px}.filterbar{display:flex;gap:6px;margin-bottom:14px}.filterbar .btn{font-size:11px;padding:6px 9px}#racks{display:flex;gap:8px;align-items:flex-start;min-width:max-content;padding-bottom:14px}.rackrow{width:172px;min-width:172px;display:flex;flex-direction:column;align-items:stretch}.modlabel{text-align:center;font-weight:800;font-size:14px;color:#fff;padding:0 0 8px}.rack{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,56px);gap:4px;padding:5px 4px;background:#10151c;border:4px solid #aeb5bf;box-shadow:inset 0 0 0 1px #252c36}.slot{position:relative;border:1px solid #2e3641;background:#151b23;overflow:hidden;cursor:pointer;transition:.12s}.slot:hover{outline:2px solid #58d7ff;z-index:2}.slot.occupied{background:linear-gradient(180deg,#ddb17d,#cb985f);border-color:#dfbb90;color:#111}.slot.multi{background:linear-gradient(180deg,#ea5963,#b52e3d);border-color:#ff8892;color:#fff}.slot.bad{background:linear-gradient(180deg,#f2b553,#d88725);border-color:#ffd28c;color:#17120b}.slot.unknown{background:#343d49;border-color:#596473;color:#e8edf3}.slot.match{outline:3px solid #58d7ff;box-shadow:0 0 13px #2dbdf688;z-index:3}.slot.dim{opacity:.16}.slot.selected{outline:3px solid #fff!important}.pnum{position:absolute;left:5px;top:5px;font-size:10px;color:#626c78;font-weight:700}.skuLabel{position:absolute;left:5px;top:5px;font-size:10px;font-weight:900;letter-spacing:-.2px}.qty{position:absolute;right:4px;bottom:4px;font-size:10px;font-weight:900;color:#101318;background:#f3d2ad;padding:2px 4px;border-radius:3px}.slot.multi .qty{color:#fff;background:#7d1e29}.slot.bad .qty{background:#ffe0a8}.slot.unknown .qty{color:#fff;background:#596575}.rail{height:10px;background:#aeb5bf;border-radius:7px;margin:6px -4px 0;box-shadow:0 2px 0 #555d68}.side h2{margin-top:0}.muted{color:#9aa3af;font-size:12px}.detailCard{border:1px solid #38414d;background:#1b2028;border-radius:9px;padding:12px;margin-top:12px}.loc{font-size:20px;font-weight:900}.alert{padding:9px;border-radius:7px;margin:10px 0;font-weight:800}.alert.bad{background:#6c4211;color:#ffd89c}.alert.multi{background:#681f24;color:#ffb0b5}.item{border-top:1px solid #38414d;padding-top:10px;margin-top:10px}.item b{display:block}.groups{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.gbox{background:#11161d;padding:8px;border-radius:6px}.gbox small{display:block;color:#8d97a3}.notice{margin-top:18px;color:#7f8995;font-size:11px;line-height:1.4}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{position:static;height:auto;border-left:0;border-top:1px solid #333}.kpis{margin-left:0}}
 
@@ -1085,7 +1062,7 @@ html,body{max-width:100%;overflow-x:hidden}
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Buscando stock… · VL + Layout Julio integrados</small></div>
+  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Cargando referencia de stock…</small></div>
   <div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
   <div class="controls">
     <button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
@@ -2417,7 +2394,7 @@ function applyStockPayload(payload,{fromCache=false}={}){
   const stamp=updatedAt ? new Date(updatedAt) : null;
   const validStamp=stamp && !isNaN(stamp);
 
-  const status=$('loadStatus');
+  const status=$('sourceText');
   if(status){
     status.textContent=formatStockStatus(updatedAt,{
       fromCache,
@@ -2450,7 +2427,7 @@ function loadCachedStock(){
 
 
 function refreshVisibleStockStatus(){
-  const status=$('loadStatus');
+  const status=$('sourceText');
   if(!status) return;
   if(DATA && DATA.length){
     const meta=localStorage.getItem(STOCK_VISIBLE_META_KEY)||localStorage.getItem(STOCK_CACHE_META_KEY)||'';
@@ -2472,7 +2449,7 @@ async function loadPublishedStock({silent=false}={}){
   if(stockLoadInFlight) return;
   stockLoadInFlight=true;
 
-  const status=$('loadStatus');
+  const status=$('sourceText');
   if(status && !DATA.length && !silent) status.textContent='Buscando stock…';
 
   const controller=new AbortController();
@@ -2531,6 +2508,27 @@ rebuild();
 
 
 
+
+
+let autoRefreshTimer=null;
+function startAutoStockRefresh(){
+  if(autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },300000);
+}
+
+const refreshBtn=document.getElementById('refreshStockBtn');
+if(refreshBtn){
+  refreshBtn.onclick=async()=>{
+    refreshBtn.disabled=true;
+    const prev=refreshBtn.textContent;
+    refreshBtn.textContent='Actualizando…';
+    try{ await loadPublishedStock(); }
+    finally{
+      refreshBtn.disabled=false;
+      refreshBtn.textContent=prev;
+    }
+  };
+}
 
 // Arranque único del dashboard:
 // 1) mostrar cache inmediatamente;
