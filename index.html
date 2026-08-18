@@ -2509,17 +2509,16 @@ rebuild();
 
 
 
-function initDashboardStock(){
-  const hadCache=loadCachedStock();
-  loadPublishedStock({silent:hadCache});
-  startAutoStockRefresh();
-}
 
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',initDashboardStock,{once:true});
-}else{
-  initDashboardStock();
-}
+
+
+// Arranque único del dashboard:
+// 1) mostrar cache inmediatamente;
+// 2) buscar stock nuevo en segundo plano;
+// 3) refrescar cada 5 minutos.
+loadCachedStock();
+loadPublishedStock({silent:true});
+startAutoStockRefresh();
 
 </script>
 
