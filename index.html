@@ -2456,7 +2456,7 @@ async function loadPublishedStock({silent=false}={}){
   const timeout=setTimeout(()=>controller.abort(),20000);
 
   try{
-    const url='https://raw.githubusercontent.com/lupavon/UBICACIONES/stock/stock.json?v='+Date.now();
+    const url='https://raw.githubusercontent.com/lupavon/UBICACIONES/main/stock.json?v='+Date.now();
     const res=await fetch(url,{
       cache:'no-store',
       signal:controller.signal
