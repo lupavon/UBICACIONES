@@ -2373,14 +2373,23 @@ let stockLoadInFlight=false;
 let lastGoodStockAt=0;
 const STOCK_CACHE_KEY='ubicaciones_stock_cache_v1';
 const STOCK_CACHE_META_KEY='ubicaciones_stock_cache_meta_v1';
+const STOCK_VISIBLE_META_KEY='ubicaciones_stock_visible_meta_v1';
 
 function formatStockStatus(updatedAt,{fromCache=false,checking=false,error=false}={}){
-  if(!updatedAt) return checking?'Buscando actualización de stock…':'Hora de stock no disponible';
-  const d=new Date(updatedAt);
-  if(isNaN(d)) return 'Stock visible · '+updatedAt;
+  let raw=updatedAt || localStorage.getItem(STOCK_VISIBLE_META_KEY) || localStorage.getItem(STOCK_CACHE_META_KEY) || '';
+  if(!raw){
+    if(DATA && DATA.length) return '🟡 Stock visible cargado · hora de actualización no disponible';
+    return checking?'Buscando actualización de stock…':'Hora de stock no disponible';
+  }
 
-  const now=Date.now();
-  const diffMin=Math.max(0,Math.floor((now-d.getTime())/60000));
+  const d=new Date(raw);
+  if(isNaN(d)){
+    return '🟡 Stock visible: '+raw+(checking?' · buscando actualización…':'');
+  }
+
+  localStorage.setItem(STOCK_VISIBLE_META_KEY,raw);
+
+  const diffMin=Math.max(0,Math.floor((Date.now()-d.getTime())/60000));
   const stamp=d.toLocaleString('es-AR');
 
   let freshness='🟢';
@@ -2403,7 +2412,8 @@ function applyStockPayload(payload,{fromCache=false}={}){
 
   DATA=rows;
 
-  const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+  const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||localStorage.getItem(STOCK_CACHE_META_KEY)||'';
+  if(updatedAt) localStorage.setItem(STOCK_VISIBLE_META_KEY,updatedAt);
   const stamp=updatedAt ? new Date(updatedAt) : null;
   const validStamp=stamp && !isNaN(stamp);
 
@@ -2435,6 +2445,16 @@ function loadCachedStock(){
   }catch(err){
     console.warn('No pude leer cache de stock',err);
     return false;
+  }
+}
+
+
+function refreshVisibleStockStatus(){
+  const status=$('loadStatus');
+  if(!status) return;
+  if(DATA && DATA.length){
+    const meta=localStorage.getItem(STOCK_VISIBLE_META_KEY)||localStorage.getItem(STOCK_CACHE_META_KEY)||'';
+    status.textContent=formatStockStatus(meta);
   }
 }
 
@@ -2517,6 +2537,7 @@ rebuild();
 // 2) buscar stock nuevo en segundo plano;
 // 3) refrescar cada 5 minutos.
 loadCachedStock();
+refreshVisibleStockStatus();
 loadPublishedStock({silent:true});
 startAutoStockRefresh();
 
