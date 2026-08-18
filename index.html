@@ -1085,7 +1085,7 @@ html,body{max-width:100%;overflow-x:hidden}
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Preparando stock… · VL + Layout Julio integrados</small></div>
+  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Buscando stock… · VL + Layout Julio integrados</small></div>
   <div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
   <div class="controls">
     <button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
@@ -2374,6 +2374,29 @@ let lastGoodStockAt=0;
 const STOCK_CACHE_KEY='ubicaciones_stock_cache_v1';
 const STOCK_CACHE_META_KEY='ubicaciones_stock_cache_meta_v1';
 
+function formatStockStatus(updatedAt,{fromCache=false,checking=false,error=false}={}){
+  if(!updatedAt) return checking?'Buscando actualización de stock…':'Hora de stock no disponible';
+  const d=new Date(updatedAt);
+  if(isNaN(d)) return 'Stock visible · '+updatedAt;
+
+  const now=Date.now();
+  const diffMin=Math.max(0,Math.floor((now-d.getTime())/60000));
+  const stamp=d.toLocaleString('es-AR');
+
+  let freshness='🟢';
+  if(diffMin>=10) freshness='🟠';
+  if(diffMin>=30) freshness='🔴';
+
+  let suffix='';
+  if(error) suffix=' · actualización fallida';
+  else if(checking) suffix=' · buscando actualización…';
+  else if(fromCache) suffix=' · último stock guardado';
+
+  return `${freshness} Stock visible: ${stamp} · hace ${diffMin} min${suffix}`;
+}
+
+
+
 function applyStockPayload(payload,{fromCache=false}={}){
   const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
   if(!rows.length) throw new Error('stock.json no contiene filas');
@@ -2386,11 +2409,10 @@ function applyStockPayload(payload,{fromCache=false}={}){
 
   const status=$('loadStatus');
   if(status){
-    if(fromCache){
-      status.textContent='Stock disponible'+(validStamp?' · '+stamp.toLocaleString('es-AR'):'')+' · verificando…';
-    }else{
-      status.textContent='Stock actualizado'+(validStamp?' · '+stamp.toLocaleString('es-AR'):'')+' ✓';
-    }
+    status.textContent=formatStockStatus(updatedAt,{
+      fromCache,
+      checking:fromCache
+    });
   }
 
   rebuild();
@@ -2431,7 +2453,7 @@ async function loadPublishedStock({silent=false}={}){
   stockLoadInFlight=true;
 
   const status=$('loadStatus');
-  if(status && !DATA.length && !silent) status.textContent='Cargando stock…';
+  if(status && !DATA.length && !silent) status.textContent='Buscando stock…';
 
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),20000);
@@ -2452,8 +2474,7 @@ async function loadPublishedStock({silent=false}={}){
     // Si es la misma versión y ya tenemos datos renderizados, no redibujar todo.
     if(DATA.length && updatedAt && cachedMeta===updatedAt){
       if(status){
-        const stamp=new Date(updatedAt);
-        status.textContent='Stock actualizado'+(!isNaN(stamp)?' · '+stamp.toLocaleString('es-AR'):'')+' ✓';
+        status.textContent=formatStockStatus(updatedAt);
       }
       lastGoodStockAt=Date.now();
       return;
@@ -2467,9 +2488,10 @@ async function loadPublishedStock({silent=false}={}){
     console.error('loadPublishedStock',err);
     if(status){
       if(DATA.length){
-        status.textContent='Mostrando último stock válido · actualización pendiente';
+        const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
+        status.textContent=formatStockStatus(cachedMeta,{fromCache:true,error:true});
       }else{
-        status.textContent='No se pudo cargar stock.json · '+(err?.message||err);
+        status.textContent='🔴 No se pudo cargar stock.json · '+(err?.message||err);
       }
     }
   }finally{
