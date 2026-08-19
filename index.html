@@ -1059,6 +1059,38 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+.mbMfcToolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:12px 0}
+.mbMfcToolbar label{display:block;font-size:9px;font-weight:900;color:#8f9ba7;margin-bottom:4px;text-transform:uppercase}
+.mbMfcToolbar select,.mbMfcToolbar input{background:#10161d;color:#e9eef4;border:1px solid #303b47;border-radius:7px;padding:8px 10px;min-width:150px}
+.mbMfcKpis{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:8px;margin:10px 0}
+.mbMfcKpi{background:#111820;border:1px solid #29343f;border-radius:9px;padding:11px}
+.mbMfcKpi small{display:block;font-size:8px;font-weight:900;color:#7e8b97}
+.mbMfcKpi b{display:block;font-size:23px;margin-top:4px}
+.mbMfcKpi span{font-size:9px;color:#84919e}
+.mbMfcTableWrap{overflow:auto;border:1px solid #29343f;border-radius:9px;background:#0f151c}
+.mbMfcTable{width:100%;border-collapse:collapse;min-width:900px}
+.mbMfcTable th{position:sticky;top:0;background:#151d26;color:#8f9ba7;font-size:8px;text-align:left;padding:9px;border-bottom:1px solid #2d3944;z-index:1}
+.mbMfcTable td{padding:9px;border-bottom:1px solid #202a34;font-size:10px;vertical-align:top}
+.mbMfcTable tr:hover td{background:#121b24}
+.mbMfcLoc{font-weight:900;color:#f1f4f7}
+.mbMfcGroup{display:inline-block;padding:3px 6px;border-radius:7px;background:#172833;border:1px solid #2d566c;color:#79d9ff;font-size:8px;font-weight:900}
+.mbMfcStreet{display:inline-block;padding:2px 5px;border-radius:6px;background:#30251b;color:#f0b66b;font-size:8px;font-weight:900}
+.mbMfcEmpty{padding:24px;text-align:center;color:#7e8b97}
+.mbMfcNote{padding:9px 10px;border:1px solid #34404b;border-radius:8px;background:#121921;color:#95a2ae;font-size:9px;line-height:1.45;margin-bottom:10px}
+@media(max-width:700px){.mbMfcKpis{grid-template-columns:repeat(2,1fr)}.mbMfcToolbar>div{flex:1 1 140px}.mbMfcToolbar select,.mbMfcToolbar input{width:100%;min-width:0}}
+</style>
+
+
+<style>
+/* MFCC físico: cada módulo tiene solo 4 posiciones etiquetadas (01, 04, 07, 10). */
+.rack.mfcc4{
+  grid-template-columns:1fr;
+  grid-template-rows:repeat(4,56px);
+}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -1084,6 +1116,7 @@ html,body{max-width:100%;overflow-x:hidden}
     <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
     <button class="btn" id="kpiModeBtn">📊 KPIs</button>
     <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
+    <button class="btn" id="mbMfcModeBtn">↪ Masterbox → MFC</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -1268,6 +1301,60 @@ html,body{max-width:100%;overflow-x:hidden}
       <div id="sanSourceCards" class="sanSourceGrid"></div>
     </div>
   </div>
+
+  <div id="mbMfcView" style="display:none">
+    <div class="layoutHeatTitle">Masterbox → MFC</div>
+    <div class="layoutHeatSubtitle">Detecta artículos con stock en posiciones de picking Masterbox (calles C, D, E, F, G, H o PM) cuya Variable Logística los configura para MFC.</div>
+
+    <div class="mbMfcNote">
+      Se consideran únicamente posiciones con <b>Área = Picking</b> y saldo mayor a 0. El criterio de destino se toma del <b>Código de Grupo</b> de Variables Logísticas. Esta vista identifica qué debería salir de Masterbox; no ejecuta movimientos.
+    </div>
+
+    <div class="mbMfcKpis">
+      <div class="mbMfcKpi"><small>SKU A MUDAR</small><b id="mbMfcSkuCount">0</b><span>códigos distintos</span></div>
+      <div class="mbMfcKpi"><small>POSICIONES MB</small><b id="mbMfcPosCount">0</b><span>ubicaciones afectadas</span></div>
+      <div class="mbMfcKpi"><small>UNIDADES EN MB</small><b id="mbMfcUnits">0</b><span>saldo a revisar</span></div>
+      <div class="mbMfcKpi"><small>CALLES AFECTADAS</small><b id="mbMfcStreetCount">0</b><span>C–H / PM</span></div>
+    </div>
+
+    <div class="mbMfcToolbar">
+      <div>
+        <label for="mbMfcStreetFilter">Calle Masterbox</label>
+        <select id="mbMfcStreetFilter">
+          <option value="ALL">Todas</option>
+          <option value="C">C</option><option value="D">D</option><option value="E">E</option>
+          <option value="F">F</option><option value="G">G</option><option value="H">H</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+      <div>
+        <label for="mbMfcGroupFilter">Grupo MFC</label>
+        <select id="mbMfcGroupFilter"><option value="ALL">Todos</option></select>
+      </div>
+      <div style="flex:1 1 260px">
+        <label for="mbMfcSearch">Buscar</label>
+        <input id="mbMfcSearch" placeholder="SKU, descripción o ubicación...">
+      </div>
+    </div>
+
+    <div class="mbMfcTableWrap">
+      <table class="mbMfcTable">
+        <thead><tr>
+          <th>Calle</th>
+          <th>Ubicación actual</th>
+          <th>SKU / EAN</th>
+          <th>Descripción</th>
+          <th>Saldo</th>
+          <th>Grupo configurado</th>
+          <th>Destino lógico</th>
+          <th>Último mov.</th>
+        </tr></thead>
+        <tbody id="mbMfcBody"></tbody>
+      </table>
+      <div id="mbMfcEmpty" class="mbMfcEmpty" style="display:none">No se detectaron artículos para mudar con los filtros seleccionados.</div>
+    </div>
+  </div>
+
 </main>
 <aside class="side">
   <h2>Detalle de posición</h2>
@@ -1328,6 +1415,21 @@ function normalizeRow(r){
  grupoSku:SKU_GROUP[ean]||'',grupoUbicacion:LOCATION_GROUP[groupKey(p)]||''};
 }
 function skuKey(x){return String(x.ean||x.referencia||x.descripcion||'').trim()}
+
+const MFCC_PHYSICAL_POSITIONS=[1,4,7,10];
+function validPhysicalPosition(prefix,pos){
+  pos=Number(pos);
+  if(prefix==='MFCC') return MFCC_PHYSICAL_POSITIONS.includes(pos);
+  if(prefix==='MFCA'||prefix==='MFCB') return pos>=1&&pos<=12;
+  if(prefix==='A'||prefix==='B') return pos>=1&&pos<=8;
+  return false;
+}
+function modulePhysicalPositions(prefix){
+  if(prefix==='MFCC') return [...MFCC_PHYSICAL_POSITIONS];
+  if(prefix==='MFCA'||prefix==='MFCB') return Array.from({length:12},(_,i)=>i+1);
+  if(prefix==='A'||prefix==='B') return Array.from({length:8},(_,i)=>i+1);
+  return [];
+}
 function status(items,gkey){
  if(!items.length)return 'empty';
  const skus=[...new Set(items.map(skuKey).filter(Boolean))];
@@ -1362,18 +1464,20 @@ function rebuild(){
  const mods=[...new Set(rows.map(x=>x.modulo))].sort((a,b)=>cfg.zona.endsWith('L') ? b-a : a-b);
  const allCells=[];
  if(cfg.kind==='mfc'){
-   const use=rows.filter(x=>x.pos>=1&&x.pos<=12&&x.sub==='01');
+   const use=rows.filter(x=>x.sub==='01'&&validPhysicalPosition(cfg.prefix,x.pos));
    const by={};use.forEach(x=>(by[x.modulo+'-'+x.pos]??=[]).push(x));
    mods.forEach(mod=>{
      const wrap=document.createElement('div');wrap.className='rackrow';
      const title=document.createElement('div');title.className='modlabel';title.textContent=mod;wrap.appendChild(title);
-     const rack=document.createElement('div');rack.className='rack';
+     const rack=document.createElement('div');rack.className='rack'+(cfg.prefix==='MFCC'?' mfcc4':'');
      // En lados L, las posiciones chicas quedan a la derecha:
      // 12 11 10 / 09 08 07 / 06 05 04 / 03 02 01.
      // Los lados R conservan la orientación anterior.
-     const posOrder=cfg.zona.endsWith('L')
-       ? [12,11,10,9,8,7,6,5,4,3,2,1]
-       : [10,11,12,7,8,9,4,5,6,1,2,3];
+     const posOrder=cfg.prefix==='MFCC'
+       ? [10,7,4,1]
+       : (cfg.zona.endsWith('L')
+          ? [12,11,10,9,8,7,6,5,4,3,2,1]
+          : [10,11,12,7,8,9,4,5,6,1,2,3]);
      posOrder.forEach(pos=>{
        const items=by[mod+'-'+pos]||[],gkey=cfg.prefix+String(mod),st=status(items,gkey);
        allCells.push({items,st});
@@ -1437,11 +1541,11 @@ function allPhysicalSlots(){
   const slots=[];
   const rows=allActiveRows();
   const configs=[
-    {prefix:'MFCA',zones:['MFCAL','MFCAR'],maxPos:12},
-    {prefix:'MFCB',zones:['MFCBL','MFCBR'],maxPos:12},
-    {prefix:'MFCC',zones:['MFCCL','MFCCR'],maxPos:12},
-    {prefix:'A',zones:['AR'],maxPos:8},
-    {prefix:'B',zones:['BR'],maxPos:8}
+    {prefix:'MFCA',zones:['MFCAL','MFCAR'],positions:modulePhysicalPositions('MFCA')},
+    {prefix:'MFCB',zones:['MFCBL','MFCBR'],positions:modulePhysicalPositions('MFCB')},
+    {prefix:'MFCC',zones:['MFCCL','MFCCR'],positions:modulePhysicalPositions('MFCC')},
+    {prefix:'A',zones:['AR'],positions:modulePhysicalPositions('A')},
+    {prefix:'B',zones:['BR'],positions:modulePhysicalPositions('B')}
   ];
 
   configs.forEach(cfg=>{
@@ -1452,13 +1556,13 @@ function allPhysicalSlots(){
       return prefixOk && zoneOk && validRange;
     }).map(x=>x.modulo))].sort((a,b)=>a-b);
     mods.forEach(mod=>{
-      for(let pos=1;pos<=cfg.maxPos;pos++){
+      cfg.positions.forEach(pos=>{
         slots.push({
           prefix:cfg.prefix,modulo:mod,sub:'01',pos,
           ubicacion:locationCode(cfg.prefix,mod,'01',pos),
           grupo:LOCATION_GROUP[cfg.prefix+String(mod)]||''
         });
-      }
+      });
     });
   });
   return slots;
@@ -1601,7 +1705,7 @@ $('fileInput').onchange=async e=>{
    const n=rows.map(normalizeRow).filter(x=>x&&Object.values(VIEWS).some(v=>v.zona===x.zona));
    if(!n.length)throw new Error('No encontré stock de MFCA/MFCB/MFCC/AR/BR.');
    DATA=rows;$('sourceText').textContent='Stock: '+f.name+' · VL + Layout Julio integrados';
-   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();
+   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();if(displayMode==='mbmfc')buildMbMfcPanel();
  }catch(err){alert(err.message||String(err))}
 };
 
@@ -1614,15 +1718,18 @@ function setDisplayMode(mode){
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
   $('kpiView').style.display=mode==='kpi'?'block':'none';
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
+  $('mbMfcView').style.display=mode==='mbmfc'?'block':'none';
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
   $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
   $('kpiModeBtn').classList.toggle('active',mode==='kpi');
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
+  $('mbMfcModeBtn').classList.toggle('active',mode==='mbmfc');
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
   if(mode==='sanitation') buildSanitationPanel();
+  if(mode==='mbmfc') buildMbMfcPanel();
 }
 
 
@@ -1644,7 +1751,7 @@ function mixedSlotsByModule(){
     // MFC: current racks use level/sub 01 and positions 01..12.
     // AR/BR: current physical front uses level 01 and positions 01..08.
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
-      if(x.sub!=='01'||x.pos<1||x.pos>12)return;
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return;
     }else if(x.prefix==='A'||x.prefix==='B'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
@@ -1744,7 +1851,7 @@ function occupancyByModule(){
     if(Number(x.saldo||0)===0) return;
 
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
-      if(x.sub!=='01'||x.pos<1||x.pos>12) return;
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos)) return;
     } else if(x.prefix==='A'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule('A',x.modulo)) return;
     } else if(x.prefix==='B'){
@@ -1757,7 +1864,8 @@ function occupancyByModule(){
 
   const result={};
   Object.entries(occupiedSlots).forEach(([mod,set])=>{
-    const cap=/^(MFCA|MFCB|MFCC)/.test(mod)?12:8;
+    const prefix=String(mod).match(/^(MFCA|MFCB|MFCC|A|B)/)?.[1]||'';
+    const cap=modulePhysicalPositions(prefix).length||8;
     result[mod]={occupied:set.size,capacity:cap,pct:(set.size/cap)*100};
   });
   return result;
@@ -1788,7 +1896,8 @@ function buildOccupancyMap(){
       if(Number.isFinite(nmod) && !validABModule(prefix,nmod)) return;
     }
 
-    const cap=/^(MFCA|MFCB|MFCC)/i.test(cell.label)?12:8;
+    const cellPrefix=String(cell.label).match(/^(MFCA|MFCB|MFCC|A|B)/i)?.[1]?.toUpperCase()||'';
+    const cap=modulePhysicalPositions(cellPrefix).length||8;
     const data=occ[cell.label]||{occupied:0,capacity:cap,pct:0};
     totalPct+=data.pct;
     counted++;
@@ -1816,15 +1925,13 @@ function buildOccupancyMap(){
 
 function showOccupancyDetail(moduleKey,displayLabel,data){
   const rows=allNormalizedRows().filter(x=>moduleKeyFromRow(x)===moduleKey);
-  const maxPos=/^(MFCA|MFCB|MFCC)/.test(moduleKey)?12:8;
+  const prefix=String(moduleKey).match(/^(MFCA|MFCB|MFCC|A|B)/)?.[1]||'';
+  const physicalPositions=modulePhysicalPositions(prefix);
   const occupied=new Set(
-    rows.filter(x=>Number(x.saldo||0)!==0 && x.sub==='01' && x.pos>=1 && x.pos<=maxPos)
+    rows.filter(x=>Number(x.saldo||0)!==0 && x.sub==='01' && validPhysicalPosition(prefix,x.pos))
         .map(x=>x.pos)
   );
-  const empties=[];
-  for(let pos=1;pos<=maxPos;pos++){
-    if(!occupied.has(pos)) empties.push(pos);
-  }
+  const empties=physicalPositions.filter(pos=>!occupied.has(pos));
 
   let h='<div class="detailCard"><div class="loc">'+esc(displayLabel)+'</div>';
   h+='<div class="muted">Mapa superior · ocupación física</div>';
@@ -1863,7 +1970,8 @@ function validABModule(prefix,mod){
 }
 
 function moduleCapacity(label){
-  return /^(MFCA|MFCB|MFCC)/i.test(label)?12:8;
+  const prefix=String(label).match(/^(MFCA|MFCB|MFCC|A|B)/i)?.[1]?.toUpperCase()||'';
+  return modulePhysicalPositions(prefix).length||8;
 }
 
 function moduleZone(label){
@@ -1883,7 +1991,7 @@ function moduleStockStats(){
 
   rows.forEach(x=>{
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
-      if(x.sub!=='01'||x.pos<1||x.pos>12)return;
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return;
     }else if(x.prefix==='A'||x.prefix==='B'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
@@ -2024,7 +2132,7 @@ function sanitationSlotMap(){
   const map={};
   allNormalizedRows().forEach(x=>{
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
-      if(x.sub!=='01'||x.pos<1||x.pos>12)return;
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return;
     }else if(x.prefix==='A'||x.prefix==='B'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
@@ -2326,11 +2434,120 @@ function buildSanitationPanel(){
 
 }
 
+
+function rawVal(r,...keys){
+  for(const k of keys){
+    if(r && r[k]!==undefined && r[k]!==null) return r[k];
+  }
+  return '';
+}
+function masterboxStreet(loc){
+  const s=String(loc||'').trim().toUpperCase();
+  if(s.startsWith('PM')) return 'PM';
+  const c=s.charAt(0);
+  return ['C','D','E','F','G','H'].includes(c)?c:'';
+}
+function isConfiguredForMfc(group){
+  const g=String(group||'').trim().toUpperCase();
+  if(!g || g==='SIN GRUPO') return false;
+  // Incluye FMFC*, QMFC*, REFMFC, CONMFC, MMFCL y futuros grupos cuyo código indique MFC.
+  return g.includes('MFC');
+}
+function mfcLogicalDestination(group){
+  const g=String(group||'').trim().toUpperCase();
+  const prefixes=new Set();
+  Object.entries(LOCATION_GROUP).forEach(([module,grp])=>{
+    if(String(grp||'').toUpperCase()!==g) return;
+    const m=String(module).match(/^(MFCA|MFCB|MFCC)/);
+    if(m) prefixes.add(m[1]);
+  });
+  if(prefixes.size) return [...prefixes].join(' / ');
+  return 'MFC · '+g;
+}
+function mbMfcCandidates(){
+  const agg=new Map();
+  DATA.forEach(r=>{
+    const loc=String(rawVal(r,'Ubicacion','ubicacion')||'').trim().toUpperCase();
+    const street=masterboxStreet(loc);
+    if(!street) return;
+    const area=String(rawVal(r,'Area','area')||'').trim().toUpperCase();
+    if(area!=='PICKING') return;
+    const saldo=Number(rawVal(r,'Saldo','saldo')||0)||0;
+    if(saldo<=0) return;
+    const ean=String(rawVal(r,'EAN','ean')||'').trim();
+    if(!ean) return;
+    const group=String(SKU_GROUP[ean]||'').trim().toUpperCase();
+    if(!isConfiguredForMfc(group)) return;
+
+    const key=loc+'|'+ean;
+    if(!agg.has(key)){
+      agg.set(key,{
+        street,loc,ean,group,saldo:0,
+        referencia:String(rawVal(r,'referencia','Referencia')||'').trim(),
+        descripcion:String(rawVal(r,'Descripcion','descripcion')||'').trim(),
+        unidad:String(rawVal(r,'UnidadMedida','unidad')||'').trim(),
+        ultimo:String(rawVal(r,'Fecha Ultimo Mov','ultimo')||'').trim()
+      });
+    }
+    const x=agg.get(key);
+    x.saldo+=saldo;
+    if(!x.descripcion) x.descripcion=String(rawVal(r,'Descripcion','descripcion')||'').trim();
+    if(!x.referencia) x.referencia=String(rawVal(r,'referencia','Referencia')||'').trim();
+    if(!x.ultimo) x.ultimo=String(rawVal(r,'Fecha Ultimo Mov','ultimo')||'').trim();
+  });
+  return [...agg.values()].sort((a,b)=>a.street.localeCompare(b.street)||a.loc.localeCompare(b.loc)||a.ean.localeCompare(b.ean));
+}
+function buildMbMfcPanel(){
+  const all=mbMfcCandidates();
+  const streetSel=$('mbMfcStreetFilter');
+  const groupSel=$('mbMfcGroupFilter');
+  const q=norm($('mbMfcSearch')?.value||'');
+
+  const groups=[...new Set(all.map(x=>x.group))].sort();
+  const currentGroup=groupSel.value||'ALL';
+  groupSel.innerHTML='<option value="ALL">Todos</option>'+groups.map(g=>'<option value="'+esc(g)+'">'+esc(g)+'</option>').join('');
+  groupSel.value=groups.includes(currentGroup)?currentGroup:'ALL';
+
+  const street=streetSel.value||'ALL';
+  const group=groupSel.value||'ALL';
+  const rows=all.filter(x=>{
+    if(street!=='ALL'&&x.street!==street)return false;
+    if(group!=='ALL'&&x.group!==group)return false;
+    if(q&&!norm([x.loc,x.ean,x.referencia,x.descripcion,x.group].join(' ')).includes(q))return false;
+    return true;
+  });
+
+  const skuSet=new Set(rows.map(x=>x.ean));
+  const posSet=new Set(rows.map(x=>x.loc));
+  const streets=new Set(rows.map(x=>x.street));
+  $('mbMfcSkuCount').textContent=skuSet.size.toLocaleString('es-AR');
+  $('mbMfcPosCount').textContent=posSet.size.toLocaleString('es-AR');
+  $('mbMfcUnits').textContent=Math.round(rows.reduce((s,x)=>s+x.saldo,0)).toLocaleString('es-AR');
+  $('mbMfcStreetCount').textContent=streets.size.toLocaleString('es-AR');
+
+  const body=$('mbMfcBody');
+  body.innerHTML=rows.map(x=>'<tr>'+
+    '<td><span class="mbMfcStreet">'+esc(x.street)+'</span></td>'+
+    '<td><span class="mbMfcLoc">'+esc(x.loc)+'</span></td>'+
+    '<td><b>'+esc(x.ean)+'</b>'+(x.referencia?'<br><span class="muted">Ref. '+esc(x.referencia)+'</span>':'')+'</td>'+
+    '<td>'+esc(x.descripcion||'—')+'</td>'+
+    '<td><b>'+Number(x.saldo).toLocaleString('es-AR')+'</b> '+esc(x.unidad||'')+'</td>'+
+    '<td><span class="mbMfcGroup">'+esc(x.group)+'</span></td>'+
+    '<td>'+esc(mfcLogicalDestination(x.group))+'</td>'+
+    '<td>'+esc(x.ultimo||'—')+'</td>'+
+  '</tr>').join('');
+  $('mbMfcEmpty').style.display=rows.length?'none':'block';
+}
+
 $('rackModeBtn').onclick=()=>setDisplayMode('rack');
 $('heatModeBtn').onclick=()=>setDisplayMode('heat');
 $('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
 $('kpiModeBtn').onclick=()=>setDisplayMode('kpi');
 $('sanitationModeBtn').onclick=()=>setDisplayMode('sanitation');
+$('mbMfcModeBtn').onclick=()=>setDisplayMode('mbmfc');
+$('mbMfcStreetFilter').onchange=()=>buildMbMfcPanel();
+$('mbMfcGroupFilter').onchange=()=>buildMbMfcPanel();
+$('mbMfcSearch').oninput=()=>buildMbMfcPanel();
 $('sanGroupSelect').onchange=()=>{
   localStorage.setItem('sanSelectedGroup',$('sanGroupSelect').value||'');
   sanOperatorIndex=0;
@@ -2406,7 +2623,7 @@ function applyStockPayload(payload,{fromCache=false}={}){
   if(displayMode==='heat')buildHeatmap();
   if(displayMode==='occupancy')buildOccupancyMap();
   if(displayMode==='kpi')buildKpiPanel();
-  if(displayMode==='sanitation')buildSanitationPanel();
+  if(displayMode==='sanitation')buildSanitationPanel();if(displayMode==='mbmfc')buildMbMfcPanel();
 
   return updatedAt;
 }
