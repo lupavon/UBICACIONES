@@ -1866,17 +1866,23 @@ function trCurrentPositiveStart(result,skuInfo){
 }
 
 function trBoxSkuMap(items){
+  // Una misma caja puede contener más de un SKU.
+  // No mapear caja -> SKU único: conservar TODOS los SKU actuales de esa caja.
   const mp=new Map();
   items.forEach(x=>{
     const c=String(x.caja||'').trim();
     if(!c)return;
-    mp.set(c,{
+    if(!mp.has(c))mp.set(c,[]);
+    const sku={
       sku:skuKey(x),
       ean:String(x.ean||'').trim(),
       referencia:String(x.referencia||'').trim(),
       descripcion:String(x.descripcion||'').trim(),
       saldoActual:Number(x.saldo||0)
-    });
+    };
+    const arr=mp.get(c);
+    const key=String(sku.sku||sku.ean||sku.referencia||'').trim();
+    if(!arr.some(s=>String(s.sku||s.ean||s.referencia||'').trim()===key))arr.push(sku);
   });
   return mp;
 }
@@ -1886,10 +1892,13 @@ function analyzeMixTrace(loc,items,results){
   const boxEvents=[];
 
   (results||[]).filter(r=>r?.ok).forEach(r=>{
-    const info=skuByBox.get(String(r.caja||'').trim());
-    if(!info)return;
-    const ev=trCurrentPositiveStart(r,info);
-    if(ev)boxEvents.push(ev);
+    const infos=skuByBox.get(String(r.caja||'').trim())||[];
+    // Importante: una sola caja puede traer varios EAN agrupados en movimientos
+    // (como 272687 con 7969 y 8161). Analizar cada SKU por separado.
+    infos.forEach(info=>{
+      const ev=trCurrentPositiveStart(r,info);
+      if(ev)boxEvents.push(ev);
+    });
   });
 
   // Un SKU puede estar en más de una caja. Para saber desde cuándo está presente
@@ -1969,7 +1978,7 @@ function mixTraceHtml(state){
       })),null,2))+'</div></details>';
   }
 
-  h+='<div class="mixTraceNote">Criterio: para cada SKU actualmente presente se busca, en la trazabilidad de su caja, el comienzo de su saldo positivo actual. El SKU cuya presencia activa comenzó último es el que generó la convivencia actual. El responsable mostrado es <strong>Nombre_empleado</strong> de ese movimiento.</div></div>';
+  h+='<div class="mixTraceNote">Criterio: para cada SKU actualmente presente se busca, incluso cuando comparte la misma caja con otros SKU, el comienzo de su saldo positivo actual. El SKU cuya presencia activa comenzó último es el que generó la convivencia actual. El responsable mostrado es <strong>Nombre_empleado</strong> de ese movimiento.</div></div>';
   return h;
 }
 function requestMixTrace(loc,items,force=false){
