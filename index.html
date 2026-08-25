@@ -539,6 +539,76 @@ html,body{max-width:100%;overflow-x:hidden}
   font-size:12px;
 }
 
+
+/* ===== v39 · panel de detalle debajo del layout ===== */
+.layout{
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:calc(100vh - 74px)!important;
+}
+.main{
+  width:100%!important;
+  padding:18px!important;
+  overflow:auto!important;
+}
+.side{
+  position:static!important;
+  width:100%!important;
+  height:auto!important;
+  max-height:none!important;
+  border-left:0!important;
+  border-top:1px solid #303642!important;
+  background:#151922!important;
+  padding:18px 22px 24px!important;
+  overflow:visible!important;
+}
+.side h2{
+  margin:0 0 12px!important;
+}
+#detail{
+  width:100%!important;
+}
+#detail .detailCard{
+  max-width:none!important;
+}
+
+/* Aprovechar el ancho: detalle en columnas cuando hay espacio */
+@media(min-width:1000px){
+  #detail .detailCard{
+    display:grid;
+    grid-template-columns:minmax(270px,340px) minmax(0,1fr);
+    gap:14px 18px;
+    align-items:start;
+  }
+  #detail .detailCard > .loc,
+  #detail .detailCard > .locBoxes,
+  #detail .detailCard > .muted,
+  #detail .detailCard > .groups,
+  #detail .detailCard > .alert{
+    grid-column:1;
+  }
+  #detail .detailCard > .mixTraceBox,
+  #detail .detailCard > .movePlan,
+  #detail .detailCard > .item,
+  #detail .detailCard > .notice{
+    grid-column:2;
+  }
+  #detail .detailCard > .item{
+    margin-top:0;
+  }
+  #detail .detailCard > .movePlan{
+    margin-top:0;
+    border-top:0;
+    padding-top:0;
+  }
+}
+
+/* En móvil/tablet queda apilado normal */
+@media(max-width:999px){
+  .main{padding:10px 8px 14px!important}
+  .side{padding:14px 12px 24px!important}
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1790,7 +1860,7 @@ function trEstado(m){return String(trPick(m,['Estado','estado'])||'').trim()}
 function trTransaccion(m){return String(trPick(m,['Transaccion','Transacción','transaccion'])||'').trim()}
 function trNoControl(m){return String(trPick(m,['NoControl','No Control','nocontrol'])||'').trim()}
 
-function trRowsForSku(result,skuInfo){
+function trRowsForSku(result,skuInfo,{strict=false}={}){
   const wanted=new Set(
     [skuInfo?.ean,skuInfo?.referencia,skuInfo?.sku]
       .map(x=>String(x??'').trim())
@@ -1799,7 +1869,8 @@ function trRowsForSku(result,skuInfo){
   let rows=trArr(result?.movimientos).filter(x=>x&&typeof x==='object');
   if(wanted.size){
     const exact=rows.filter(x=>wanted.has(trEan(x)));
-    if(exact.length)rows=exact;
+    if(exact.length) rows=exact;
+    else if(strict) rows=[];
   }
   return rows
     .map(raw=>({
@@ -1823,8 +1894,8 @@ function trRowsForSku(result,skuInfo){
   el primer movimiento posterior al último momento en que el saldo quedó en 0.
   Así evitamos atribuir una mezcla actual a una entrada histórica ya consumida.
 */
-function trCurrentPositiveStart(result,skuInfo){
-  const rows=trRowsForSku(result,skuInfo);
+function trCurrentPositiveStart(result,skuInfo,{strict=false}={}){
+  const rows=trRowsForSku(result,skuInfo,{strict});
   if(!rows.length)return null;
 
   // Si Copérnico informa saldo, usarlo como fuente principal.
@@ -1888,21 +1959,36 @@ function trBoxSkuMap(items){
 }
 
 function analyzeMixTrace(loc,items,results){
-  const skuByBox=trBoxSkuMap(items);
+  // SKU actualmente presentes en la ubicación, independientemente de que cada fila
+  // de stock tenga o no tenga caja informada.
+  const currentSkuMap=new Map();
+  (items||[]).forEach(x=>{
+    const key=String(skuKey(x)||x.ean||x.referencia||'').trim();
+    if(!key)return;
+    if(!currentSkuMap.has(key)){
+      currentSkuMap.set(key,{
+        sku:key,
+        ean:String(x.ean||'').trim(),
+        referencia:String(x.referencia||'').trim(),
+        descripcion:String(x.descripcion||'').trim(),
+        saldoActual:Number(x.saldo||0)
+      });
+    }
+  });
+  const currentSkus=[...currentSkuMap.values()];
   const boxEvents=[];
 
+  // Cada caja consultada puede contener movimientos de varios SKU.
+  // Probar cada SKU actual contra cada caja y conservar solamente coincidencias EAN exactas.
   (results||[]).filter(r=>r?.ok).forEach(r=>{
-    const infos=skuByBox.get(String(r.caja||'').trim())||[];
-    // Importante: una sola caja puede traer varios EAN agrupados en movimientos
-    // (como 272687 con 7969 y 8161). Analizar cada SKU por separado.
-    infos.forEach(info=>{
-      const ev=trCurrentPositiveStart(r,info);
+    currentSkus.forEach(info=>{
+      const ev=trCurrentPositiveStart(r,info,{strict:true});
       if(ev)boxEvents.push(ev);
     });
   });
 
-  // Un SKU puede estar en más de una caja. Para saber desde cuándo está presente
-  // en la posición, tomar el inicio activo más antiguo entre sus cajas actuales.
+  // Un mismo SKU puede aparecer en más de una caja. Su presencia activa en la ubicación
+  // comienza con el evento activo más antiguo entre las cajas que todavía lo sostienen.
   const bySku=new Map();
   for(const ev of boxEvents){
     const k=String(ev.sku||ev.ean||'').trim();
@@ -1913,19 +1999,20 @@ function analyzeMixTrace(loc,items,results){
 
   const skuEvents=[...bySku.values()].sort((a,b)=>a.time-b.time);
   let cause=null;
+
+  // Solo declarar responsable si pudimos reconstruir al menos dos SKU actuales.
   if(skuEvents.length>=2){
-    // El SKU cuya presencia activa comenzó último es el que generó
-    // la convivencia actual de más de un SKU.
     const latest=skuEvents[skuEvents.length-1];
     if(latest.employee && !isNaN(latest.time))cause=latest;
   }
 
   return {
     loc,
-    currentSkuCount:[...new Set(items.map(skuKey).filter(Boolean))].length,
+    currentSkuCount:currentSkus.length,
     skuEvents,
     boxEvents,
-    cause
+    cause,
+    unresolvedSkus:currentSkus.filter(s=>!bySku.has(String(s.sku||s.ean||'').trim()))
   };
 }
 
@@ -1950,6 +2037,12 @@ function mixTraceHtml(state){
     h+='</div>';
   }else{
     h+='<div class="mixTraceResult">No pude identificar de forma concluyente el usuario que inició la convivencia actual de los SKU. Revisá la evidencia inferior.</div>';
+  }
+
+  
+  if(a.unresolvedSkus?.length){
+    h+='<div class="mixTraceResult" style="margin-top:7px;color:#ffd987">SKU actuales sin evento activo reconstruido: '+
+      a.unresolvedSkus.map(s=>esc(s.ean||s.sku||'?')).join(', ')+'</div>';
   }
 
   if(a.skuEvents?.length){
