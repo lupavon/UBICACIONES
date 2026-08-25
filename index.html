@@ -1105,6 +1105,12 @@ html,body{max-width:100%;overflow-x:hidden}
 .mixTraceRetry{margin-top:8px;font-size:9px;padding:6px 8px}
 </style>
 
+
+<style>
+.mixTraceDebug{margin-top:10px;border-top:1px solid #34404d;padding-top:8px}
+.mixTraceDebug summary{cursor:pointer;color:#8fdcff;font-size:9px;font-weight:800}
+.mixTraceRaw{margin-top:7px;background:#0b1117;border:1px solid #2d3945;border-radius:6px;padding:7px;max-height:240px;overflow:auto;font:9px/1.35 ui-monospace,Consolas,monospace;color:#c8d2dd;white-space:pre-wrap;word-break:break-word}
+</style>
 </head>
 <body>
 <div class="top">
@@ -1718,10 +1724,23 @@ function trDateValue(m){
   if(mm){let y=+mm[3];if(y<100)y+=2000;return new Date(y,+mm[2]-1,+mm[1],+mm[4],+mm[5],+(mm[6]||0)).getTime()}
   return NaN;
 }
-function trUser(m){return String(trPick(m,['Usuario','User','Operador','Empleado','NombreEmpleado','Nombre Empleado','Responsable','Operario','Login','Username'])||'').trim()}
-function trLoc(m){return String(trPick(m,['Ubicacion','Ubicación','Posicion','Posición','Destino','UbicacionDestino','Ubicación Destino','Location'])||'').trim()}
-function trMove(m){return String(trPick(m,['Movimiento','TipoMovimiento','Tipo Movimiento','Proceso','Accion','Acción','Operacion','Operación','Descripcion','Descripción'])||'').trim()}
+function trUser(m){
+  const v=String(trPick(m,['Usuario','User','Operador','Empleado','NombreEmpleado','Nombre Empleado','Responsable','Operario','Login','Username','UsuarioMovimiento','Usuario Mov'])||'').trim();
+  // Evitar IDs/cantidades interpretados como usuario.
+  return /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(v)?v:'';
+}
+function trLoc(m){return String(trPick(m,['Ubicacion','Ubicación','Posicion','Posición','Destino','UbicacionDestino','Ubicación Destino','Location','UbicacionFinal','Ubicación Final'])||'').trim()}
+function trMove(m){
+  const v=String(trPick(m,['Movimiento','TipoMovimiento','Tipo Movimiento','Proceso','Accion','Acción','Operacion','Operación','Motivo','Evento'])||'').trim();
+  return v;
+}
 function trTimeLabel(m){return String(trDateRaw(m)||'—')}
+function trSourceRows(result){
+  const out=[];
+  trArr(result?.movimientos).forEach(x=>out.push({source:'movimientos',raw:x}));
+  trArr(result?.ubicaciones).forEach(x=>out.push({source:'ubicaciones',raw:x}));
+  return out;
+}
 function trEventMatchesLoc(m,loc){
   const want=trNorm(loc); if(!want)return false;
   const direct=trNorm(trLoc(m)); if(direct && direct.includes(want))return true;
@@ -1733,16 +1752,17 @@ function trBoxSkuMap(items){
   return mp;
 }
 function trLatestArrivalForBox(result,loc,skuInfo){
-  const mov=trArr(result?.movimientos);
-  let cand=mov.filter(m=>trEventMatchesLoc(m,loc));
-  if(!cand.length)cand=mov;
-  if(!cand.length)return null;
+  const rows=trSourceRows(result);
+  if(!rows.length)return null;
+  // Preferir registros que mencionen explícitamente la ubicación objetivo.
+  let cand=rows.filter(x=>trEventMatchesLoc(x.raw,loc));
+  if(!cand.length)cand=rows;
   cand=[...cand].sort((a,b)=>{
-    const da=trDateValue(a),db=trDateValue(b);
+    const da=trDateValue(a.raw),db=trDateValue(b.raw);
     if(isNaN(da)&&isNaN(db))return 0;if(isNaN(da))return -1;if(isNaN(db))return 1;return da-db;
   });
-  const m=cand[cand.length-1];
-  return {caja:String(result.caja||''),sku:skuInfo?.sku||'',ean:skuInfo?.ean||'',descripcion:skuInfo?.descripcion||'',user:trUser(m),time:trDateValue(m),timeLabel:trTimeLabel(m),move:trMove(m),raw:m};
+  const x=cand[cand.length-1],m=x.raw;
+  return {caja:String(result.caja||''),sku:skuInfo?.sku||'',ean:skuInfo?.ean||'',descripcion:skuInfo?.descripcion||'',user:trUser(m),time:trDateValue(m),timeLabel:trTimeLabel(m),move:trMove(m),source:x.source,raw:m,rawResult:result};
 }
 function analyzeMixTrace(loc,items,results){
   const skuByBox=trBoxSkuMap(items),events=[];
@@ -1758,7 +1778,7 @@ function analyzeMixTrace(loc,items,results){
   for(const ev of events){
     if(!ev.sku)continue;
     if(!distinct.includes(ev.sku)){
-      if(distinct.length>=1 && !cause)cause=ev;
+      if(distinct.length>=1 && !cause && ev.user && !isNaN(ev.time))cause=ev;
       distinct.push(ev.sku);
     }
   }
@@ -1778,10 +1798,11 @@ function mixTraceHtml(state){
   }
   if(a.events?.length){
     h+='<div class="mixTraceEvidence">';
-    a.events.forEach(ev=>{h+='<div class="mixTraceEvent"><span>'+esc(ev.timeLabel||'—')+'</span><div><b>Caja '+esc(ev.caja)+'</b> · <span class="mixTraceSku">'+esc(ev.ean||ev.sku||'SKU ?')+'</span><br><span class="mixTraceUser">'+esc(ev.user||'usuario ?')+'</span>'+(ev.move?' · '+esc(ev.move):'')+'</div></div>'});
+    a.events.forEach(ev=>{h+='<div class="mixTraceEvent"><span>'+esc(ev.timeLabel||'—')+'</span><div><b>Caja '+esc(ev.caja)+'</b> · <span class="mixTraceSku">'+esc(ev.ean||ev.sku||'SKU ?')+'</span><br><span class="mixTraceUser">'+esc(ev.user||'usuario no identificado')+'</span>'+(ev.move?' · '+esc(ev.move):'')+(ev.source?' · '+esc(ev.source):'')+'</div></div>'});
     h+='</div>';
+    h+='<details class="mixTraceDebug"><summary>Ver respuesta técnica de Copérnico</summary><div class="mixTraceRaw">'+esc(JSON.stringify(a.events.map(ev=>({caja:ev.caja,source:ev.source,raw:ev.raw})),null,2))+'</div></details>';
   }
-  h+='<div class="mixTraceNote">Criterio: se ordena el último ingreso localizado de cada caja actualmente presente. El primer ingreso perteneciente a un SKU distinto se marca como probable causante. Se muestra como evidencia operativa, no como sanción automática.</div></div>';
+  h+='<div class="mixTraceNote">Criterio: solo se marca responsable cuando el segundo SKU tiene fecha válida y un campo de usuario textual identificable. Si Copérnico devuelve IDs o campos ambiguos, queda en REVISAR y se muestra la respuesta técnica.</div></div>';
   return h;
 }
 function requestMixTrace(loc,items,force=false){
