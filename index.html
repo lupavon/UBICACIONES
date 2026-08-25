@@ -505,6 +505,10 @@ html,body{max-width:100%;overflow-x:hidden}
   .layoutHeatStat{min-width:78px}
 }
 
+
+.locBoxes{margin-top:5px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;font-size:10px;color:#9aa3af}
+.locBoxes b{color:#dfe7f0;font-size:11px}
+.locBoxTag{display:inline-flex;align-items:center;padding:3px 7px;border-radius:6px;background:#10233a;border:1px solid #285a91;color:#8ecbff;font-weight:900;font-size:10px}
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1976,8 +1980,11 @@ function showDetail(mod,sub,pos,items,st){
  selected=view+'-'+mod+'-'+sub+'-'+pos;rebuild();
  const modTxt=cfg.kind==='ab'?String(mod).padStart(2,'0'):String(mod);
  const loc=cfg.prefix+modTxt+sub+String(pos).padStart(2,'0'),lg=LOCATION_GROUP[gkey]||'SIN DEFINIR',
- skus=[...new Set(items.map(skuKey).filter(Boolean))];
- let h='<div class="detailCard"><div class="loc">'+esc(loc)+'</div><div class="muted">'+esc(cfg.label)+' · módulo '+esc(modTxt)+' · nivel '+esc(sub)+' · posición '+String(pos).padStart(2,'0')+'</div><div class="groups"><div class="gbox"><small>Grupo ubicación</small><b>'+esc(lg)+'</b></div><div class="gbox"><small>SKU distintos</small><b>'+skus.length+'</b></div></div>';
+ skus=[...new Set(items.map(skuKey).filter(Boolean))],
+ boxes=[...new Set(items.map(x=>String(x.caja||'').trim()).filter(Boolean))];
+ let h='<div class="detailCard"><div class="loc">'+esc(loc)+'</div>';
+ if(boxes.length)h+='<div class="locBoxes"><b>Caja'+(boxes.length>1?'s':'')+':</b> '+boxes.map(c=>'<span class="locBoxTag">'+esc(c)+'</span>').join('')+'</div>';
+ h+='<div class="muted">'+esc(cfg.label)+' · módulo '+esc(modTxt)+' · nivel '+esc(sub)+' · posición '+String(pos).padStart(2,'0')+'</div><div class="groups"><div class="gbox"><small>Grupo ubicación</small><b>'+esc(lg)+'</b></div><div class="gbox"><small>SKU distintos</small><b>'+skus.length+'</b></div></div>';
  if(st==='multi')h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div><div id="mixTraceHolder"></div>';
  if(st==='bad')h+='<div class="alert bad">⚠ SKU almacenado fuera de su grupo</div>';
  if(!items.length)h+='<div class="notice">Posición vacía.</div>';
@@ -2132,6 +2139,8 @@ function openHeatMixTrace(key){
   currentDetailTraceContext={loc:ctx.loc,items:ctx.items};
   let h='<div class="detailCard"><button class="btn" type="button" onclick="showLayoutHeatDetailFromLast()">← Volver al módulo</button>';
   h+='<div class="loc" style="margin-top:10px">'+esc(ctx.loc)+'</div>';
+  const boxes=[...new Set(ctx.items.map(x=>String(x.caja||'').trim()).filter(Boolean))];
+  if(boxes.length)h+='<div class="locBoxes"><b>Caja'+(boxes.length>1?'s':'')+':</b> '+boxes.map(c=>'<span class="locBoxTag">'+esc(c)+'</span>').join('')+'</div>';
   h+='<div class="muted">Posición con mezcla · '+esc(ctx.moduleLabel)+'</div>';
   h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div>';
   h+='<div id="mixTraceHolder">'+mixTraceHtml(MIX_TRACE_CACHE.get(trNorm(ctx.loc))||{status:'loading'})+'</div>';
