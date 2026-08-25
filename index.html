@@ -823,6 +823,145 @@ html,body{max-width:100%;overflow-x:hidden}
   }
 }
 
+
+/* ===== v42 · Heatmap + detalle lado a lado ===== */
+body.heatSplit .layout{
+  display:block!important;
+}
+body.heatSplit .main{
+  width:100%!important;
+  max-width:none!important;
+  padding:16px!important;
+}
+body.heatSplit #heatmapView{
+  display:grid!important;
+  grid-template-columns:minmax(500px,36%) minmax(0,64%)!important;
+  grid-template-rows:auto auto auto auto 1fr!important;
+  column-gap:28px!important;
+  align-items:start!important;
+  overflow:visible!important;
+}
+body.heatSplit #heatmapView > .layoutHeatTitle,
+body.heatSplit #heatmapView > .layoutHeatSubtitle,
+body.heatSplit #heatmapView > .layoutHeatToolbar,
+body.heatSplit #heatmapView > .layoutHeatHint,
+body.heatSplit #heatmapView > .layoutHeatViewport{
+  grid-column:1!important;
+}
+body.heatSplit #heatmapView > .layoutHeatTitle{grid-row:1}
+body.heatSplit #heatmapView > .layoutHeatSubtitle{grid-row:2}
+body.heatSplit #heatmapView > .layoutHeatToolbar{grid-row:3}
+body.heatSplit #heatmapView > .layoutHeatHint{grid-row:4}
+body.heatSplit #heatmapView > .layoutHeatViewport{grid-row:5}
+
+body.heatSplit #heatDetailHost{
+  grid-column:2!important;
+  grid-row:1 / span 5!important;
+  min-width:0!important;
+  width:100%!important;
+  align-self:start!important;
+  padding-top:52px!important;
+}
+body.heatSplit #heatDetailHost .detailSection{
+  display:block!important;
+  width:100%!important;
+  background:transparent!important;
+  border:0!important;
+  padding:0!important;
+}
+body.heatSplit #heatDetailHost .detailSectionInner{
+  width:100%!important;
+  max-width:none!important;
+}
+body.heatSplit #heatDetailHost .detailSection h2{
+  display:none!important;
+}
+body.heatSplit #heatDetailHost #detail{
+  width:100%!important;
+  font-size:15px!important;
+}
+body.heatSplit #heatDetailHost #detail .detailCard{
+  width:100%!important;
+  max-width:none!important;
+  display:block!important;
+  padding:18px!important;
+  border-radius:10px!important;
+}
+body.heatSplit #heatDetailHost #detail .loc{
+  font-size:28px!important;
+}
+body.heatSplit #heatDetailHost #detail .locBoxes,
+body.heatSplit #heatDetailHost #detail .locBoxes b,
+body.heatSplit #heatDetailHost #detail .locBoxTag{
+  font-size:14px!important;
+}
+body.heatSplit #heatDetailHost #detail .muted{font-size:13px!important}
+body.heatSplit #heatDetailHost #detail .groups{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+body.heatSplit #heatDetailHost #detail .gbox{
+  padding:11px 12px!important;
+}
+body.heatSplit #heatDetailHost #detail .alert{
+  font-size:18px!important;
+  padding:14px 15px!important;
+}
+body.heatSplit #heatDetailHost #detail .mixTraceBox{
+  margin-top:16px!important;
+  padding:16px!important;
+  font-size:14px!important;
+}
+body.heatSplit #heatDetailHost #detail .mixTraceHead{
+  font-size:17px!important;
+}
+body.heatSplit #heatDetailHost #detail .mixTraceResult{
+  font-size:14px!important;
+  line-height:1.45!important;
+}
+body.heatSplit #heatDetailHost #detail .mixTraceEvent{
+  font-size:13px!important;
+  grid-template-columns:145px 1fr!important;
+}
+body.heatSplit #heatDetailHost #detail .movePlan{
+  margin-top:16px!important;
+}
+body.heatSplit #heatDetailHost #detail .item{
+  padding:14px 0!important;
+}
+body.heatSplit #heatDetailHost #detail .item > b{
+  font-size:18px!important;
+}
+
+/* mapa compacto dentro de su columna */
+body.heatSplit .layoutHeatViewport{
+  width:100%!important;
+  min-width:0!important;
+  overflow:auto!important;
+  padding:12px!important;
+}
+body.heatSplit .layoutHeatGrid{
+  transform-origin:top left;
+}
+
+/* En pantallas más chicas vuelve a apilarse */
+@media(max-width:1200px){
+  body.heatSplit #heatmapView{
+    grid-template-columns:1fr!important;
+  }
+  body.heatSplit #heatmapView > .layoutHeatTitle,
+  body.heatSplit #heatmapView > .layoutHeatSubtitle,
+  body.heatSplit #heatmapView > .layoutHeatToolbar,
+  body.heatSplit #heatmapView > .layoutHeatHint,
+  body.heatSplit #heatmapView > .layoutHeatViewport,
+  body.heatSplit #heatDetailHost{
+    grid-column:1!important;
+    grid-row:auto!important;
+  }
+  body.heatSplit #heatDetailHost{padding-top:18px!important}
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1497,6 +1636,7 @@ html,body{max-width:100%;overflow-x:hidden}
       <div class="layoutHeatSectionLabel">SECO MFC ACTUAL</div>
       <div id="heatmap" class="layoutHeatGrid"></div>
     </div>
+    <div id="heatDetailHost"></div>
   </div>
 
   <div id="occupancyView" style="display:none">
@@ -1696,6 +1836,7 @@ html,body{max-width:100%;overflow-x:hidden}
 </main>
 </div>
 
+<div id="detailHomeAnchor"></div>
 <section class="detailSection">
   <div class="detailSectionInner">
     <h2>Detalle de posición</h2>
@@ -2378,8 +2519,28 @@ $('fileInput').onchange=async e=>{
 
 let displayMode='rack';
 
+
+function placeDetailForMode(mode){
+  const section=document.querySelector('.detailSection');
+  const host=document.getElementById('heatDetailHost');
+  const home=document.getElementById('detailHomeAnchor');
+  if(!section||!home)return;
+
+  if(mode==='heat' && host){
+    if(section.parentNode!==host) host.appendChild(section);
+    document.body.classList.add('heatSplit');
+  }else{
+    document.body.classList.remove('heatSplit');
+    if(section.parentNode!==home.parentNode || section.previousElementSibling!==home){
+      home.insertAdjacentElement('afterend',section);
+    }
+  }
+}
+
+
 function setDisplayMode(mode){
   displayMode=mode;
+  placeDetailForMode(mode);
   $('rackView').style.display=mode==='rack'?'block':'none';
   $('heatmapView').style.display=mode==='heat'?'block':'none';
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
@@ -3453,6 +3614,7 @@ if(refreshBtn){
 // 1) mostrar cache inmediatamente;
 // 2) buscar stock nuevo en segundo plano;
 // 3) refrescar cada 5 minutos.
+placeDetailForMode(displayMode);
 loadCachedStock();
 refreshVisibleStockStatus();
 loadPublishedStock({silent:true});
