@@ -1969,7 +1969,38 @@ function buildHeatmap(){
   });
 }
 
+const HEAT_MIX_LOOKUP=new Map();
+function heatMixKey(loc){return 'hm_'+String(loc||'').toUpperCase().replace(/[^A-Z0-9]/g,'_')}
+
+function openHeatMixTrace(key){
+  const ctx=HEAT_MIX_LOOKUP.get(key);
+  if(!ctx)return;
+  currentDetailTraceContext={loc:ctx.loc,items:ctx.items};
+  let h='<div class="detailCard"><button class="btn" type="button" onclick="showLayoutHeatDetailFromLast()">← Volver al módulo</button>';
+  h+='<div class="loc" style="margin-top:10px">'+esc(ctx.loc)+'</div>';
+  h+='<div class="muted">Posición con mezcla · '+esc(ctx.moduleLabel)+'</div>';
+  h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div>';
+  h+='<div id="mixTraceHolder">'+mixTraceHtml(MIX_TRACE_CACHE.get(trNorm(ctx.loc))||{status:'loading'})+'</div>';
+  ctx.items.forEach(x=>{
+    h+='<div class="item"><b>'+esc(x.descripcion||'(sin descripción)')+'</b>'+
+       '<div class="muted">SKU '+esc(x.ean||'')+' · Ref. '+esc(x.referencia||'')+'</div>'+
+       '<div>Saldo: <b>'+Number(x.saldo||0).toLocaleString('es-AR')+'</b> '+esc(x.unidad||'')+'</div>'+
+       '<div class="muted">Caja '+esc(x.caja||'—')+' · Últ. mov. '+esc(x.ultimo||'—')+'</div></div>';
+  });
+  h+='</div>';
+  $('detail').innerHTML=h;
+  requestMixTrace(ctx.loc,ctx.items,false);
+}
+
+let LAST_HEAT_DETAIL=null;
+function showLayoutHeatDetailFromLast(){
+  if(LAST_HEAT_DETAIL)showLayoutHeatDetail(LAST_HEAT_DETAIL.moduleKey,LAST_HEAT_DETAIL.displayLabel,LAST_HEAT_DETAIL.mixes);
+}
+
 function showLayoutHeatDetail(moduleKey,displayLabel,mixes){
+  LAST_HEAT_DETAIL={moduleKey,displayLabel,mixes};
+  currentDetailTraceContext=null;
+  HEAT_MIX_LOOKUP.clear();
   let h='<div class="detailCard"><div class="loc">'+esc(displayLabel)+'</div>';
   h+='<div class="muted">Mapa superior · Layout Secos MFC</div>';
   h+='<div class="groups"><div class="gbox"><small>Posiciones con mezcla</small><b>'+mixes.length+'</b></div><div class="gbox"><small>Grupo ubicación</small><b>'+esc(LOCATION_GROUP[moduleKey]||'SIN DEFINIR')+'</b></div></div>';
@@ -1977,9 +2008,12 @@ function showLayoutHeatDetail(moduleKey,displayLabel,mixes){
     h+='<div class="notice">✓ Este módulo no tiene posiciones con más de 1 SKU.</div>';
   }else{
     mixes.sort((a,b)=>b.pos-a.pos).forEach(m=>{
-      // Display exact physical stock location from first row when available.
       const loc=(m.items[0]&&m.items[0].ubicacion)||moduleKey+'01'+String(m.pos).padStart(2,'0');
-      h+='<div class="item"><b>'+esc(loc)+'</b><div><b>'+m.skus.length+' SKU distintos</b> · Saldo '+Number(m.saldo).toLocaleString('es-AR')+'</div>';
+      const key=heatMixKey(loc);
+      HEAT_MIX_LOOKUP.set(key,{loc,items:m.items,moduleKey,moduleLabel:displayLabel});
+      h+='<div class="item" style="cursor:pointer" onclick="openHeatMixTrace(\''+key+'\')">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><b>'+esc(loc)+'</b><span class="mixTraceState">VER TRAZABILIDAD →</span></div>';
+      h+='<div><b>'+m.skus.length+' SKU distintos</b> · Saldo '+Number(m.saldo).toLocaleString('es-AR')+'</div>';
       const desc=[...new Set(m.items.map(x=>x.descripcion).filter(Boolean))];
       if(desc.length)h+='<div class="muted">'+desc.map(esc).join(' · ')+'</div>';
       h+='</div>';
