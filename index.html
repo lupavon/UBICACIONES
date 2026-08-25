@@ -1091,6 +1091,20 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style>
+/* v35 · trazabilidad de mezcla SKU */
+.mixTraceBox{margin-top:10px;border:1px solid #334150;background:#101821;border-radius:9px;padding:10px}
+.mixTraceHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.mixTraceHead b{font-size:11px;color:#eef4fa}.mixTraceState{font-size:8px;font-weight:900;padding:3px 6px;border-radius:9px;background:#25313d;color:#aab7c4}
+.mixTraceState.ok{background:#1e4a35;color:#a7e8bf}.mixTraceState.warn{background:#5a421f;color:#ffd78a}.mixTraceState.bad{background:#5a2930;color:#ffb2bb}
+.mixTraceResult{font-size:10px;line-height:1.45;color:#c9d3dd}.mixTraceResult strong{color:#fff}
+.mixTraceEvidence{margin-top:8px;border-top:1px solid #273340;padding-top:7px;display:flex;flex-direction:column;gap:5px}
+.mixTraceEvent{display:grid;grid-template-columns:68px 1fr;gap:7px;font-size:9px;color:#aeb9c5}
+.mixTraceEvent b{color:#e7eef5}.mixTraceUser{color:#79dcff;font-weight:900}.mixTraceSku{color:#ffcf80;font-weight:800}.mixTraceNote{font-size:8px;color:#7f8c99;margin-top:7px}
+.mixTraceRetry{margin-top:8px;font-size:9px;padding:6px 8px}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -1672,6 +1686,137 @@ function relocationPlanHtml(mod,sub,pos,items){
   return h;
 }
 
+
+/* ===== v35 · detección de responsable de mezcla vía extensión Trazabilidad ===== */
+const MIX_TRACE_CACHE=new Map();
+const MIX_TRACE_WAITERS=new Map();
+let mixTraceSeq=0;
+
+function trArr(v){return Array.isArray(v)?v:(Array.isArray(v?.data)?v.data:[])}
+function trNorm(s){return String(s??'').trim().toUpperCase().replace(/\s+/g,'')}
+function trPick(obj,names){
+  if(!obj||typeof obj!=='object')return '';
+  const entries=Object.entries(obj);
+  for(const n of names){
+    const exact=entries.find(([k])=>trNorm(k)===trNorm(n));
+    if(exact && exact[1]!==null && exact[1]!==undefined && String(exact[1]).trim()!=='')return exact[1];
+  }
+  for(const n of names){
+    const nn=trNorm(n);
+    const fuzzy=entries.find(([k,v])=>trNorm(k).includes(nn) && v!==null && v!==undefined && String(v).trim()!=='');
+    if(fuzzy)return fuzzy[1];
+  }
+  return '';
+}
+function trDateRaw(m){return trPick(m,['FechaHora','Fecha Hora','Fecha','Hora','Timestamp','CreatedAt','FechaMovimiento','Fecha Mov','FechaMovimientoCaja'])}
+function trDateValue(m){
+  const raw=trDateRaw(m); if(!raw)return NaN;
+  if(typeof raw==='number')return raw;
+  const s=String(raw).trim();
+  const d=new Date(s); if(!isNaN(d))return d.getTime();
+  const mm=s.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4}).*?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(mm){let y=+mm[3];if(y<100)y+=2000;return new Date(y,+mm[2]-1,+mm[1],+mm[4],+mm[5],+(mm[6]||0)).getTime()}
+  return NaN;
+}
+function trUser(m){return String(trPick(m,['Usuario','User','Operador','Empleado','NombreEmpleado','Nombre Empleado','Responsable','Operario','Login','Username'])||'').trim()}
+function trLoc(m){return String(trPick(m,['Ubicacion','Ubicación','Posicion','Posición','Destino','UbicacionDestino','Ubicación Destino','Location'])||'').trim()}
+function trMove(m){return String(trPick(m,['Movimiento','TipoMovimiento','Tipo Movimiento','Proceso','Accion','Acción','Operacion','Operación','Descripcion','Descripción'])||'').trim()}
+function trTimeLabel(m){return String(trDateRaw(m)||'—')}
+function trEventMatchesLoc(m,loc){
+  const want=trNorm(loc); if(!want)return false;
+  const direct=trNorm(trLoc(m)); if(direct && direct.includes(want))return true;
+  try{return trNorm(JSON.stringify(m)).includes(want)}catch(e){return false}
+}
+function trBoxSkuMap(items){
+  const mp=new Map();
+  items.forEach(x=>{const c=String(x.caja||'').trim();if(c)mp.set(c,{sku:skuKey(x),ean:x.ean,referencia:x.referencia,descripcion:x.descripcion})});
+  return mp;
+}
+function trLatestArrivalForBox(result,loc,skuInfo){
+  const mov=trArr(result?.movimientos);
+  let cand=mov.filter(m=>trEventMatchesLoc(m,loc));
+  if(!cand.length)cand=mov;
+  if(!cand.length)return null;
+  cand=[...cand].sort((a,b)=>{
+    const da=trDateValue(a),db=trDateValue(b);
+    if(isNaN(da)&&isNaN(db))return 0;if(isNaN(da))return -1;if(isNaN(db))return 1;return da-db;
+  });
+  const m=cand[cand.length-1];
+  return {caja:String(result.caja||''),sku:skuInfo?.sku||'',ean:skuInfo?.ean||'',descripcion:skuInfo?.descripcion||'',user:trUser(m),time:trDateValue(m),timeLabel:trTimeLabel(m),move:trMove(m),raw:m};
+}
+function analyzeMixTrace(loc,items,results){
+  const skuByBox=trBoxSkuMap(items),events=[];
+  (results||[]).filter(r=>r?.ok).forEach(r=>{
+    const info=skuByBox.get(String(r.caja||''));
+    const ev=trLatestArrivalForBox(r,loc,info);
+    if(ev)events.push(ev);
+  });
+  events.sort((a,b)=>{
+    if(isNaN(a.time)&&isNaN(b.time))return 0;if(isNaN(a.time))return 1;if(isNaN(b.time))return -1;return a.time-b.time;
+  });
+  const distinct=[]; let cause=null;
+  for(const ev of events){
+    if(!ev.sku)continue;
+    if(!distinct.includes(ev.sku)){
+      if(distinct.length>=1 && !cause)cause=ev;
+      distinct.push(ev.sku);
+    }
+  }
+  return {events,cause,distinct};
+}
+function mixTraceHtml(state){
+  if(!state)return '';
+  if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Buscando movimientos de las cajas de esta posición…</div></div>';
+  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">NO CONECTADO</span></div><div class="mixTraceResult">Abrí la extensión <strong>Trazabilidad de Cajas</strong> actualizada y mantené Copérnico logueado.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+  if(state.status==='error')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState bad">ERROR</span></div><div class="mixTraceResult">'+esc(state.error||'No se pudo consultar la trazabilidad.')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+  const a=state.analysis||{},cause=a.cause;
+  let h='<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState '+(cause?'ok':'warn')+'">'+(cause?'DETECTADO':'REVISAR')+'</span></div>';
+  if(cause){
+    h+='<div class="mixTraceResult">Probable generador de la mezcla: <strong class="mixTraceUser">'+esc(cause.user||'usuario no informado')+'</strong><br>Caja <strong>'+esc(cause.caja)+'</strong> · SKU <span class="mixTraceSku">'+esc(cause.ean||cause.sku)+'</span><br>Movimiento: '+esc(cause.move||'—')+' · '+esc(cause.timeLabel||'—')+'</div>';
+  }else{
+    h+='<div class="mixTraceResult">La trazabilidad encontrada no alcanza para identificar de forma concluyente quién incorporó el segundo SKU.</div>';
+  }
+  if(a.events?.length){
+    h+='<div class="mixTraceEvidence">';
+    a.events.forEach(ev=>{h+='<div class="mixTraceEvent"><span>'+esc(ev.timeLabel||'—')+'</span><div><b>Caja '+esc(ev.caja)+'</b> · <span class="mixTraceSku">'+esc(ev.ean||ev.sku||'SKU ?')+'</span><br><span class="mixTraceUser">'+esc(ev.user||'usuario ?')+'</span>'+(ev.move?' · '+esc(ev.move):'')+'</div></div>'});
+    h+='</div>';
+  }
+  h+='<div class="mixTraceNote">Criterio: se ordena el último ingreso localizado de cada caja actualmente presente. El primer ingreso perteneciente a un SKU distinto se marca como probable causante. Se muestra como evidencia operativa, no como sanción automática.</div></div>';
+  return h;
+}
+function requestMixTrace(loc,items,force=false){
+  if(!loc||!items?.length)return;
+  const boxes=[...new Set(items.map(x=>String(x.caja||'').trim()).filter(Boolean))];
+  if(!boxes.length)return;
+  const key=trNorm(loc);
+  if(!force && MIX_TRACE_CACHE.has(key))return;
+  MIX_TRACE_CACHE.set(key,{status:'loading'});refreshSelectedDetailTrace();
+  const requestId='mix-'+(++mixTraceSeq)+'-'+Date.now();
+  const timer=setTimeout(()=>{
+    if(MIX_TRACE_WAITERS.has(requestId)){
+      MIX_TRACE_WAITERS.delete(requestId);MIX_TRACE_CACHE.set(key,{status:'unavailable'});refreshSelectedDetailTrace();
+    }
+  },5000);
+  MIX_TRACE_WAITERS.set(requestId,{key,loc,items,timer});
+  window.postMessage({source:'UBICACIONES_APP',type:'TRAZA_QUERY_BOXES',requestId,boxes},'*');
+}
+window.addEventListener('message',ev=>{
+  if(ev.source!==window)return;const d=ev.data;
+  if(!d||d.source!=='TRAZA_UBICACIONES'||d.type!=='TRAZA_QUERY_RESULT')return;
+  const w=MIX_TRACE_WAITERS.get(d.requestId);if(!w)return;
+  clearTimeout(w.timer);MIX_TRACE_WAITERS.delete(d.requestId);
+  if(!d.ok)MIX_TRACE_CACHE.set(w.key,{status:'error',error:d.error||'No se pudo consultar'});
+  else MIX_TRACE_CACHE.set(w.key,{status:'ok',analysis:analyzeMixTrace(w.loc,w.items,d.results||[])});
+  refreshSelectedDetailTrace();
+});
+let currentDetailTraceContext=null;
+function refreshSelectedDetailTrace(){
+  if(!currentDetailTraceContext)return;
+  const holder=$('mixTraceHolder');if(!holder)return;
+  holder.innerHTML=mixTraceHtml(MIX_TRACE_CACHE.get(trNorm(currentDetailTraceContext.loc))||{status:'loading'});
+}
+function retryMixTrace(){if(currentDetailTraceContext)requestMixTrace(currentDetailTraceContext.loc,currentDetailTraceContext.items,true)}
+
 function showDetail(mod,sub,pos,items,st){
  const cfg=VIEWS[view],gkey=cfg.prefix+String(mod);
  selected=view+'-'+mod+'-'+sub+'-'+pos;rebuild();
@@ -1679,15 +1824,17 @@ function showDetail(mod,sub,pos,items,st){
  const loc=cfg.prefix+modTxt+sub+String(pos).padStart(2,'0'),lg=LOCATION_GROUP[gkey]||'SIN DEFINIR',
  skus=[...new Set(items.map(skuKey).filter(Boolean))];
  let h='<div class="detailCard"><div class="loc">'+esc(loc)+'</div><div class="muted">'+esc(cfg.label)+' · módulo '+esc(modTxt)+' · nivel '+esc(sub)+' · posición '+String(pos).padStart(2,'0')+'</div><div class="groups"><div class="gbox"><small>Grupo ubicación</small><b>'+esc(lg)+'</b></div><div class="gbox"><small>SKU distintos</small><b>'+skus.length+'</b></div></div>';
- if(st==='multi')h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div>';
+ if(st==='multi')h+='<div class="alert multi">⚠ Más de un SKU en la misma posición</div><div id="mixTraceHolder"></div>';
  if(st==='bad')h+='<div class="alert bad">⚠ SKU almacenado fuera de su grupo</div>';
  if(!items.length)h+='<div class="notice">Posición vacía.</div>';
  if(st==='multi')h+=relocationPlanHtml(mod,sub,pos,items);
  items.forEach(x=>{
-   const sg=x.String(grupoSku||SKU_GROUP[x.ean]||'SIN GRUPO').toUpperCase(),ok=lg!=='SIN DEFINIR'&&sg!=='SIN GRUPO'&&sg===lg;
+   const sg=String(x.grupoSku||SKU_GROUP[x.ean]||'SIN GRUPO').toUpperCase(),ok=lg!=='SIN DEFINIR'&&sg!=='SIN GRUPO'&&sg===lg;
    h+='<div class="item"><b>'+esc(x.descripcion||'(sin descripción)')+'</b><div class="muted">SKU '+esc(x.ean)+' · Ref. '+esc(x.referencia)+'</div><div class="groups"><div class="gbox"><small>Grupo SKU (VL)</small><b>'+esc(sg)+'</b></div><div class="gbox"><small>Validación</small><b>'+(ok?'✓ CORRECTO':(sg==='SIN GRUPO'||lg==='SIN DEFINIR'?'? SIN CLASIFICAR':'✕ INCORRECTO'))+'</b></div></div><div>Saldo: <b>'+Number(x.saldo||0).toLocaleString('es-AR')+'</b> '+esc(x.unidad)+'</div><div class="muted">Caja '+esc(x.caja)+' · Últ. mov. '+esc(x.ultimo)+'</div></div>';
  });
  h+='</div>';$('detail').innerHTML=h;
+ currentDetailTraceContext=st==='multi'?{loc,items}:null;
+ if(st==='multi')requestMixTrace(loc,items);
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-view]').forEach(x=>x.classList.remove('active'));b.classList.add('active');
