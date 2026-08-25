@@ -609,6 +609,74 @@ html,body{max-width:100%;overflow-x:hidden}
   .side{padding:14px 12px 24px!important}
 }
 
+
+/* ===== v40 · detalle realmente debajo del layout ===== */
+.layout{
+  display:block!important;
+  width:100%!important;
+  min-height:0!important;
+}
+.main{
+  width:100%!important;
+  max-width:none!important;
+  padding:18px!important;
+  overflow:auto!important;
+}
+.detailSection{
+  display:block;
+  width:100%;
+  border-top:1px solid #303642;
+  background:#151922;
+  padding:18px 22px 28px;
+  clear:both;
+}
+.detailSectionInner{
+  width:100%;
+  max-width:none;
+  margin:0;
+}
+.detailSection h2{
+  margin:0 0 12px;
+  font-size:20px;
+}
+.detailSection #detail:empty{
+  display:none;
+}
+
+/* El detalle usa el ancho disponible debajo del layout */
+@media(min-width:1000px){
+  .detailSection #detail .detailCard{
+    display:grid;
+    grid-template-columns:minmax(300px,360px) minmax(0,1fr);
+    gap:14px 22px;
+    align-items:start;
+    width:100%;
+    max-width:none;
+  }
+  .detailSection #detail .detailCard > .loc,
+  .detailSection #detail .detailCard > .locBoxes,
+  .detailSection #detail .detailCard > .muted,
+  .detailSection #detail .detailCard > .groups,
+  .detailSection #detail .detailCard > .alert{
+    grid-column:1;
+  }
+  .detailSection #detail .detailCard > .mixTraceBox,
+  .detailSection #detail .detailCard > .movePlan,
+  .detailSection #detail .detailCard > .item,
+  .detailSection #detail .detailCard > .notice{
+    grid-column:2;
+  }
+  .detailSection #detail .detailCard > .movePlan{
+    margin-top:0;
+    padding-top:0;
+    border-top:0;
+  }
+}
+@media(max-width:999px){
+  .main{padding:10px 8px 14px!important}
+  .detailSection{padding:14px 12px 24px}
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1480,11 +1548,15 @@ html,body{max-width:100%;overflow-x:hidden}
   </div>
 
 </main>
-<aside class="side">
-  <h2>Detalle de posición</h2>
-  <div id="detail"></div>
-</aside>
 </div>
+
+<section class="detailSection">
+  <div class="detailSectionInner">
+    <h2>Detalle de posición</h2>
+    <div id="detail"></div>
+  </div>
+</section>
+
 <script>
 
 let DATA=[];
