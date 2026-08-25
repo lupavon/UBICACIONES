@@ -677,6 +677,152 @@ html,body{max-width:100%;overflow-x:hidden}
   .detailSection{padding:14px 12px 24px}
 }
 
+
+/* ===== v41 · detalle inferior con escala legible ===== */
+.detailSection{
+  padding:26px 28px 38px!important;
+}
+.detailSection h2{
+  font-size:28px!important;
+  line-height:1.15!important;
+  margin-bottom:18px!important;
+}
+.detailSection #detail{
+  font-size:16px!important;
+  line-height:1.38!important;
+}
+.detailSection #detail .detailCard{
+  padding:20px!important;
+  border-radius:12px!important;
+  gap:18px 26px!important;
+}
+.detailSection #detail .loc{
+  font-size:28px!important;
+  line-height:1.05!important;
+  margin-bottom:6px!important;
+}
+.detailSection #detail .locBoxes,
+.detailSection #detail .locBoxes b,
+.detailSection #detail .locBoxTag{
+  font-size:15px!important;
+}
+.detailSection #detail .locBoxTag{
+  padding:6px 10px!important;
+}
+.detailSection #detail .muted{
+  font-size:14px!important;
+  line-height:1.35!important;
+}
+.detailSection #detail .groups{
+  gap:10px!important;
+  margin:12px 0!important;
+}
+.detailSection #detail .groupBox{
+  padding:10px 12px!important;
+  font-size:14px!important;
+  min-height:62px!important;
+}
+.detailSection #detail .groupBox b{
+  font-size:20px!important;
+}
+.detailSection #detail .alert{
+  font-size:19px!important;
+  line-height:1.25!important;
+  padding:14px 16px!important;
+  border-radius:9px!important;
+}
+.detailSection #detail .mixTraceBox{
+  padding:16px!important;
+  border-radius:10px!important;
+}
+.detailSection #detail .mixTraceHead{
+  font-size:17px!important;
+  margin-bottom:10px!important;
+}
+.detailSection #detail .mixTraceState{
+  font-size:12px!important;
+  padding:5px 9px!important;
+}
+.detailSection #detail .mixTraceResult{
+  font-size:15px!important;
+  line-height:1.45!important;
+}
+.detailSection #detail .mixTraceUser{
+  font-size:16px!important;
+}
+.detailSection #detail .mixTraceEvidence{
+  margin-top:14px!important;
+  padding-top:12px!important;
+}
+.detailSection #detail .mixTraceEvent{
+  font-size:14px!important;
+  line-height:1.4!important;
+  padding:8px 0!important;
+  grid-template-columns:150px 1fr!important;
+}
+.detailSection #detail .mixTraceNote{
+  font-size:12px!important;
+  line-height:1.4!important;
+  margin-top:12px!important;
+}
+.detailSection #detail .mixTraceDebug summary{
+  font-size:14px!important;
+  padding:9px 0!important;
+}
+.detailSection #detail .movePlan{
+  font-size:15px!important;
+  line-height:1.4!important;
+}
+.detailSection #detail .movePlan > b{
+  font-size:18px!important;
+}
+.detailSection #detail .moveKeep,
+.detailSection #detail .moveSku{
+  padding:13px 15px!important;
+  margin-top:10px!important;
+  border-radius:9px!important;
+}
+.detailSection #detail .moveSku strong,
+.detailSection #detail .moveKeep strong{
+  font-size:16px!important;
+}
+.detailSection #detail .item{
+  padding:16px 0!important;
+  font-size:15px!important;
+}
+.detailSection #detail .item > b{
+  font-size:20px!important;
+  line-height:1.25!important;
+}
+.detailSection #detail .item .muted{
+  font-size:14px!important;
+}
+.detailSection #detail .itemGrid{
+  gap:10px!important;
+  margin-top:10px!important;
+}
+.detailSection #detail .itemGrid > div{
+  padding:10px 12px!important;
+  font-size:14px!important;
+}
+.detailSection #detail .itemGrid b{
+  font-size:18px!important;
+}
+.detailSection #detail .saldo{
+  font-size:18px!important;
+  margin-top:10px!important;
+}
+.detailSection #detail .btn{
+  font-size:14px!important;
+  padding:8px 12px!important;
+}
+
+@media(min-width:1000px){
+  .detailSection #detail .detailCard{
+    grid-template-columns:minmax(380px,470px) minmax(0,1fr)!important;
+  }
+}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
