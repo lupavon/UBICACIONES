@@ -1693,7 +1693,7 @@ function relocationPlanHtml(mod,sub,pos,items){
 }
 
 
-/* ===== v35 · detección de responsable de mezcla vía extensión Trazabilidad ===== */
+/* ===== v36 · responsable de mezcla usando movimientos reales de Copérnico ===== */
 const MIX_TRACE_CACHE=new Map();
 const MIX_TRACE_WAITERS=new Map();
 let mixTraceSeq=0;
@@ -1707,102 +1707,235 @@ function trPick(obj,names){
     const exact=entries.find(([k])=>trNorm(k)===trNorm(n));
     if(exact && exact[1]!==null && exact[1]!==undefined && String(exact[1]).trim()!=='')return exact[1];
   }
-  for(const n of names){
-    const nn=trNorm(n);
-    const fuzzy=entries.find(([k,v])=>trNorm(k).includes(nn) && v!==null && v!==undefined && String(v).trim()!=='');
-    if(fuzzy)return fuzzy[1];
-  }
   return '';
 }
-function trDateRaw(m){return trPick(m,['FechaHora','Fecha Hora','Fecha','Hora','Timestamp','CreatedAt','FechaMovimiento','Fecha Mov','FechaMovimientoCaja'])}
+function trDateRaw(m){return trPick(m,['Fecha','FechaHora','Fecha Hora','FechaMovimiento','Fecha Mov'])}
 function trDateValue(m){
   const raw=trDateRaw(m); if(!raw)return NaN;
   if(typeof raw==='number')return raw;
   const s=String(raw).trim();
-  const d=new Date(s); if(!isNaN(d))return d.getTime();
-  const mm=s.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4}).*?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if(mm){let y=+mm[3];if(y<100)y+=2000;return new Date(y,+mm[2]-1,+mm[1],+mm[4],+mm[5],+(mm[6]||0)).getTime()}
+  // ISO
+  const iso=new Date(s);
+  if(!isNaN(iso))return iso.getTime();
+  // dd/mm/yyyy hh:mm:ss
+  let mm=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})[,\sT]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(mm){
+    let y=+mm[3]; if(y<100)y+=2000;
+    return new Date(y,+mm[2]-1,+mm[1],+mm[4],+mm[5],+(mm[6]||0)).getTime();
+  }
+  // yyyy-mm-dd hh:mm:ss
+  mm=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(mm)return new Date(+mm[1],+mm[2]-1,+mm[3],+mm[4],+mm[5],+(mm[6]||0)).getTime();
   return NaN;
 }
-function trUser(m){
-  const v=String(trPick(m,['Usuario','User','Operador','Empleado','NombreEmpleado','Nombre Empleado','Responsable','Operario','Login','Username','UsuarioMovimiento','Usuario Mov'])||'').trim();
-  // Evitar IDs/cantidades interpretados como usuario.
-  return /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(v)?v:'';
+function trDateLabel(ms,raw){
+  if(!isNaN(ms)){
+    const d=new Date(ms);
+    return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  }
+  return String(raw||'—');
 }
-function trLoc(m){return String(trPick(m,['Ubicacion','Ubicación','Posicion','Posición','Destino','UbicacionDestino','Ubicación Destino','Location','UbicacionFinal','Ubicación Final'])||'').trim()}
-function trMove(m){
-  const v=String(trPick(m,['Movimiento','TipoMovimiento','Tipo Movimiento','Proceso','Accion','Acción','Operacion','Operación','Motivo','Evento'])||'').trim();
-  return v;
+function trEmployee(m){
+  return String(trPick(m,['Nombre_empleado','Nombre empleado','NombreEmpleado'])||'').trim();
 }
-function trTimeLabel(m){return String(trDateRaw(m)||'—')}
-function trSourceRows(result){
-  const out=[];
-  trArr(result?.movimientos).forEach(x=>out.push({source:'movimientos',raw:x}));
-  trArr(result?.ubicaciones).forEach(x=>out.push({source:'ubicaciones',raw:x}));
-  return out;
+function trEmployeeId(m){
+  return String(trPick(m,['Id_empleado','ID empleado','IdEmpleado'])||'').trim();
 }
-function trEventMatchesLoc(m,loc){
-  const want=trNorm(loc); if(!want)return false;
-  const direct=trNorm(trLoc(m)); if(direct && direct.includes(want))return true;
-  try{return trNorm(JSON.stringify(m)).includes(want)}catch(e){return false}
+function trEan(m){return String(trPick(m,['EAN','ean'])||'').trim()}
+function trSaldo(m){
+  const v=trPick(m,['Saldo','saldo']);
+  const n=Number(String(v??'').replace(',','.'));
+  return Number.isFinite(n)?n:NaN;
 }
+function trMovimiento(m){
+  const v=trPick(m,['Movimiento','movimiento']);
+  const n=Number(String(v??'').replace(',','.'));
+  return Number.isFinite(n)?n:NaN;
+}
+function trEstado(m){return String(trPick(m,['Estado','estado'])||'').trim()}
+function trTransaccion(m){return String(trPick(m,['Transaccion','Transacción','transaccion'])||'').trim()}
+function trNoControl(m){return String(trPick(m,['NoControl','No Control','nocontrol'])||'').trim()}
+
+function trRowsForSku(result,skuInfo){
+  const wanted=new Set(
+    [skuInfo?.ean,skuInfo?.referencia,skuInfo?.sku]
+      .map(x=>String(x??'').trim())
+      .filter(Boolean)
+  );
+  let rows=trArr(result?.movimientos).filter(x=>x&&typeof x==='object');
+  if(wanted.size){
+    const exact=rows.filter(x=>wanted.has(trEan(x)));
+    if(exact.length)rows=exact;
+  }
+  return rows
+    .map(raw=>({
+      raw,
+      time:trDateValue(raw),
+      saldo:trSaldo(raw),
+      mov:trMovimiento(raw),
+      estado:trEstado(raw),
+      transaccion:trTransaccion(raw),
+      employee:trEmployee(raw),
+      employeeId:trEmployeeId(raw),
+      ean:trEan(raw),
+      noControl:trNoControl(raw)
+    }))
+    .filter(x=>!isNaN(x.time))
+    .sort((a,b)=>a.time-b.time);
+}
+
+/*
+  Para cada SKU/caja reconstruimos el comienzo de la "racha positiva actual":
+  el primer movimiento posterior al último momento en que el saldo quedó en 0.
+  Así evitamos atribuir una mezcla actual a una entrada histórica ya consumida.
+*/
+function trCurrentPositiveStart(result,skuInfo){
+  const rows=trRowsForSku(result,skuInfo);
+  if(!rows.length)return null;
+
+  // Si Copérnico informa saldo, usarlo como fuente principal.
+  const withSaldo=rows.filter(x=>!isNaN(x.saldo));
+  let start=null;
+  if(withSaldo.length){
+    const last=withSaldo[withSaldo.length-1];
+    if(last.saldo<=0)return null; // esa caja/SKU ya no tiene saldo activo según la traza
+    let lastZero=-1;
+    for(let i=withSaldo.length-2;i>=0;i--){
+      if(withSaldo[i].saldo<=0){lastZero=i;break}
+    }
+    start=withSaldo[lastZero+1]||last;
+  }
+
+  // Fallback: última entrada positiva.
+  if(!start){
+    const positive=rows.filter(x=>(!isNaN(x.mov)&&x.mov>0)||trNorm(x.estado)==='ENTRADA');
+    start=positive[positive.length-1]||rows[0];
+  }
+
+  return {
+    caja:String(result?.caja||''),
+    sku:skuInfo?.sku||'',
+    ean:skuInfo?.ean||start.ean||'',
+    referencia:skuInfo?.referencia||'',
+    descripcion:skuInfo?.descripcion||'',
+    employee:start.employee,
+    employeeId:start.employeeId,
+    time:start.time,
+    timeLabel:trDateLabel(start.time,trDateRaw(start.raw)),
+    estado:start.estado,
+    movimiento:start.mov,
+    saldo:start.saldo,
+    transaccion:start.transaccion,
+    noControl:start.noControl,
+    raw:start.raw
+  };
+}
+
 function trBoxSkuMap(items){
   const mp=new Map();
-  items.forEach(x=>{const c=String(x.caja||'').trim();if(c)mp.set(c,{sku:skuKey(x),ean:x.ean,referencia:x.referencia,descripcion:x.descripcion})});
+  items.forEach(x=>{
+    const c=String(x.caja||'').trim();
+    if(!c)return;
+    mp.set(c,{
+      sku:skuKey(x),
+      ean:String(x.ean||'').trim(),
+      referencia:String(x.referencia||'').trim(),
+      descripcion:String(x.descripcion||'').trim(),
+      saldoActual:Number(x.saldo||0)
+    });
+  });
   return mp;
 }
-function trLatestArrivalForBox(result,loc,skuInfo){
-  const rows=trSourceRows(result);
-  if(!rows.length)return null;
-  // Preferir registros que mencionen explícitamente la ubicación objetivo.
-  let cand=rows.filter(x=>trEventMatchesLoc(x.raw,loc));
-  if(!cand.length)cand=rows;
-  cand=[...cand].sort((a,b)=>{
-    const da=trDateValue(a.raw),db=trDateValue(b.raw);
-    if(isNaN(da)&&isNaN(db))return 0;if(isNaN(da))return -1;if(isNaN(db))return 1;return da-db;
-  });
-  const x=cand[cand.length-1],m=x.raw;
-  return {caja:String(result.caja||''),sku:skuInfo?.sku||'',ean:skuInfo?.ean||'',descripcion:skuInfo?.descripcion||'',user:trUser(m),time:trDateValue(m),timeLabel:trTimeLabel(m),move:trMove(m),source:x.source,raw:m,rawResult:result};
-}
+
 function analyzeMixTrace(loc,items,results){
-  const skuByBox=trBoxSkuMap(items),events=[];
+  const skuByBox=trBoxSkuMap(items);
+  const boxEvents=[];
+
   (results||[]).filter(r=>r?.ok).forEach(r=>{
-    const info=skuByBox.get(String(r.caja||''));
-    const ev=trLatestArrivalForBox(r,loc,info);
-    if(ev)events.push(ev);
+    const info=skuByBox.get(String(r.caja||'').trim());
+    if(!info)return;
+    const ev=trCurrentPositiveStart(r,info);
+    if(ev)boxEvents.push(ev);
   });
-  events.sort((a,b)=>{
-    if(isNaN(a.time)&&isNaN(b.time))return 0;if(isNaN(a.time))return 1;if(isNaN(b.time))return -1;return a.time-b.time;
-  });
-  const distinct=[]; let cause=null;
-  for(const ev of events){
-    if(!ev.sku)continue;
-    if(!distinct.includes(ev.sku)){
-      if(distinct.length>=1 && !cause && ev.user && !isNaN(ev.time))cause=ev;
-      distinct.push(ev.sku);
-    }
+
+  // Un SKU puede estar en más de una caja. Para saber desde cuándo está presente
+  // en la posición, tomar el inicio activo más antiguo entre sus cajas actuales.
+  const bySku=new Map();
+  for(const ev of boxEvents){
+    const k=String(ev.sku||ev.ean||'').trim();
+    if(!k)continue;
+    const prev=bySku.get(k);
+    if(!prev || ev.time<prev.time)bySku.set(k,ev);
   }
-  return {events,cause,distinct};
+
+  const skuEvents=[...bySku.values()].sort((a,b)=>a.time-b.time);
+  let cause=null;
+  if(skuEvents.length>=2){
+    // El SKU cuya presencia activa comenzó último es el que generó
+    // la convivencia actual de más de un SKU.
+    const latest=skuEvents[skuEvents.length-1];
+    if(latest.employee && !isNaN(latest.time))cause=latest;
+  }
+
+  return {
+    loc,
+    currentSkuCount:[...new Set(items.map(skuKey).filter(Boolean))].length,
+    skuEvents,
+    boxEvents,
+    cause
+  };
 }
+
 function mixTraceHtml(state){
   if(!state)return '';
-  if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Buscando movimientos de las cajas de esta posición…</div></div>';
-  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">NO CONECTADO</span></div><div class="mixTraceResult">Abrí la extensión <strong>Trazabilidad de Cajas</strong> actualizada y mantené Copérnico logueado.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+  if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Reconstruyendo los movimientos de las cajas/SKU de esta posición…</div></div>';
+  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">NO CONECTADO</span></div><div class="mixTraceResult">Abrí la extensión <strong>Trazabilidad de Cajas</strong> y mantené Copérnico logueado.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
   if(state.status==='error')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState bad">ERROR</span></div><div class="mixTraceResult">'+esc(state.error||'No se pudo consultar la trazabilidad.')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+
   const a=state.analysis||{},cause=a.cause;
   let h='<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState '+(cause?'ok':'warn')+'">'+(cause?'DETECTADO':'REVISAR')+'</span></div>';
+
   if(cause){
-    h+='<div class="mixTraceResult">Probable generador de la mezcla: <strong class="mixTraceUser">'+esc(cause.user||'usuario no informado')+'</strong><br>Caja <strong>'+esc(cause.caja)+'</strong> · SKU <span class="mixTraceSku">'+esc(cause.ean||cause.sku)+'</span><br>Movimiento: '+esc(cause.move||'—')+' · '+esc(cause.timeLabel||'—')+'</div>';
-  }else{
-    h+='<div class="mixTraceResult">La trazabilidad encontrada no alcanza para identificar de forma concluyente quién incorporó el segundo SKU.</div>';
-  }
-  if(a.events?.length){
-    h+='<div class="mixTraceEvidence">';
-    a.events.forEach(ev=>{h+='<div class="mixTraceEvent"><span>'+esc(ev.timeLabel||'—')+'</span><div><b>Caja '+esc(ev.caja)+'</b> · <span class="mixTraceSku">'+esc(ev.ean||ev.sku||'SKU ?')+'</span><br><span class="mixTraceUser">'+esc(ev.user||'usuario no identificado')+'</span>'+(ev.move?' · '+esc(ev.move):'')+(ev.source?' · '+esc(ev.source):'')+'</div></div>'});
+    h+='<div class="mixTraceResult"><strong>Responsable registrado del ingreso que generó la mezcla actual:</strong><br>';
+    h+='<strong class="mixTraceUser">'+esc(cause.employee)+'</strong>';
+    if(cause.employeeId)h+=' · ID '+esc(cause.employeeId);
+    h+='<br>SKU <span class="mixTraceSku">'+esc(cause.ean||cause.sku)+'</span> · Caja <strong>'+esc(cause.caja)+'</strong>';
+    h+='<br>'+esc(cause.timeLabel)+'';
+    if(cause.transaccion)h+='<br>'+esc(cause.transaccion);
+    if(!isNaN(cause.movimiento))h+=' · Movimiento '+Number(cause.movimiento).toLocaleString('es-AR');
+    if(!isNaN(cause.saldo))h+=' · Saldo '+Number(cause.saldo).toLocaleString('es-AR');
     h+='</div>';
-    h+='<details class="mixTraceDebug"><summary>Ver respuesta técnica de Copérnico</summary><div class="mixTraceRaw">'+esc(JSON.stringify(a.events.map(ev=>({caja:ev.caja,source:ev.source,raw:ev.raw})),null,2))+'</div></details>';
+  }else{
+    h+='<div class="mixTraceResult">No pude identificar de forma concluyente el usuario que inició la convivencia actual de los SKU. Revisá la evidencia inferior.</div>';
   }
-  h+='<div class="mixTraceNote">Criterio: solo se marca responsable cuando el segundo SKU tiene fecha válida y un campo de usuario textual identificable. Si Copérnico devuelve IDs o campos ambiguos, queda en REVISAR y se muestra la respuesta técnica.</div></div>';
+
+  if(a.skuEvents?.length){
+    h+='<div class="mixTraceEvidence">';
+    h+='<div class="mixTraceNote" style="margin:0 0 4px">Inicio de presencia activa actual por SKU:</div>';
+    a.skuEvents.forEach((ev,i)=>{
+      const isCause=cause===ev;
+      h+='<div class="mixTraceEvent"><span>'+esc(ev.timeLabel||'—')+'</span><div>';
+      h+='<b>'+esc(ev.ean||ev.sku||'SKU ?')+'</b> · Caja '+esc(ev.caja);
+      if(isCause)h+=' · <span class="mixTraceUser">← GENERÓ MEZCLA</span>';
+      h+='<br><span class="mixTraceUser">'+esc(ev.employee||'usuario no informado')+'</span>';
+      if(ev.employeeId)h+=' (ID '+esc(ev.employeeId)+')';
+      if(ev.transaccion)h+='<br>'+esc(ev.transaccion);
+      h+='</div></div>';
+    });
+    h+='</div>';
+  }
+
+  if(a.boxEvents?.length){
+    h+='<details class="mixTraceDebug"><summary>Ver movimientos usados para el cálculo</summary><div class="mixTraceRaw">'+
+      esc(JSON.stringify(a.boxEvents.map(ev=>({
+        caja:ev.caja,sku:ev.ean||ev.sku,fecha:ev.timeLabel,
+        empleado:ev.employee,id_empleado:ev.employeeId,
+        estado:ev.estado,movimiento:ev.movimiento,saldo:ev.saldo,
+        transaccion:ev.transaccion,noControl:ev.noControl,raw:ev.raw
+      })),null,2))+'</div></details>';
+  }
+
+  h+='<div class="mixTraceNote">Criterio: para cada SKU actualmente presente se busca, en la trazabilidad de su caja, el comienzo de su saldo positivo actual. El SKU cuya presencia activa comenzó último es el que generó la convivencia actual. El responsable mostrado es <strong>Nombre_empleado</strong> de ese movimiento.</div></div>';
   return h;
 }
 function requestMixTrace(loc,items,force=false){
@@ -1817,7 +1950,7 @@ function requestMixTrace(loc,items,force=false){
     if(MIX_TRACE_WAITERS.has(requestId)){
       MIX_TRACE_WAITERS.delete(requestId);MIX_TRACE_CACHE.set(key,{status:'unavailable'});refreshSelectedDetailTrace();
     }
-  },5000);
+  },10000);
   MIX_TRACE_WAITERS.set(requestId,{key,loc,items,timer});
   window.postMessage({source:'UBICACIONES_APP',type:'TRAZA_QUERY_BOXES',requestId,boxes},'*');
 }
