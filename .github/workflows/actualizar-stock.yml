@@ -1,14 +1,26 @@
-name: Probar conexion Copernico
+name: Actualizar stock Copernico
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar-stock-copernico
+  cancel-in-progress: false
 
 jobs:
-  probar:
+  actualizar:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Diagnosticar login y stock
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Consultar Copernico
         env:
           COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
           COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
@@ -16,103 +28,306 @@ jobs:
           python3 <<'PY'
           import os
           import json
+          import base64
           import urllib.request
           import urllib.error
+          import http.cookiejar
+          from datetime import datetime, timezone
 
-          print("=== PASO 1: LOGIN COPERNICO ===")
+          LOGIN_URL = "https://services.copernicowms.com/users/api/login"
+          STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
+          LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
-          login_url = "https://services.copernicowms.com/users/api/login"
+          EMAIL = os.environ["COPERNICO_EMAIL"]
+          PASSWORD = os.environ["COPERNICO_PASSWORD"]
 
-          login_data = json.dumps({
-              "email": os.environ["COPERNICO_EMAIL"],
-              "password": os.environ["COPERNICO_PASSWORD"],
-              "plataforma": "Copernico WMS"
-          }).encode("utf-8")
-
-          login_req = urllib.request.Request(
-              login_url,
-              data=login_data,
-              headers={
-                  "Content-Type": "application/json",
-                  "Accept": "application/json, text/plain, */*",
-                  "Origin": "https://copernicowms.com",
-                  "Referer": "https://copernicowms.com/",
-                  "User-Agent": "Mozilla/5.0"
-              },
-              method="POST"
+          jar = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(
+              urllib.request.HTTPCookieProcessor(jar)
           )
 
-          try:
-              with urllib.request.urlopen(login_req, timeout=30) as response:
-                  login_raw = response.read().decode("utf-8")
-                  print("LOGIN HTTP:", response.status)
-          except urllib.error.HTTPError as e:
-              print("LOGIN ERROR HTTP:", e.code)
+          BASE_HEADERS = {
+              "Accept": "application/json, text/plain, */*",
+              "Origin": "https://copernicowms.com",
+              "Referer": "https://copernicowms.com/",
+              "User-Agent": "Mozilla/5.0"
+          }
+
+          def request_json(url, method="GET", data=None, jwt=None, timeout=120):
+              headers = dict(BASE_HEADERS)
+
+              if data is not None:
+                  headers["Content-Type"] = "application/json"
+                  body = json.dumps(data).encode("utf-8")
+              else:
+                  body = None
+
+              if jwt:
+                  # Copernico usa el JWT directamente, sin prefijo Bearer.
+                  headers["Authorization"] = jwt
+
+              req = urllib.request.Request(
+                  url,
+                  data=body,
+                  headers=headers,
+                  method=method
+              )
+
               try:
-                  print("LOGIN RESPUESTA:", e.read().decode("utf-8")[:500])
-              except:
-                  pass
-              raise SystemExit("FALLO EN PASO 1: LOGIN")
+                  with opener.open(req, timeout=timeout) as response:
+                      raw = response.read()
+                      status = response.status
+              except urllib.error.HTTPError as e:
+                  try:
+                      detail = e.read().decode("utf-8", errors="replace")[:500]
+                  except Exception:
+                      detail = ""
+                  raise RuntimeError(
+                      f"{method} {url} -> HTTP {e.code} {detail}"
+                  )
 
-          try:
-              login_json = json.loads(login_raw)
-          except Exception:
-              raise SystemExit("LOGIN respondio pero no devolvio JSON valido")
-
-          jwt = login_json.get("jwt")
-
-          if not jwt:
-              print("Campos devueltos:", list(login_json.keys()))
-              raise SystemExit("LOGIN OK pero no devolvio jwt")
-
-          print("LOGIN OK")
-          print("JWT recibido correctamente")
-          print()
-
-          print("=== PASO 2: CONSULTA STOCK BODEGA 47 ===")
-
-          stock_url = (
-              "https://services.copernicowms.com/"
-              "backweb25/inventario/obtenerrefsxcaja?bodega=47"
-          )
-
-          stock_req = urllib.request.Request(
-              stock_url,
-              headers={
-                  "Authorization": jwt,
-                  "Accept": "application/json, text/plain, */*",
-                  "Origin": "https://copernicowms.com",
-                  "Referer": "https://copernicowms.com/",
-                  "User-Agent": "Mozilla/5.0"
-              },
-              method="GET"
-          )
-
-          try:
-              with urllib.request.urlopen(stock_req, timeout=120) as response:
-                  raw = response.read()
-                  print("STOCK HTTP:", response.status)
-          except urllib.error.HTTPError as e:
-              print("STOCK ERROR HTTP:", e.code)
               try:
-                  print("STOCK RESPUESTA:", e.read().decode("utf-8")[:500])
-              except:
-                  pass
-              raise SystemExit("FALLO EN PASO 2: STOCK")
+                  parsed = json.loads(raw.decode("utf-8"))
+              except Exception:
+                  raise RuntimeError(
+                      f"{method} {url} respondió HTTP {status}, pero no devolvió JSON"
+                  )
 
-          print("Bytes recibidos:", len(raw))
+              return parsed, status, len(raw)
+
+          def recursive_user_id(obj):
+              """
+              Busca el ID del usuario sin asumir una estructura exacta
+              de la respuesta de login.
+              """
+              preferred = {
+                  "id",
+                  "userid",
+                  "user_id",
+                  "idusuario",
+                  "id_usuario",
+                  "usuarioid",
+                  "usuario_id"
+              }
+
+              if isinstance(obj, dict):
+                  for key, value in obj.items():
+                      normalized = str(key).lower().replace("-", "_")
+
+                      if normalized in preferred:
+                          if isinstance(value, int):
+                              return value
+                          if isinstance(value, str) and value.isdigit():
+                              return int(value)
+
+                  for value in obj.values():
+                      found = recursive_user_id(value)
+                      if found is not None:
+                          return found
+
+              elif isinstance(obj, list):
+                  for value in obj:
+                      found = recursive_user_id(value)
+                      if found is not None:
+                          return found
+
+              return None
+
+          def user_id_from_jwt(token):
+              """
+              Como respaldo, lee solamente el payload público del JWT
+              para encontrar el ID. No imprime ni guarda el token.
+              """
+              try:
+                  parts = token.split(".")
+                  if len(parts) < 2:
+                      return None
+
+                  payload = parts[1]
+                  payload += "=" * (-len(payload) % 4)
+
+                  decoded = base64.urlsafe_b64decode(payload)
+                  claims = json.loads(decoded.decode("utf-8"))
+
+                  found = recursive_user_id(claims)
+                  if found is not None:
+                      return found
+
+                  sub = claims.get("sub")
+                  if isinstance(sub, int):
+                      return sub
+                  if isinstance(sub, str) and sub.isdigit():
+                      return int(sub)
+
+              except Exception:
+                  pass
+
+              return None
+
+          def extract_rows(payload):
+              if isinstance(payload, list):
+                  return payload
+
+              if not isinstance(payload, dict):
+                  return []
+
+              for key in (
+                  "rows",
+                  "data",
+                  "items",
+                  "result",
+                  "results",
+                  "stock",
+                  "inventario"
+              ):
+                  value = payload.get(key)
+
+                  if isinstance(value, list):
+                      return value
+
+                  if isinstance(value, dict):
+                      for subkey in (
+                          "rows",
+                          "data",
+                          "items",
+                          "results",
+                          "stock"
+                      ):
+                          subvalue = value.get(subkey)
+                          if isinstance(subvalue, list):
+                              return subvalue
+
+              return []
+
+          jwt = None
+          user_id = None
+          main_error = None
+          logout_error = None
 
           try:
-              stock = json.loads(raw.decode("utf-8"))
-          except Exception:
-              raise SystemExit("STOCK respondio pero no era JSON valido")
+              print("=== 1. LOGIN ===")
 
-          if isinstance(stock, list):
-              print("Registros recibidos:", len(stock))
-          elif isinstance(stock, dict):
-              print("Respuesta JSON OK")
-              print("Campos principales:", list(stock.keys())[:10])
+              login, status, _ = request_json(
+                  LOGIN_URL,
+                  method="POST",
+                  data={
+                      "email": EMAIL,
+                      "password": PASSWORD,
+                      "plataforma": "Copernico WMS"
+                  },
+                  timeout=30
+              )
 
-          print()
-          print("=== PRUEBA COMPLETADA OK ===")
+              jwt = login.get("jwt")
+
+              if not jwt:
+                  raise RuntimeError(
+                      "Login respondió correctamente pero no devolvió jwt"
+                  )
+
+              user_id = recursive_user_id(login)
+
+              if user_id is None:
+                  user_id = user_id_from_jwt(jwt)
+
+              if user_id is None:
+                  raise RuntimeError(
+                      "No pude obtener el ID del usuario para realizar el logout"
+                  )
+
+              print("LOGIN OK")
+              print("ID de sesión identificado correctamente")
+
+              print("=== 2. STOCK BODEGA 47 ===")
+
+              stock_response, status, size = request_json(
+                  STOCK_URL,
+                  method="GET",
+                  jwt=jwt,
+                  timeout=180
+              )
+
+              rows = extract_rows(stock_response)
+
+              if not rows:
+                  raise RuntimeError(
+                      "Copernico respondió, pero no encontré filas de inventario"
+                  )
+
+              print("STOCK HTTP:", status)
+              print("Registros:", len(rows))
+              print("Bytes recibidos:", size)
+
+              # Seguridad: nunca reemplazar el último stock válido
+              # por una respuesta sospechosamente vacía.
+              if len(rows) < 100:
+                  raise RuntimeError(
+                      f"Respuesta sospechosa: solamente {len(rows)} registros"
+                  )
+
+              payload = {
+                  "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "source": "Copernico WMS · bodega 47 · GitHub Actions",
+                  "row_count": len(rows),
+                  "rows": rows
+              }
+
+              with open("stock.json", "w", encoding="utf-8") as f:
+                  json.dump(
+                      payload,
+                      f,
+                      ensure_ascii=False,
+                      separators=(",", ":")
+                  )
+
+              print("stock.json generado correctamente")
+
+          except Exception as e:
+              main_error = e
+
+          finally:
+              if jwt and user_id is not None:
+                  print("=== 3. LOGOUT ===")
+
+                  try:
+                      _, logout_status, _ = request_json(
+                          LOGOUT_URL,
+                          method="POST",
+                          data={"id": user_id},
+                          jwt=jwt,
+                          timeout=30
+                      )
+
+                      print("LOGOUT HTTP:", logout_status)
+                      print("LOGOUT OK")
+
+                  except Exception as e:
+                      logout_error = e
+                      print("ERROR LOGOUT:", str(e))
+
+          if main_error:
+              raise main_error
+
+          if logout_error:
+              raise RuntimeError(
+                  "El stock se descargó pero el logout falló: "
+                  + str(logout_error)
+              )
+
+          print("=== CICLO COMPLETO OK ===")
           PY
+
+      - name: Publicar stock.json
+        run: |
+          git config user.name "UBICACIONES AutoSync"
+          git config user.email "actions@github.com"
+
+          git add stock.json
+
+          if git diff --cached --quiet; then
+            echo "No hubo cambios para publicar."
+            exit 0
+          fi
+
+          git commit -m "AutoSync stock desde Copérnico"
+          git push
