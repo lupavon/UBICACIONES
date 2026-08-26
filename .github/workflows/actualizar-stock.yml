@@ -572,24 +572,41 @@ jobs:
                       return caja, None, str(e)[:300]
 
               if process_boxes:
-                  with ThreadPoolExecutor(
+                  print("Consultando trazabilidad de pallets EN_PROCESO...")
+                  executor = ThreadPoolExecutor(
                       max_workers=min(8, len(process_boxes))
-                  ) as executor:
+                  )
+                  futures = {
+                      executor.submit(trace_process_one, caja): caja
+                      for caja in process_boxes
+                  }
 
-                      futures = [
-                          executor.submit(
-                              trace_process_one,
-                              caja
-                          )
-                          for caja in process_boxes
-                      ]
+                  try:
+                      for future in as_completed(futures, timeout=35):
+                          caja = futures[future]
+                          try:
+                              caja, event, error = future.result(timeout=1)
+                          except Exception as e:
+                              event = None
+                              error = "Error aislado: " + str(e)[:250]
 
-                      for future in as_completed(futures):
-                          caja, event, error = future.result()
                           trace_by_box[caja] = {
                               "event": event,
                               "error": error
                           }
+                  except Exception as e:
+                      print("AVISO: trazabilidad EN_PROCESO incompleta:", str(e))
+                  finally:
+                      executor.shutdown(wait=False, cancel_futures=True)
+
+                  for caja in process_boxes:
+                      trace_by_box.setdefault(
+                          caja,
+                          {
+                              "event": None,
+                              "error": "Trazabilidad no disponible en este ciclo"
+                          }
+                      )
 
               process_rows = []
 
@@ -762,21 +779,48 @@ jobs:
               trace_boxes_sorted = sorted(trace_boxes)
 
               if trace_boxes_sorted:
-                  with ThreadPoolExecutor(
+                  print("Consultando trazabilidad de cajas mezcladas...")
+                  executor = ThreadPoolExecutor(
                       max_workers=min(6, len(trace_boxes_sorted))
-                  ) as executor:
+                  )
+                  futures = {
+                      executor.submit(trace_full_one, caja): caja
+                      for caja in trace_boxes_sorted
+                  }
 
-                      futures = [
-                          executor.submit(
-                              trace_full_one,
-                              caja
-                          )
-                          for caja in trace_boxes_sorted
-                      ]
+                  try:
+                      for future in as_completed(futures, timeout=40):
+                          caja = futures[future]
+                          try:
+                              caja, result = future.result(timeout=1)
+                          except Exception as e:
+                              result = {
+                                  "ok": False,
+                                  "caja": str(caja),
+                                  "error": "Error aislado: " + str(e)[:250],
+                                  "movimientos": [],
+                                  "ubicaciones": [],
+                                  "inventario": []
+                              }
 
-                      for future in as_completed(futures):
-                          caja, result = future.result()
                           trace_dataset_boxes[str(caja)] = result
+                  except Exception as e:
+                      print("AVISO: trazabilidad de mezcla incompleta:", str(e))
+                  finally:
+                      executor.shutdown(wait=False, cancel_futures=True)
+
+                  for caja in trace_boxes_sorted:
+                      trace_dataset_boxes.setdefault(
+                          str(caja),
+                          {
+                              "ok": False,
+                              "caja": str(caja),
+                              "error": "Trazabilidad no disponible en este ciclo",
+                              "movimientos": [],
+                              "ubicaciones": [],
+                              "inventario": []
+                          }
+                      )
 
               trace_payload = {
                   "updated_at": now_iso,
