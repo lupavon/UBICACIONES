@@ -428,29 +428,6 @@ jobs:
 
           now = now_utc()
 
-          next_retry_at = status.get("next_retry_at")
-          if next_retry_at:
-              try:
-                  next_retry_dt = datetime.fromisoformat(
-                      str(next_retry_at).replace("Z", "+00:00")
-                  )
-              except Exception:
-                  next_retry_dt = None
-
-              if next_retry_dt and now < next_retry_dt:
-                  status.update({
-                      "status": "backoff",
-                      "last_attempt_at": iso(now),
-                      "message": (
-                          "Copérnico no disponible. "
-                          "Se conserva el último dato válido."
-                      )
-                  })
-                  save_json_file(STATUS_FILE, status)
-                  print("BACKOFF ACTIVO HASTA:", iso(next_retry_dt))
-                  print("No se intenta login en este ciclo.")
-                  raise SystemExit(0)
-
           jwt = None
           user_id = None
           login_ok = False
@@ -478,15 +455,10 @@ jobs:
                   if e.code == 403:
                       fail_count = int(status.get("fail_count", 0)) + 1
 
-                      # 1er fallo: 2 min, 2do: 5 min, luego 10 min.
-                      if fail_count <= 1:
-                          delay_min = 2
-                      elif fail_count == 2:
-                          delay_min = 5
-                      else:
-                          delay_min = 10
-
-                      retry = now + timedelta(minutes=delay_min)
+                      # Cloudflare dispara este workflow cada minuto.
+                      # No aplicamos backoff: se conserva el último dato válido
+                      # y se vuelve a intentar en el próximo ciclo.
+                      retry = now + timedelta(minutes=1)
 
                       detail_lower = (e.detail or "").lower()
                       if "sesión activa" in detail_lower or "sesion activa" in detail_lower:
@@ -510,7 +482,7 @@ jobs:
 
                       print("CONTINGENCIA:", reason)
                       print("Se conserva stock/pallets/trazabilidad anteriores.")
-                      print("Próximo intento:", iso(retry))
+                      print("Se reintentará automáticamente en el próximo minuto.")
                       raise SystemExit(0)
 
                   raise
@@ -910,9 +882,7 @@ jobs:
 
               # Error genérico: no pisa datos válidos; deja estado.
               fail_count = int(status.get("fail_count", 0)) + 1
-              retry = now_utc() + timedelta(
-                  minutes=2 if fail_count <= 1 else 5
-              )
+              retry = now_utc() + timedelta(minutes=1)
 
               status.update({
                   "status": "error",
