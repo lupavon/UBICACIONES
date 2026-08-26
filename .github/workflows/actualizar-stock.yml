@@ -63,7 +63,6 @@ jobs:
                   body = None
 
               if jwt:
-                  # Copernico usa el JWT directamente, sin prefijo Bearer.
                   headers["Authorization"] = jwt
 
               req = urllib.request.Request(
@@ -79,9 +78,13 @@ jobs:
                       status = response.status
               except urllib.error.HTTPError as e:
                   try:
-                      detail = e.read().decode("utf-8", errors="replace")[:500]
+                      detail = e.read().decode(
+                          "utf-8",
+                          errors="replace"
+                      )[:500]
                   except Exception:
                       detail = ""
+
                   raise RuntimeError(
                       f"{method} {url} -> HTTP {e.code} {detail}"
                   )
@@ -90,16 +93,13 @@ jobs:
                   parsed = json.loads(raw.decode("utf-8"))
               except Exception:
                   raise RuntimeError(
-                      f"{method} {url} respondió HTTP {status}, pero no devolvió JSON"
+                      f"{method} {url} respondió HTTP {status}, "
+                      "pero no devolvió JSON"
                   )
 
               return parsed, status, len(raw)
 
           def recursive_user_id(obj):
-              """
-              Busca el ID del usuario sin asumir una estructura exacta
-              de la respuesta de login.
-              """
               preferred = {
                   "id",
                   "userid",
@@ -117,6 +117,7 @@ jobs:
                       if normalized in preferred:
                           if isinstance(value, int):
                               return value
+
                           if isinstance(value, str) and value.isdigit():
                               return int(value)
 
@@ -134,12 +135,9 @@ jobs:
               return None
 
           def user_id_from_jwt(token):
-              """
-              Como respaldo, lee solamente el payload público del JWT
-              para encontrar el ID. No imprime ni guarda el token.
-              """
               try:
                   parts = token.split(".")
+
                   if len(parts) < 2:
                       return None
 
@@ -150,12 +148,15 @@ jobs:
                   claims = json.loads(decoded.decode("utf-8"))
 
                   found = recursive_user_id(claims)
+
                   if found is not None:
                       return found
 
                   sub = claims.get("sub")
+
                   if isinstance(sub, int):
                       return sub
+
                   if isinstance(sub, str) and sub.isdigit():
                       return int(sub)
 
@@ -194,6 +195,7 @@ jobs:
                           "stock"
                       ):
                           subvalue = value.get(subkey)
+
                           if isinstance(subvalue, list):
                               return subvalue
 
@@ -232,7 +234,8 @@ jobs:
 
               if user_id is None:
                   raise RuntimeError(
-                      "No pude obtener el ID del usuario para realizar el logout"
+                      "No pude obtener el ID del usuario "
+                      "para realizar el logout"
                   )
 
               print("LOGIN OK")
@@ -251,28 +254,36 @@ jobs:
 
               if not rows:
                   raise RuntimeError(
-                      "Copernico respondió, pero no encontré filas de inventario"
+                      "Copernico respondió, pero no encontré "
+                      "filas de inventario"
                   )
 
               print("STOCK HTTP:", status)
               print("Registros:", len(rows))
               print("Bytes recibidos:", size)
 
-              # Seguridad: nunca reemplazar el último stock válido
-              # por una respuesta sospechosamente vacía.
               if len(rows) < 100:
                   raise RuntimeError(
-                      f"Respuesta sospechosa: solamente {len(rows)} registros"
+                      f"Respuesta sospechosa: solamente "
+                      f"{len(rows)} registros"
                   )
 
               payload = {
-                  "updated_at": datetime.now(timezone.utc).isoformat(),
-                  "source": "Copernico WMS · bodega 47 · GitHub Actions",
+                  "updated_at": datetime.now(
+                      timezone.utc
+                  ).isoformat(),
+                  "source": (
+                      "Copernico WMS · bodega 47 · GitHub Actions"
+                  ),
                   "row_count": len(rows),
                   "rows": rows
               }
 
-              with open("stock.json", "w", encoding="utf-8") as f:
+              with open(
+                  "stock.json",
+                  "w",
+                  encoding="utf-8"
+              ) as f:
                   json.dump(
                       payload,
                       f,
@@ -317,19 +328,16 @@ jobs:
           print("=== CICLO COMPLETO OK ===")
           PY
 
-            - name: Publicar stock.json
+      - name: Publicar stock.json
         run: |
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
 
-          # Guardamos exclusivamente el stock generado por esta ejecución.
           cp stock.json /tmp/stock-nuevo.json
 
-          # Nos sincronizamos con el último main antes de publicar.
           git fetch origin main
           git reset --hard origin/main
 
-          # Restauramos el stock recién obtenido de Copérnico.
           cp /tmp/stock-nuevo.json stock.json
           git add stock.json
 
