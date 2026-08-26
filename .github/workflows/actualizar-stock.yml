@@ -317,17 +317,26 @@ jobs:
           print("=== CICLO COMPLETO OK ===")
           PY
 
-      - name: Publicar stock.json
+            - name: Publicar stock.json
         run: |
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
 
+          # Guardamos exclusivamente el stock generado por esta ejecución.
+          cp stock.json /tmp/stock-nuevo.json
+
+          # Nos sincronizamos con el último main antes de publicar.
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Restauramos el stock recién obtenido de Copérnico.
+          cp /tmp/stock-nuevo.json stock.json
           git add stock.json
 
           if git diff --cached --quiet; then
-            echo "No hubo cambios para publicar."
+            echo "El stock remoto ya está actualizado."
             exit 0
           fi
 
           git commit -m "AutoSync stock desde Copérnico"
-          git push
+          git push origin HEAD:main
