@@ -2,8 +2,6 @@ name: Actualizar stock Copernico
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
@@ -31,11 +29,14 @@ jobs:
           import base64
           import urllib.request
           import urllib.error
+          import urllib.parse
           import http.cookiejar
+          from concurrent.futures import ThreadPoolExecutor, as_completed
           from datetime import datetime, timezone
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
+          CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
           EMAIL = os.environ["COPERNICO_EMAIL"]
@@ -123,12 +124,14 @@ jobs:
 
                   for value in obj.values():
                       found = recursive_user_id(value)
+
                       if found is not None:
                           return found
 
               elif isinstance(obj, list):
                   for value in obj:
                       found = recursive_user_id(value)
+
                       if found is not None:
                           return found
 
@@ -201,6 +204,237 @@ jobs:
 
               return []
 
+          def norm_key(value):
+              return (
+                  str(value)
+                  .strip()
+                  .lower()
+                  .replace(" ", "")
+                  .replace("_", "")
+                  .replace("-", "")
+              )
+
+          def field(row, *names):
+              if not isinstance(row, dict):
+                  return ""
+
+              indexed = {
+                  norm_key(k): v
+                  for k, v in row.items()
+              }
+
+              for name in names:
+                  key = norm_key(name)
+
+                  if key in indexed:
+                      value = indexed[key]
+
+                      if value is not None:
+                          return value
+
+              return ""
+
+          def norm_value(value):
+              return str(value or "").strip().upper()
+
+          def parse_date(value):
+              if value is None or value == "":
+                  return float("-inf")
+
+              if isinstance(value, (int, float)):
+                  return float(value)
+
+              text = str(value).strip()
+
+              formats = (
+                  "%d/%m/%Y %H:%M:%S",
+                  "%d/%m/%Y %H:%M",
+                  "%Y-%m-%dT%H:%M:%S.%fZ",
+                  "%Y-%m-%dT%H:%M:%SZ",
+                  "%Y-%m-%d %H:%M:%S",
+                  "%Y-%m-%d %H:%M"
+              )
+
+              for fmt in formats:
+                  try:
+                      return datetime.strptime(
+                          text,
+                          fmt
+                      ).timestamp()
+                  except Exception:
+                      pass
+
+              try:
+                  return datetime.fromisoformat(
+                      text.replace("Z", "+00:00")
+                  ).timestamp()
+              except Exception:
+                  return float("-inf")
+
+          def query_ubicaciones(caja, jwt):
+              q = urllib.parse.quote(
+                  str(caja).strip(),
+                  safe=""
+              )
+
+              url = (
+                  CAJA_API_BASE
+                  + "getubicaciones?caja="
+                  + q
+              )
+
+              payload, _, _ = request_json(
+                  url,
+                  method="GET",
+                  jwt=jwt,
+                  timeout=45
+              )
+
+              return extract_rows(payload)
+
+          def latest_move_to_process(moves):
+              candidates = []
+
+              for move in moves:
+                  destino = field(
+                      move,
+                      "UbicacionFinal",
+                      "ubicacion_final",
+                      "ubicacionfinal"
+                  )
+
+                  if norm_value(destino) == "EN_PROCESO":
+                      candidates.append(move)
+
+              if not candidates:
+                  return None
+
+              return max(
+                  candidates,
+                  key=lambda x: parse_date(
+                      field(
+                          x,
+                          "fecha",
+                          "Fecha",
+                          "FechaMovimiento",
+                          "fecha_movimiento"
+                      )
+                  )
+              )
+
+          def build_process_row(
+              stock_row,
+              trace_move=None,
+              trace_error=""
+          ):
+              return {
+                  "Caja": field(
+                      stock_row,
+                      "Caja",
+                      "caja",
+                      "numeroCaja",
+                      "NroCaja"
+                  ),
+                  "EAN": field(
+                      stock_row,
+                      "EAN",
+                      "ean"
+                  ),
+                  "Referencia": field(
+                      stock_row,
+                      "referencia",
+                      "Referencia",
+                      "ref"
+                  ),
+                  "Descripcion": field(
+                      stock_row,
+                      "Descripcion",
+                      "descripcion",
+                      "Descripción"
+                  ),
+                  "Saldo": field(
+                      stock_row,
+                      "Saldo",
+                      "saldo",
+                      "Cantidad",
+                      "cantidad"
+                  ),
+                  "Unidad": field(
+                      stock_row,
+                      "UnidadMedida",
+                      "unidadMedida",
+                      "Unidad"
+                  ),
+                  "FV": field(
+                      stock_row,
+                      "FV",
+                      "fv",
+                      "FechaVencimiento"
+                  ),
+                  "Ubicacion": (
+                      field(
+                          stock_row,
+                          "Ubicacion",
+                          "ubicacion"
+                      )
+                      or "EN_PROCESO"
+                  ),
+                  "PosicionOrigen": (
+                      field(
+                          trace_move,
+                          "UbicacionInicial",
+                          "ubicacion_inicial",
+                          "ubicacionInicial"
+                      )
+                      if trace_move else ""
+                  ),
+                  "Maquinista": (
+                      field(
+                          trace_move,
+                          "Nombre_empleado",
+                          "NombreEmpleado",
+                          "nombreEmpleado",
+                          "Empleado"
+                      )
+                      if trace_move else ""
+                  ),
+                  "Id_maquinista": (
+                      field(
+                          trace_move,
+                          "Id_empleado",
+                          "IdEmpleado",
+                          "idEmpleado"
+                      )
+                      if trace_move else ""
+                  ),
+                  "FechaIngresoProceso": (
+                      field(
+                          trace_move,
+                          "fecha",
+                          "Fecha",
+                          "FechaMovimiento",
+                          "fecha_movimiento"
+                      )
+                      if trace_move else ""
+                  ),
+                  "Prioridad": (
+                      field(
+                          trace_move,
+                          "Prioridad",
+                          "prioridad"
+                      )
+                      if trace_move else ""
+                  ),
+                  "Trazabilidad": (
+                      "OK"
+                      if trace_move
+                      else (
+                          trace_error
+                          or "Sin movimiento a EN_PROCESO identificado"
+                      )
+                  )
+              }
+
           jwt = None
           user_id = None
           main_error = None
@@ -268,10 +502,12 @@ jobs:
                       f"{len(rows)} registros"
                   )
 
-              payload = {
-                  "updated_at": datetime.now(
-                      timezone.utc
-                  ).isoformat(),
+              now_iso = datetime.now(
+                  timezone.utc
+              ).isoformat()
+
+              stock_payload = {
+                  "updated_at": now_iso,
                   "source": (
                       "Copernico WMS · bodega 47 · GitHub Actions"
                   ),
@@ -285,7 +521,7 @@ jobs:
                   encoding="utf-8"
               ) as f:
                   json.dump(
-                      payload,
+                      stock_payload,
                       f,
                       ensure_ascii=False,
                       separators=(",", ":")
@@ -293,12 +529,186 @@ jobs:
 
               print("stock.json generado correctamente")
 
+              print("=== 3. PALLETS EN PROCESO ===")
+
+              process_stock_rows = [
+                  row
+                  for row in rows
+                  if norm_value(
+                      field(
+                          row,
+                          "Ubicacion",
+                          "ubicacion",
+                          "Location"
+                      )
+                  ) == "EN_PROCESO"
+              ]
+
+              cajas = sorted({
+                  str(
+                      field(
+                          row,
+                          "Caja",
+                          "caja",
+                          "numeroCaja",
+                          "NroCaja"
+                      )
+                  ).strip()
+                  for row in process_stock_rows
+                  if str(
+                      field(
+                          row,
+                          "Caja",
+                          "caja",
+                          "numeroCaja",
+                          "NroCaja"
+                      )
+                  ).strip()
+              })
+
+              print(
+                  "Líneas EN_PROCESO:",
+                  len(process_stock_rows)
+              )
+
+              print(
+                  "Cajas/pallets EN_PROCESO:",
+                  len(cajas)
+              )
+
+              trace_by_box = {}
+
+              def trace_one(caja):
+                  try:
+                      moves = query_ubicaciones(
+                          caja,
+                          jwt
+                      )
+
+                      event = latest_move_to_process(
+                          moves
+                      )
+
+                      return caja, event, ""
+
+                  except Exception as e:
+                      return (
+                          caja,
+                          None,
+                          str(e)[:300]
+                      )
+
+              if cajas:
+                  with ThreadPoolExecutor(
+                      max_workers=min(
+                          8,
+                          len(cajas)
+                      )
+                  ) as executor:
+
+                      futures = [
+                          executor.submit(
+                              trace_one,
+                              caja
+                          )
+                          for caja in cajas
+                      ]
+
+                      for future in as_completed(
+                          futures
+                      ):
+                          caja, event, error = (
+                              future.result()
+                          )
+
+                          trace_by_box[caja] = {
+                              "event": event,
+                              "error": error
+                          }
+
+              process_rows = []
+
+              for stock_row in process_stock_rows:
+                  caja = str(
+                      field(
+                          stock_row,
+                          "Caja",
+                          "caja",
+                          "numeroCaja",
+                          "NroCaja"
+                      )
+                  ).strip()
+
+                  trace = trace_by_box.get(
+                      caja,
+                      {}
+                  )
+
+                  process_rows.append(
+                      build_process_row(
+                          stock_row,
+                          trace_move=trace.get(
+                              "event"
+                          ),
+                          trace_error=trace.get(
+                              "error",
+                              ""
+                          )
+                      )
+                  )
+
+              identified = sum(
+                  1
+                  for row in process_rows
+                  if row["PosicionOrigen"]
+                  and row["Maquinista"]
+              )
+
+              process_payload = {
+                  "updated_at": now_iso,
+                  "source": (
+                      "Copernico WMS · EN_PROCESO · "
+                      "trazabilidad de ubicaciones"
+                  ),
+                  "total_lineas": len(
+                      process_rows
+                  ),
+                  "total_pallets": len(
+                      cajas
+                  ),
+                  "identificados": identified,
+                  "rows": process_rows
+              }
+
+              with open(
+                  "pallets-proceso.json",
+                  "w",
+                  encoding="utf-8"
+              ) as f:
+                  json.dump(
+                      process_payload,
+                      f,
+                      ensure_ascii=False,
+                      separators=(",", ":")
+                  )
+
+              print(
+                  "pallets-proceso.json generado correctamente"
+              )
+
+              print(
+                  "Identificados:",
+                  identified,
+                  "/",
+                  len(process_rows)
+              )
+
           except Exception as e:
               main_error = e
 
           finally:
               if jwt and user_id is not None:
-                  print("=== 3. LOGOUT ===")
+                  print("=== 4. LOGOUT ===")
 
                   try:
                       _, logout_status, _ = request_json(
@@ -309,42 +719,53 @@ jobs:
                           timeout=30
                       )
 
-                      print("LOGOUT HTTP:", logout_status)
+                      print(
+                          "LOGOUT HTTP:",
+                          logout_status
+                      )
+
                       print("LOGOUT OK")
 
                   except Exception as e:
                       logout_error = e
-                      print("ERROR LOGOUT:", str(e))
+
+                      print(
+                          "ERROR LOGOUT:",
+                          str(e)
+                      )
 
           if main_error:
               raise main_error
 
           if logout_error:
               raise RuntimeError(
-                  "El stock se descargó pero el logout falló: "
+                  "La consulta terminó pero el logout falló: "
                   + str(logout_error)
               )
 
           print("=== CICLO COMPLETO OK ===")
           PY
 
-      - name: Publicar stock.json
+      - name: Publicar archivos
         run: |
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
 
           cp stock.json /tmp/stock-nuevo.json
+          cp pallets-proceso.json /tmp/pallets-proceso-nuevo.json
 
           git fetch origin main
           git reset --hard origin/main
 
           cp /tmp/stock-nuevo.json stock.json
-          git add stock.json
+          cp /tmp/pallets-proceso-nuevo.json pallets-proceso.json
+
+          git add stock.json pallets-proceso.json
 
           if git diff --cached --quiet; then
-            echo "El stock remoto ya está actualizado."
+            echo "Los archivos remotos ya están actualizados."
             exit 0
           fi
 
-          git commit -m "AutoSync stock desde Copérnico"
+          git commit -m "AutoSync stock y pallets en proceso desde Copérnico"
           git push origin HEAD:main
