@@ -983,6 +983,13 @@ body.heatSplit .layoutHeatGrid{
 .processEmpty{padding:28px;text-align:center;color:#8995a2}
 @media(max-width:900px){.processKpis{grid-template-columns:1fr}.processToolbar{flex-wrap:wrap}.processToolbar input{width:100%}}
 
+
+.syncHealth{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px}
+.syncHealth .dot{width:8px;height:8px;border-radius:50%;background:#8d98a5}
+.syncHealth.ok{color:#78d79a}.syncHealth.ok .dot{background:#78d79a}
+.syncHealth.warn{color:#e5bd67}.syncHealth.warn .dot{background:#e5bd67}
+.syncHealth.bad{color:#ef8e98}.syncHealth.bad .dot{background:#ef8e98}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -2167,7 +2174,7 @@ function relocationPlanHtml(mod,sub,pos,items){
 
 /* ===== v36 · responsable de mezcla usando movimientos reales de Copérnico ===== */
 const MIX_TRACE_CACHE=new Map();
-const MIX_TRACE_WAITERS=new Map();
+const MIX_TRACE_WAITERS=new Map(); // legado, sin uso en modo automático
 let mixTraceSeq=0;
 
 function trArr(v){return Array.isArray(v)?v:(Array.isArray(v?.data)?v.data:[])}
@@ -2387,7 +2394,7 @@ function analyzeMixTrace(loc,items,results){
 function mixTraceHtml(state){
   if(!state)return '';
   if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Reconstruyendo los movimientos de las cajas/SKU de esta posición…</div></div>';
-  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">NO CONECTADO</span></div><div class="mixTraceResult">Abrí la extensión <strong>Trazabilidad de Cajas</strong> y mantené Copérnico logueado.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">SIN DATOS</span></div><div class="mixTraceResult">La trazabilidad automática todavía no está publicada para estas cajas.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
   if(state.status==='error')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState bad">ERROR</span></div><div class="mixTraceResult">'+esc(state.error||'No se pudo consultar la trazabilidad.')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
 
   const a=state.analysis||{},cause=a.cause;
@@ -2442,31 +2449,96 @@ function mixTraceHtml(state){
   h+='<div class="mixTraceNote">Criterio: para cada SKU actualmente presente se busca, incluso cuando comparte la misma caja con otros SKU, el comienzo de su saldo positivo actual. El SKU cuya presencia activa comenzó último es el que generó la convivencia actual. El responsable mostrado es <strong>Nombre_empleado</strong> de ese movimiento.</div></div>';
   return h;
 }
-function requestMixTrace(loc,items,force=false){
-  if(!loc||!items?.length)return;
-  const boxes=[...new Set(items.map(x=>String(x.caja||'').trim()).filter(Boolean))];
-  if(!boxes.length)return;
-  const key=trNorm(loc);
-  if(!force && MIX_TRACE_CACHE.has(key))return;
-  MIX_TRACE_CACHE.set(key,{status:'loading'});refreshSelectedDetailTrace();
-  const requestId='mix-'+(++mixTraceSeq)+'-'+Date.now();
-  const timer=setTimeout(()=>{
-    if(MIX_TRACE_WAITERS.has(requestId)){
-      MIX_TRACE_WAITERS.delete(requestId);MIX_TRACE_CACHE.set(key,{status:'unavailable'});refreshSelectedDetailTrace();
-    }
-  },10000);
-  MIX_TRACE_WAITERS.set(requestId,{key,loc,items,timer});
-  window.postMessage({source:'UBICACIONES_APP',type:'TRAZA_QUERY_BOXES',requestId,boxes},'*');
+let TRACE_DATASET=null;
+let TRACE_DATASET_PROMISE=null;
+
+async function loadTraceDataset(force=false){
+  if(TRACE_DATASET && !force)return TRACE_DATASET;
+  if(TRACE_DATASET_PROMISE && !force)return TRACE_DATASET_PROMISE;
+
+  TRACE_DATASET_PROMISE=(async()=>{
+    const res=await fetch('./trazabilidad-cajas.json?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    TRACE_DATASET=payload||{};
+    return TRACE_DATASET;
+  })();
+
+  try{
+    return await TRACE_DATASET_PROMISE;
+  }finally{
+    TRACE_DATASET_PROMISE=null;
+  }
 }
-window.addEventListener('message',ev=>{
-  if(ev.source!==window)return;const d=ev.data;
-  if(!d||d.source!=='TRAZA_UBICACIONES'||d.type!=='TRAZA_QUERY_RESULT')return;
-  const w=MIX_TRACE_WAITERS.get(d.requestId);if(!w)return;
-  clearTimeout(w.timer);MIX_TRACE_WAITERS.delete(d.requestId);
-  if(!d.ok)MIX_TRACE_CACHE.set(w.key,{status:'error',error:d.error||'No se pudo consultar'});
-  else MIX_TRACE_CACHE.set(w.key,{status:'ok',analysis:analyzeMixTrace(w.loc,w.items,d.results||[])});
+
+async function requestMixTrace(loc,items,force=false){
+  if(!loc||!items?.length)return;
+
+  const boxes=[...new Set(
+    items.map(x=>String(x.caja||'').trim()).filter(Boolean)
+  )];
+
+  if(!boxes.length)return;
+
+  const key=trNorm(loc);
+
+  if(!force && MIX_TRACE_CACHE.has(key))return;
+
+  MIX_TRACE_CACHE.set(key,{status:'loading'});
   refreshSelectedDetailTrace();
-});
+
+  try{
+    const dataset=await loadTraceDataset(force);
+    const boxMap=dataset?.boxes||{};
+    const results=[];
+
+    for(const caja of boxes){
+      const r=boxMap[String(caja)];
+
+      if(r){
+        results.push({
+          ...r,
+          caja:String(caja),
+          ok:r.ok!==false
+        });
+      }else{
+        results.push({
+          ok:false,
+          caja:String(caja),
+          error:'Caja sin trazabilidad publicada'
+        });
+      }
+    }
+
+    const okResults=results.filter(r=>r.ok);
+
+    if(!okResults.length){
+      MIX_TRACE_CACHE.set(key,{
+        status:'unavailable'
+      });
+    }else{
+      MIX_TRACE_CACHE.set(key,{
+        status:'ok',
+        analysis:analyzeMixTrace(
+          loc,
+          items,
+          results
+        )
+      });
+    }
+
+  }catch(err){
+    MIX_TRACE_CACHE.set(key,{
+      status:'error',
+      error:'No se pudo cargar la trazabilidad automática: '+(err?.message||String(err))
+    });
+  }
+
+  refreshSelectedDetailTrace();
+}
 let currentDetailTraceContext=null;
 function refreshSelectedDetailTrace(){
   if(!currentDetailTraceContext)return;
@@ -3744,6 +3816,68 @@ loadCachedStock();
 refreshVisibleStockStatus();
 loadPublishedStock({silent:true});
 startAutoStockRefresh();
+
+
+
+let LAST_SYNC_STATUS=null;
+
+function fmtAgoFromIso(value){
+  if(!value)return '';
+  const d=new Date(value);
+  if(isNaN(d))return '';
+  const sec=Math.max(0,Math.floor((Date.now()-d.getTime())/1000));
+  if(sec<60)return `hace ${sec} s`;
+  const min=Math.floor(sec/60);
+  if(min<60)return `hace ${min} min`;
+  const h=Math.floor(min/60);
+  return `hace ${h} h`;
+}
+
+async function loadSyncHealth(){
+  const el=document.getElementById('syncHealth');
+  if(!el)return;
+
+  try{
+    const res=await fetch('./sync-status.json?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+
+    const st=await res.json();
+    LAST_SYNC_STATUS=st;
+
+    let cls='syncHealth';
+    let text='';
+
+    if(st.status==='ok'){
+      cls+=' ok';
+      text='Copérnico conectado · última actualización '+fmtAgoFromIso(st.last_success_at);
+    }else if(st.status==='copernico_unavailable' || st.status==='backoff'){
+      cls+=' warn';
+      text=(st.message||'Copérnico sin licencia disponible');
+      if(st.last_success_at)text+=' · usando último dato válido de '+fmtAgoFromIso(st.last_success_at);
+      if(st.next_retry_at){
+        const nr=new Date(st.next_retry_at);
+        if(!isNaN(nr))text+=' · reintento '+nr.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      }
+    }else{
+      cls+=' bad';
+      text=(st.message||'Copérnico sin actualizar');
+      if(st.last_success_at)text+=' · último dato válido '+fmtAgoFromIso(st.last_success_at);
+    }
+
+    el.className=cls;
+    el.innerHTML='<span class="dot"></span><span>'+esc(text)+'</span>';
+
+  }catch(err){
+    el.className='syncHealth bad';
+    el.innerHTML='<span class="dot"></span><span>No se pudo leer el estado de sincronización</span>';
+  }
+}
+
+loadSyncHealth();
+setInterval(loadSyncHealth,30000);
 
 </script>
 
