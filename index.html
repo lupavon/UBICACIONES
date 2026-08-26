@@ -962,6 +962,27 @@ body.heatSplit .layoutHeatGrid{
   body.heatSplit #heatDetailHost{padding-top:18px!important}
 }
 
+
+/* ===== Pallets en proceso ===== */
+.processKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.processKpi{background:#111820;border:1px solid #303a47;border-radius:9px;padding:12px}
+.processKpi small{display:block;color:#8d98a5;font-size:10px;font-weight:800}
+.processKpi b{display:block;font-size:25px;margin-top:3px}
+.processKpi span{display:block;color:#8d98a5;font-size:10px;margin-top:2px}
+.processToolbar{display:flex;gap:9px;align-items:center;margin:12px 0}
+.processToolbar input{flex:1;min-width:220px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:9px 11px}
+.processStatus{font-size:12px;color:#9ba6b3;margin:8px 0 10px}
+.processStatus.ok{color:#78d79a}.processStatus.bad{color:#ef8e98}
+.processTableWrap{overflow:auto;border:1px solid #303a47;border-radius:9px;background:#0d1218;max-height:68vh}
+.processTable{width:100%;border-collapse:collapse;min-width:1250px}
+.processTable th{position:sticky;top:0;z-index:1;background:#171e27;color:#dbe2ea;text-align:left;font-size:11px;padding:10px;border-bottom:1px solid #394452}
+.processTable td{padding:10px;font-size:12px;border-bottom:1px solid #242d38;vertical-align:top}
+.processTable tr:hover td{background:#121a23}
+.processTable .who{font-weight:800;color:#67d5ff}
+.processTable .origin{font-weight:800;color:#f1c178}
+.processEmpty{padding:28px;text-align:center;color:#8995a2}
+@media(max-width:900px){.processKpis{grid-template-columns:1fr}.processToolbar{flex-wrap:wrap}.processToolbar input{width:100%}}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1593,7 +1614,7 @@ body.heatSplit .layoutHeatGrid{
     <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
     <button class="btn" id="kpiModeBtn">📊 KPIs</button>
     <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
-    <button class="btn" id="mbMfcModeBtn">↪ Masterbox → MFC</button>
+    <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -1780,56 +1801,44 @@ body.heatSplit .layoutHeatGrid{
     </div>
   </div>
 
-  <div id="mbMfcView" style="display:none">
-    <div class="layoutHeatTitle">Masterbox → MFC</div>
-    <div class="layoutHeatSubtitle">Detecta artículos con stock en posiciones de picking Masterbox (calles C, D, E, F, G, H o PM) cuya Variable Logística los configura para MFC.</div>
 
-    <div class="mbMfcNote">
-      Se consideran únicamente posiciones con <b>Área = Picking</b> y saldo mayor a 0. El criterio de destino se toma del <b>Código de Grupo</b> de Variables Logísticas. Esta vista identifica qué debería salir de Masterbox; no ejecuta movimientos.
+  <div id="palletsProcessView" style="display:none">
+    <div class="layoutHeatTitle">Pallets en proceso</div>
+    <div class="layoutHeatSubtitle">
+      Pallets que actualmente figuran en <b>EN_PROCESO</b>. Para cada caja se muestra desde qué posición fue enviada y el maquinista que realizó ese movimiento.
     </div>
 
-    <div class="mbMfcKpis">
-      <div class="mbMfcKpi"><small>SKU A MUDAR</small><b id="mbMfcSkuCount">0</b><span>códigos distintos</span></div>
-      <div class="mbMfcKpi"><small>POSICIONES MB</small><b id="mbMfcPosCount">0</b><span>ubicaciones afectadas</span></div>
-      <div class="mbMfcKpi"><small>UNIDADES EN MB</small><b id="mbMfcUnits">0</b><span>saldo a revisar</span></div>
-      <div class="mbMfcKpi"><small>CALLES AFECTADAS</small><b id="mbMfcStreetCount">0</b><span>C–H / PM</span></div>
+    <div class="processKpis">
+      <div class="processKpi"><small>PALLETS</small><b id="processPalletCount">0</b><span>cajas distintas</span></div>
+      <div class="processKpi"><small>LÍNEAS</small><b id="processLineCount">0</b><span>inventario en proceso</span></div>
+      <div class="processKpi"><small>IDENTIFICADOS</small><b id="processIdentifiedCount">0</b><span>con maquinista + origen</span></div>
     </div>
 
-    <div class="mbMfcToolbar">
-      <div>
-        <label for="mbMfcStreetFilter">Calle Masterbox</label>
-        <select id="mbMfcStreetFilter">
-          <option value="ALL">Todas</option>
-          <option value="C">C</option><option value="D">D</option><option value="E">E</option>
-          <option value="F">F</option><option value="G">G</option><option value="H">H</option>
-          <option value="PM">PM</option>
-        </select>
-      </div>
-      <div>
-        <label for="mbMfcGroupFilter">Grupo MFC</label>
-        <select id="mbMfcGroupFilter"><option value="ALL">Todos</option></select>
-      </div>
-      <div style="flex:1 1 260px">
-        <label for="mbMfcSearch">Buscar</label>
-        <input id="mbMfcSearch" placeholder="SKU, descripción o ubicación...">
-      </div>
+    <div class="processToolbar">
+      <input id="processSearch" placeholder="Buscar caja, SKU, descripción, origen o maquinista...">
+      <button class="btn" id="processRefreshBtn">↻ Actualizar</button>
     </div>
 
-    <div class="mbMfcTableWrap">
-      <table class="mbMfcTable">
-        <thead><tr>
-          <th>Calle</th>
-          <th>Ubicación actual</th>
-          <th>SKU / EAN</th>
-          <th>Descripción</th>
-          <th>Saldo</th>
-          <th>Grupo configurado</th>
-          <th>Destino lógico</th>
-          <th>Último mov.</th>
-        </tr></thead>
-        <tbody id="mbMfcBody"></tbody>
+    <div id="processStatus" class="processStatus">Cargando pallets en proceso…</div>
+
+    <div class="processTableWrap">
+      <table class="processTable">
+        <thead>
+          <tr>
+            <th>Caja</th>
+            <th>SKU / EAN</th>
+            <th>Descripción</th>
+            <th>Saldo</th>
+            <th>FV</th>
+            <th>Desde posición</th>
+            <th>Maquinista</th>
+            <th>ID empleado</th>
+            <th>Ingreso a proceso</th>
+          </tr>
+        </thead>
+        <tbody id="processBody"></tbody>
       </table>
-      <div id="mbMfcEmpty" class="mbMfcEmpty" style="display:none">No se detectaron artículos para mudar con los filtros seleccionados.</div>
+      <div id="processEmpty" class="processEmpty" style="display:none">No hay pallets actualmente en EN_PROCESO.</div>
     </div>
   </div>
 
@@ -2513,7 +2522,7 @@ $('fileInput').onchange=async e=>{
    const n=rows.map(normalizeRow).filter(x=>x&&Object.values(VIEWS).some(v=>v.zona===x.zona));
    if(!n.length)throw new Error('No encontré stock de MFCA/MFCB/MFCC/AR/BR.');
    DATA=rows;$('sourceText').textContent='Stock: '+f.name+' · VL + Layout Julio integrados';
-   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();if(displayMode==='mbmfc')buildMbMfcPanel();
+   selected=null;query='';$('search').value='';rebuild();if(displayMode==='heat')buildHeatmap();if(displayMode==='occupancy')buildOccupancyMap();if(displayMode==='kpi')buildKpiPanel();if(displayMode==='sanitation')buildSanitationPanel();
  }catch(err){alert(err.message||String(err))}
 };
 
@@ -2525,6 +2534,14 @@ function placeDetailForMode(mode){
   const host=document.getElementById('heatDetailHost');
   const home=document.getElementById('detailHomeAnchor');
   if(!section||!home)return;
+
+  const showDetail=(mode==='rack'||mode==='heat');
+  section.style.display=showDetail?'block':'none';
+
+  if(!showDetail){
+    document.body.classList.remove('heatSplit');
+    return;
+  }
 
   if(mode==='heat' && host){
     if(section.parentNode!==host) host.appendChild(section);
@@ -2541,23 +2558,132 @@ function placeDetailForMode(mode){
 function setDisplayMode(mode){
   displayMode=mode;
   placeDetailForMode(mode);
+
   $('rackView').style.display=mode==='rack'?'block':'none';
   $('heatmapView').style.display=mode==='heat'?'block':'none';
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
   $('kpiView').style.display=mode==='kpi'?'block':'none';
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
-  $('mbMfcView').style.display=mode==='mbmfc'?'block':'none';
+  $('palletsProcessView').style.display=mode==='process'?'block':'none';
+
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
   $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
   $('kpiModeBtn').classList.toggle('active',mode==='kpi');
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
-  $('mbMfcModeBtn').classList.toggle('active',mode==='mbmfc');
+  $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
+
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
   if(mode==='sanitation') buildSanitationPanel();
-  if(mode==='mbmfc') buildMbMfcPanel();
+  if(mode==='process') buildPalletsProcessPanel();
+}
+
+
+let PROCESS_ROWS=[];
+let PROCESS_LOADED=false;
+
+function processVal(r,names){
+  for(const n of names){
+    if(r && r[n]!==undefined && r[n]!==null) return r[n];
+  }
+  return '';
+}
+
+function renderPalletsProcess(){
+  const body=$('processBody'),empty=$('processEmpty');
+  if(!body||!empty)return;
+
+  const q=String($('processSearch')?.value||'').trim().toLowerCase();
+  let rows=PROCESS_ROWS.slice();
+  if(q){
+    rows=rows.filter(r=>[
+      processVal(r,['Caja','caja']),
+      processVal(r,['EAN','ean','SKU','sku']),
+      processVal(r,['Referencia','referencia']),
+      processVal(r,['Descripcion','descripcion']),
+      processVal(r,['PosicionOrigen','posicion_origen','UbicacionInicial']),
+      processVal(r,['Maquinista','maquinista','Nombre_empleado']),
+      processVal(r,['Id_maquinista','id_maquinista','Id_empleado'])
+    ].join(' ').toLowerCase().includes(q));
+  }
+
+  empty.style.display=rows.length?'none':'block';
+  body.innerHTML=rows.map(r=>{
+    const caja=processVal(r,['Caja','caja']);
+    const sku=processVal(r,['EAN','ean','SKU','sku']);
+    const desc=processVal(r,['Descripcion','descripcion']);
+    const saldo=processVal(r,['Saldo','saldo']);
+    const fv=processVal(r,['FV','fv']);
+    const origen=processVal(r,['PosicionOrigen','posicion_origen','UbicacionInicial']);
+    const maq=processVal(r,['Maquinista','maquinista','Nombre_empleado']);
+    const id=processVal(r,['Id_maquinista','id_maquinista','Id_empleado']);
+    const fecha=processVal(r,['FechaIngresoProceso','fecha_ingreso_proceso','fecha']);
+    return '<tr>'+
+      '<td><b>'+esc(caja)+'</b></td>'+
+      '<td>'+esc(sku)+'</td>'+
+      '<td>'+esc(desc)+'</td>'+
+      '<td>'+esc(saldo)+'</td>'+
+      '<td>'+esc(fv)+'</td>'+
+      '<td class="origin">'+esc(origen||'—')+'</td>'+
+      '<td class="who">'+esc(maq||'—')+'</td>'+
+      '<td>'+esc(id||'—')+'</td>'+
+      '<td>'+esc(fecha||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  const pallets=new Set(PROCESS_ROWS.map(r=>String(processVal(r,['Caja','caja'])||'')).filter(Boolean));
+  const identified=PROCESS_ROWS.filter(r=>
+    processVal(r,['PosicionOrigen','posicion_origen','UbicacionInicial']) &&
+    processVal(r,['Maquinista','maquinista','Nombre_empleado'])
+  ).length;
+
+  $('processPalletCount').textContent=pallets.size.toLocaleString('es-AR');
+  $('processLineCount').textContent=PROCESS_ROWS.length.toLocaleString('es-AR');
+  $('processIdentifiedCount').textContent=identified.toLocaleString('es-AR');
+}
+
+async function buildPalletsProcessPanel(force=false){
+  if(PROCESS_LOADED && !force){
+    renderPalletsProcess();
+    return;
+  }
+
+  const st=$('processStatus');
+  if(st){
+    st.className='processStatus';
+    st.textContent='Cargando pallets actualmente en EN_PROCESO…';
+  }
+
+  try{
+    const res=await fetch('./pallets-proceso.json?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+
+    const payload=await res.json();
+    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    PROCESS_ROWS=rows;
+    PROCESS_LOADED=true;
+
+    if(st){
+      const when=payload?.updated_at?new Date(payload.updated_at):null;
+      const whenTxt=when&&!isNaN(when)?when.toLocaleString('es-AR'):'';
+      st.className='processStatus ok';
+      st.textContent='● Información actualizada'+(whenTxt?' · '+whenTxt:'');
+    }
+    renderPalletsProcess();
+  }catch(err){
+    PROCESS_ROWS=[];
+    PROCESS_LOADED=false;
+    renderPalletsProcess();
+    if(st){
+      st.className='processStatus bad';
+      st.textContent='Todavía no está publicado pallets-proceso.json · '+(err.message||String(err));
+    }
+  }
 }
 
 
@@ -3407,10 +3533,9 @@ $('heatModeBtn').onclick=()=>setDisplayMode('heat');
 $('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
 $('kpiModeBtn').onclick=()=>setDisplayMode('kpi');
 $('sanitationModeBtn').onclick=()=>setDisplayMode('sanitation');
-$('mbMfcModeBtn').onclick=()=>setDisplayMode('mbmfc');
-$('mbMfcStreetFilter').onchange=()=>buildMbMfcPanel();
-$('mbMfcGroupFilter').onchange=()=>buildMbMfcPanel();
-$('mbMfcSearch').oninput=()=>buildMbMfcPanel();
+$('palletsProcessModeBtn').onclick=()=>setDisplayMode('process');
+$('processSearch').oninput=()=>renderPalletsProcess();
+$('processRefreshBtn').onclick=()=>buildPalletsProcessPanel(true);
 $('sanGroupSelect').onchange=()=>{
   localStorage.setItem('sanSelectedGroup',$('sanGroupSelect').value||'');
   sanOperatorIndex=0;
@@ -3486,7 +3611,7 @@ function applyStockPayload(payload,{fromCache=false}={}){
   if(displayMode==='heat')buildHeatmap();
   if(displayMode==='occupancy')buildOccupancyMap();
   if(displayMode==='kpi')buildKpiPanel();
-  if(displayMode==='sanitation')buildSanitationPanel();if(displayMode==='mbmfc')buildMbMfcPanel();
+  if(displayMode==='sanitation')buildSanitationPanel();
 
   return updatedAt;
 }
