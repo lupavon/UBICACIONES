@@ -18,7 +18,7 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Consultar Copernico
+      - name: Consultar Copernico con contingencia
         env:
           COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
           COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
@@ -32,7 +32,8 @@ jobs:
           import urllib.parse
           import http.cookiejar
           from concurrent.futures import ThreadPoolExecutor, as_completed
-          from datetime import datetime, timezone
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
@@ -41,6 +42,11 @@ jobs:
 
           EMAIL = os.environ["COPERNICO_EMAIL"]
           PASSWORD = os.environ["COPERNICO_PASSWORD"]
+
+          STATUS_FILE = Path("sync-status.json")
+          STOCK_FILE = Path("stock.json")
+          PALLETS_FILE = Path("pallets-proceso.json")
+          TRACE_FILE = Path("trazabilidad-cajas.json")
 
           jar = http.cookiejar.CookieJar()
           opener = urllib.request.build_opener(
@@ -53,6 +59,35 @@ jobs:
               "Referer": "https://copernicowms.com/",
               "User-Agent": "Mozilla/5.0"
           }
+
+          class ApiError(RuntimeError):
+              def __init__(self, code, detail, url):
+                  super().__init__(f"HTTP {code}: {detail}")
+                  self.code = code
+                  self.detail = detail
+                  self.url = url
+
+          def now_utc():
+              return datetime.now(timezone.utc)
+
+          def iso(dt):
+              return dt.astimezone(timezone.utc).isoformat()
+
+          def load_json_file(path, default):
+              try:
+                  return json.loads(path.read_text(encoding="utf-8"))
+              except Exception:
+                  return default
+
+          def save_json_file(path, payload):
+              path.write_text(
+                  json.dumps(
+                      payload,
+                      ensure_ascii=False,
+                      separators=(",", ":")
+                  ),
+                  encoding="utf-8"
+              )
 
           def request_json(url, method="GET", data=None, jwt=None, timeout=120):
               headers = dict(BASE_HEADERS)
@@ -82,13 +117,10 @@ jobs:
                       detail = e.read().decode(
                           "utf-8",
                           errors="replace"
-                      )[:500]
+                      )[:700]
                   except Exception:
                       detail = ""
-
-                  raise RuntimeError(
-                      f"{method} {url} -> HTTP {e.code} {detail}"
-                  )
+                  raise ApiError(e.code, detail, url)
 
               try:
                   parsed = json.loads(raw.decode("utf-8"))
@@ -114,11 +146,9 @@ jobs:
               if isinstance(obj, dict):
                   for key, value in obj.items():
                       normalized = str(key).lower().replace("-", "_")
-
                       if normalized in preferred:
                           if isinstance(value, int):
                               return value
-
                           if isinstance(value, str) and value.isdigit():
                               return int(value)
 
@@ -138,7 +168,6 @@ jobs:
           def user_id_from_jwt(token):
               try:
                   parts = token.split(".")
-
                   if len(parts) < 2:
                       return None
 
@@ -153,10 +182,8 @@ jobs:
                       return found
 
                   sub = claims.get("sub")
-
                   if isinstance(sub, int):
                       return sub
-
                   if isinstance(sub, str) and sub.isdigit():
                       return int(sub)
 
@@ -173,13 +200,8 @@ jobs:
                   return []
 
               for key in (
-                  "rows",
-                  "data",
-                  "items",
-                  "result",
-                  "results",
-                  "stock",
-                  "inventario"
+                  "rows", "data", "items", "result",
+                  "results", "stock", "inventario"
               ):
                   value = payload.get(key)
 
@@ -188,11 +210,8 @@ jobs:
 
                   if isinstance(value, dict):
                       for subkey in (
-                          "rows",
-                          "data",
-                          "items",
-                          "results",
-                          "stock"
+                          "rows", "data", "items",
+                          "results", "stock"
                       ):
                           subvalue = value.get(subkey)
                           if isinstance(subvalue, list):
@@ -262,7 +281,7 @@ jobs:
               except Exception:
                   return float("-inf")
 
-          def caja_api(endpoint, caja, jwt, timeout=45):
+          def caja_api(endpoint, caja, jwt, timeout=35):
               q = urllib.parse.quote(str(caja).strip(), safe="")
               url = CAJA_API_BASE + endpoint + "?caja=" + q
               payload, _, _ = request_json(
@@ -274,24 +293,30 @@ jobs:
               return payload
 
           def query_trace_full(caja, jwt):
-              movimientos = caja_api("getmovimientos", caja, jwt)
-              ubicaciones = caja_api("getubicaciones", caja, jwt)
-              inventario = caja_api("getinventario", caja, jwt)
+              try:
+                  movimientos = caja_api("getmovimientos", caja, jwt)
+                  ubicaciones = caja_api("getubicaciones", caja, jwt)
+                  inventario = caja_api("getinventario", caja, jwt)
 
-              return {
-                  "ok": True,
-                  "caja": str(caja).strip(),
-                  "movimientos": movimientos,
-                  "ubicaciones": ubicaciones,
-                  "inventario": inventario
-              }
+                  return {
+                      "ok": True,
+                      "caja": str(caja).strip(),
+                      "movimientos": movimientos,
+                      "ubicaciones": ubicaciones,
+                      "inventario": inventario
+                  }
+              except Exception as e:
+                  return {
+                      "ok": False,
+                      "caja": str(caja).strip(),
+                      "error": str(e)[:300],
+                      "movimientos": [],
+                      "ubicaciones": [],
+                      "inventario": []
+                  }
 
           def query_ubicaciones(caja, jwt):
-              payload = caja_api(
-                  "getubicaciones",
-                  caja,
-                  jwt
-              )
+              payload = caja_api("getubicaciones", caja, jwt)
               return extract_rows(payload)
 
           def latest_move_to_process(moves):
@@ -326,57 +351,14 @@ jobs:
 
           def build_process_row(stock_row, trace_move=None, trace_error=""):
               return {
-                  "Caja": field(
-                      stock_row,
-                      "Caja",
-                      "caja",
-                      "numeroCaja",
-                      "NroCaja"
-                  ),
-                  "EAN": field(
-                      stock_row,
-                      "EAN",
-                      "ean"
-                  ),
-                  "Referencia": field(
-                      stock_row,
-                      "referencia",
-                      "Referencia",
-                      "ref"
-                  ),
-                  "Descripcion": field(
-                      stock_row,
-                      "Descripcion",
-                      "descripcion",
-                      "Descripción"
-                  ),
-                  "Saldo": field(
-                      stock_row,
-                      "Saldo",
-                      "saldo",
-                      "Cantidad",
-                      "cantidad"
-                  ),
-                  "Unidad": field(
-                      stock_row,
-                      "UnidadMedida",
-                      "unidadMedida",
-                      "Unidad"
-                  ),
-                  "FV": field(
-                      stock_row,
-                      "FV",
-                      "fv",
-                      "FechaVencimiento"
-                  ),
-                  "Ubicacion": (
-                      field(
-                          stock_row,
-                          "Ubicacion",
-                          "ubicacion"
-                      )
-                      or "EN_PROCESO"
-                  ),
+                  "Caja": field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja"),
+                  "EAN": field(stock_row, "EAN", "ean"),
+                  "Referencia": field(stock_row, "referencia", "Referencia", "ref"),
+                  "Descripcion": field(stock_row, "Descripcion", "descripcion", "Descripción"),
+                  "Saldo": field(stock_row, "Saldo", "saldo", "Cantidad", "cantidad"),
+                  "Unidad": field(stock_row, "UnidadMedida", "unidadMedida", "Unidad"),
+                  "FV": field(stock_row, "FV", "fv", "FechaVencimiento"),
+                  "Ubicacion": field(stock_row, "Ubicacion", "ubicacion") or "EN_PROCESO",
                   "PosicionOrigen": (
                       field(
                           trace_move,
@@ -416,11 +398,7 @@ jobs:
                       if trace_move else ""
                   ),
                   "Prioridad": (
-                      field(
-                          trace_move,
-                          "Prioridad",
-                          "prioridad"
-                      )
+                      field(trace_move, "Prioridad", "prioridad")
                       if trace_move else ""
                   ),
                   "Trazabilidad": (
@@ -433,24 +411,109 @@ jobs:
                   )
               }
 
+          # -----------------------------
+          # Estado persistente / backoff
+          # -----------------------------
+          status = load_json_file(
+              STATUS_FILE,
+              {
+                  "status": "unknown",
+                  "fail_count": 0,
+                  "next_retry_at": None,
+                  "last_success_at": None,
+                  "last_attempt_at": None,
+                  "message": ""
+              }
+          )
+
+          now = now_utc()
+
+          next_retry_at = status.get("next_retry_at")
+          if next_retry_at:
+              try:
+                  next_retry_dt = datetime.fromisoformat(
+                      str(next_retry_at).replace("Z", "+00:00")
+                  )
+              except Exception:
+                  next_retry_dt = None
+
+              if next_retry_dt and now < next_retry_dt:
+                  status.update({
+                      "status": "backoff",
+                      "last_attempt_at": iso(now),
+                      "message": (
+                          "Copérnico no disponible. "
+                          "Se conserva el último dato válido."
+                      )
+                  })
+                  save_json_file(STATUS_FILE, status)
+                  print("BACKOFF ACTIVO HASTA:", iso(next_retry_dt))
+                  print("No se intenta login en este ciclo.")
+                  raise SystemExit(0)
+
           jwt = None
           user_id = None
+          login_ok = False
+          stock_updated = False
           main_error = None
           logout_error = None
 
           try:
               print("=== 1. LOGIN ===")
 
-              login, _, _ = request_json(
-                  LOGIN_URL,
-                  method="POST",
-                  data={
-                      "email": EMAIL,
-                      "password": PASSWORD,
-                      "plataforma": "Copernico WMS"
-                  },
-                  timeout=30
-              )
+              try:
+                  login, _, _ = request_json(
+                      LOGIN_URL,
+                      method="POST",
+                      data={
+                          "email": EMAIL,
+                          "password": PASSWORD,
+                          "plataforma": "Copernico WMS"
+                      },
+                      timeout=30
+                  )
+              except ApiError as e:
+                  # 403 de login se trata como indisponibilidad operativa:
+                  # licencia/cupo/sesión. NO se pisa ningún archivo de datos.
+                  if e.code == 403:
+                      fail_count = int(status.get("fail_count", 0)) + 1
+
+                      # 1er fallo: 2 min, 2do: 5 min, luego 10 min.
+                      if fail_count <= 1:
+                          delay_min = 2
+                      elif fail_count == 2:
+                          delay_min = 5
+                      else:
+                          delay_min = 10
+
+                      retry = now + timedelta(minutes=delay_min)
+
+                      detail_lower = (e.detail or "").lower()
+                      if "sesión activa" in detail_lower or "sesion activa" in detail_lower:
+                          reason = "Usuario técnico con sesión activa"
+                      elif "licen" in detail_lower or "cupo" in detail_lower:
+                          reason = "Sin licencia/cupo disponible"
+                      else:
+                          reason = "Copérnico rechazó temporalmente el login (HTTP 403)"
+
+                      status.update({
+                          "status": "copernico_unavailable",
+                          "fail_count": fail_count,
+                          "next_retry_at": iso(retry),
+                          "last_attempt_at": iso(now),
+                          "message": reason,
+                          "http_code": 403,
+                          "detail": (e.detail or "")[:300]
+                      })
+
+                      save_json_file(STATUS_FILE, status)
+
+                      print("CONTINGENCIA:", reason)
+                      print("Se conserva stock/pallets/trazabilidad anteriores.")
+                      print("Próximo intento:", iso(retry))
+                      raise SystemExit(0)
+
+                  raise
 
               jwt = login.get("jwt")
 
@@ -466,16 +529,18 @@ jobs:
 
               if user_id is None:
                   raise RuntimeError(
-                      "No pude obtener el ID del usuario "
-                      "para realizar el logout"
+                      "No pude obtener el ID del usuario para realizar el logout"
                   )
 
+              login_ok = True
               print("LOGIN OK")
-              print("ID de sesión identificado correctamente")
 
+              # -----------------------------
+              # STOCK: prioridad absoluta
+              # -----------------------------
               print("=== 2. STOCK BODEGA 47 ===")
 
-              stock_response, status, size = request_json(
+              stock_response, stock_http, size = request_json(
                   STOCK_URL,
                   method="GET",
                   jwt=jwt,
@@ -486,7 +551,7 @@ jobs:
 
               if not rows:
                   raise RuntimeError(
-                      "Copernico respondió, pero no encontré filas de inventario"
+                      "Copérnico respondió, pero no encontré filas de inventario"
                   )
 
               if len(rows) < 100:
@@ -494,11 +559,7 @@ jobs:
                       f"Respuesta sospechosa: solamente {len(rows)} registros"
                   )
 
-              print("STOCK HTTP:", status)
-              print("Registros:", len(rows))
-              print("Bytes recibidos:", size)
-
-              now_iso = datetime.now(timezone.utc).isoformat()
+              now_iso = iso(now_utc())
 
               stock_payload = {
                   "updated_at": now_iso,
@@ -507,229 +568,26 @@ jobs:
                   "rows": rows
               }
 
-              with open(
-                  "stock.json",
-                  "w",
-                  encoding="utf-8"
-              ) as f:
-                  json.dump(
-                      stock_payload,
-                      f,
-                      ensure_ascii=False,
-                      separators=(",", ":")
-                  )
+              save_json_file(STOCK_FILE, stock_payload)
+              stock_updated = True
 
+              print("STOCK HTTP:", stock_http)
+              print("Registros:", len(rows))
               print("stock.json generado correctamente")
 
+              # A partir de acá, si algo secundario falla, stock igual queda válido.
               print("=== 3. PALLETS EN PROCESO ===")
 
-              process_stock_rows = [
-                  row
-                  for row in rows
-                  if norm_value(
-                      field(
-                          row,
-                          "Ubicacion",
-                          "ubicacion",
-                          "Location"
-                      )
-                  ) == "EN_PROCESO"
-              ]
+              try:
+                  process_stock_rows = [
+                      row
+                      for row in rows
+                      if norm_value(
+                          field(row, "Ubicacion", "ubicacion", "Location")
+                      ) == "EN_PROCESO"
+                  ]
 
-              process_boxes = sorted({
-                  str(
-                      field(
-                          row,
-                          "Caja",
-                          "caja",
-                          "numeroCaja",
-                          "NroCaja"
-                      )
-                  ).strip()
-                  for row in process_stock_rows
-                  if str(
-                      field(
-                          row,
-                          "Caja",
-                          "caja",
-                          "numeroCaja",
-                          "NroCaja"
-                      )
-                  ).strip()
-              })
-
-              print("Líneas EN_PROCESO:", len(process_stock_rows))
-              print("Cajas/pallets EN_PROCESO:", len(process_boxes))
-
-              trace_by_box = {}
-
-              def trace_process_one(caja):
-                  try:
-                      moves = query_ubicaciones(caja, jwt)
-                      event = latest_move_to_process(moves)
-                      return caja, event, ""
-                  except Exception as e:
-                      return caja, None, str(e)[:300]
-
-              if process_boxes:
-                  print("Consultando trazabilidad de pallets EN_PROCESO...")
-                  executor = ThreadPoolExecutor(
-                      max_workers=min(8, len(process_boxes))
-                  )
-                  futures = {
-                      executor.submit(trace_process_one, caja): caja
-                      for caja in process_boxes
-                  }
-
-                  try:
-                      for future in as_completed(futures, timeout=35):
-                          caja = futures[future]
-                          try:
-                              caja, event, error = future.result(timeout=1)
-                          except Exception as e:
-                              event = None
-                              error = "Error aislado: " + str(e)[:250]
-
-                          trace_by_box[caja] = {
-                              "event": event,
-                              "error": error
-                          }
-                  except Exception as e:
-                      print("AVISO: trazabilidad EN_PROCESO incompleta:", str(e))
-                  finally:
-                      executor.shutdown(wait=False, cancel_futures=True)
-
-                  for caja in process_boxes:
-                      trace_by_box.setdefault(
-                          caja,
-                          {
-                              "event": None,
-                              "error": "Trazabilidad no disponible en este ciclo"
-                          }
-                      )
-
-              process_rows = []
-
-              for stock_row in process_stock_rows:
-                  caja = str(
-                      field(
-                          stock_row,
-                          "Caja",
-                          "caja",
-                          "numeroCaja",
-                          "NroCaja"
-                      )
-                  ).strip()
-
-                  trace = trace_by_box.get(caja, {})
-
-                  process_rows.append(
-                      build_process_row(
-                          stock_row,
-                          trace_move=trace.get("event"),
-                          trace_error=trace.get("error", "")
-                      )
-                  )
-
-              identified = sum(
-                  1
-                  for row in process_rows
-                  if row["PosicionOrigen"] and row["Maquinista"]
-              )
-
-              pallets_payload = {
-                  "updated_at": now_iso,
-                  "source": (
-                      "Copernico WMS · EN_PROCESO · "
-                      "trazabilidad de ubicaciones"
-                  ),
-                  "total_lineas": len(process_rows),
-                  "total_pallets": len(process_boxes),
-                  "identificados": identified,
-                  "rows": process_rows
-              }
-
-              with open(
-                  "pallets-proceso.json",
-                  "w",
-                  encoding="utf-8"
-              ) as f:
-                  json.dump(
-                      pallets_payload,
-                      f,
-                      ensure_ascii=False,
-                      separators=(",", ":")
-                  )
-
-              print("pallets-proceso.json generado correctamente")
-              print("Identificados:", identified, "/", len(process_rows))
-
-              print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
-
-              # Agrupa inventario actual por ubicación.
-              by_location = {}
-
-              for row in rows:
-                  ubicacion = str(
-                      field(
-                          row,
-                          "Ubicacion",
-                          "ubicacion"
-                      )
-                  ).strip()
-
-                  if not ubicacion:
-                      continue
-
-                  saldo_raw = field(
-                      row,
-                      "Saldo",
-                      "saldo"
-                  )
-
-                  try:
-                      saldo = float(saldo_raw)
-                  except Exception:
-                      saldo = 0.0
-
-                  if saldo <= 0:
-                      continue
-
-                  by_location.setdefault(
-                      ubicacion,
-                      []
-                  ).append(row)
-
-              mixed_locations = {}
-              trace_boxes = set()
-
-              for ubicacion, loc_rows in by_location.items():
-                  skus = {
-                      str(
-                          field(
-                              row,
-                              "referencia",
-                              "Referencia",
-                              "EAN",
-                              "ean"
-                          )
-                      ).strip()
-                      for row in loc_rows
-                      if str(
-                          field(
-                              row,
-                              "referencia",
-                              "Referencia",
-                              "EAN",
-                              "ean"
-                          )
-                      ).strip()
-                  }
-
-                  if len(skus) < 2:
-                      continue
-
-                  boxes = sorted({
+                  process_boxes = sorted({
                       str(
                           field(
                               row,
@@ -739,7 +597,7 @@ jobs:
                               "NroCaja"
                           )
                       ).strip()
-                      for row in loc_rows
+                      for row in process_stock_rows
                       if str(
                           field(
                               row,
@@ -751,105 +609,324 @@ jobs:
                       ).strip()
                   })
 
-                  mixed_locations[ubicacion] = {
-                      "sku_count": len(skus),
-                      "boxes": boxes
-                  }
+                  trace_by_box = {}
 
-                  trace_boxes.update(boxes)
+                  def trace_process_one(caja):
+                      try:
+                          moves = query_ubicaciones(caja, jwt)
+                          event = latest_move_to_process(moves)
+                          return caja, event, ""
+                      except Exception as e:
+                          return caja, None, str(e)[:300]
 
-              print("Ubicaciones mezcladas:", len(mixed_locations))
-              print("Cajas a trazar por mezcla:", len(trace_boxes))
+                  if process_boxes:
+                      executor = ThreadPoolExecutor(
+                          max_workers=min(8, len(process_boxes))
+                      )
 
-              trace_dataset_boxes = {}
-
-              def trace_full_one(caja):
-                  try:
-                      return caja, query_trace_full(caja, jwt)
-                  except Exception as e:
-                      return caja, {
-                          "ok": False,
-                          "caja": str(caja),
-                          "error": str(e)[:300],
-                          "movimientos": [],
-                          "ubicaciones": [],
-                          "inventario": []
+                      futures = {
+                          executor.submit(trace_process_one, caja): caja
+                          for caja in process_boxes
                       }
 
-              trace_boxes_sorted = sorted(trace_boxes)
+                      try:
+                          for future in as_completed(futures, timeout=35):
+                              caja = futures[future]
+                              try:
+                                  caja, event, error = future.result(timeout=1)
+                              except Exception as e:
+                                  event = None
+                                  error = "Error aislado: " + str(e)[:250]
 
-              if trace_boxes_sorted:
-                  print("Consultando trazabilidad de cajas mezcladas...")
-                  executor = ThreadPoolExecutor(
-                      max_workers=min(6, len(trace_boxes_sorted))
+                              trace_by_box[caja] = {
+                                  "event": event,
+                                  "error": error
+                              }
+                      except Exception as e:
+                          print(
+                              "AVISO: trazabilidad EN_PROCESO incompleta:",
+                              str(e)
+                          )
+                      finally:
+                          executor.shutdown(
+                              wait=False,
+                              cancel_futures=True
+                          )
+
+                      for caja in process_boxes:
+                          trace_by_box.setdefault(
+                              caja,
+                              {
+                                  "event": None,
+                                  "error": "Trazabilidad no disponible en este ciclo"
+                              }
+                          )
+
+                  process_rows = []
+
+                  for stock_row in process_stock_rows:
+                      caja = str(
+                          field(
+                              stock_row,
+                              "Caja",
+                              "caja",
+                              "numeroCaja",
+                              "NroCaja"
+                          )
+                      ).strip()
+
+                      trace = trace_by_box.get(caja, {})
+
+                      process_rows.append(
+                          build_process_row(
+                              stock_row,
+                              trace_move=trace.get("event"),
+                              trace_error=trace.get("error", "")
+                          )
+                      )
+
+                  identified = sum(
+                      1
+                      for row in process_rows
+                      if row["PosicionOrigen"] and row["Maquinista"]
                   )
-                  futures = {
-                      executor.submit(trace_full_one, caja): caja
-                      for caja in trace_boxes_sorted
-                  }
 
-                  try:
-                      for future in as_completed(futures, timeout=40):
-                          caja = futures[future]
-                          try:
-                              caja, result = future.result(timeout=1)
-                          except Exception as e:
-                              result = {
+                  save_json_file(
+                      PALLETS_FILE,
+                      {
+                          "updated_at": now_iso,
+                          "source": (
+                              "Copernico WMS · EN_PROCESO · "
+                              "trazabilidad de ubicaciones"
+                          ),
+                          "total_lineas": len(process_rows),
+                          "total_pallets": len(process_boxes),
+                          "identificados": identified,
+                          "rows": process_rows
+                      }
+                  )
+
+                  print("pallets-proceso.json generado correctamente")
+
+              except Exception as e:
+                  print(
+                      "AVISO: pallets-proceso no pudo actualizarse. "
+                      "Se conservará el último válido:",
+                      str(e)
+                  )
+
+              # -----------------------------
+              # TRAZABILIDAD DE MEZCLA
+              # -----------------------------
+              print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
+
+              try:
+                  by_location = {}
+
+                  for row in rows:
+                      ubicacion = str(
+                          field(row, "Ubicacion", "ubicacion")
+                      ).strip()
+
+                      if not ubicacion:
+                          continue
+
+                      try:
+                          saldo = float(field(row, "Saldo", "saldo"))
+                      except Exception:
+                          saldo = 0.0
+
+                      if saldo <= 0:
+                          continue
+
+                      by_location.setdefault(
+                          ubicacion,
+                          []
+                      ).append(row)
+
+                  mixed_locations = {}
+                  trace_boxes = set()
+
+                  for ubicacion, loc_rows in by_location.items():
+                      skus = {
+                          str(
+                              field(
+                                  row,
+                                  "referencia",
+                                  "Referencia",
+                                  "EAN",
+                                  "ean"
+                              )
+                          ).strip()
+                          for row in loc_rows
+                          if str(
+                              field(
+                                  row,
+                                  "referencia",
+                                  "Referencia",
+                                  "EAN",
+                                  "ean"
+                              )
+                          ).strip()
+                      }
+
+                      if len(skus) < 2:
+                          continue
+
+                      boxes = sorted({
+                          str(
+                              field(
+                                  row,
+                                  "Caja",
+                                  "caja",
+                                  "numeroCaja",
+                                  "NroCaja"
+                              )
+                          ).strip()
+                          for row in loc_rows
+                          if str(
+                              field(
+                                  row,
+                                  "Caja",
+                                  "caja",
+                                  "numeroCaja",
+                                  "NroCaja"
+                              )
+                          ).strip()
+                      })
+
+                      mixed_locations[ubicacion] = {
+                          "sku_count": len(skus),
+                          "boxes": boxes
+                      }
+
+                      trace_boxes.update(boxes)
+
+                  trace_dataset_boxes = {}
+                  trace_boxes_sorted = sorted(trace_boxes)
+
+                  if trace_boxes_sorted:
+                      executor = ThreadPoolExecutor(
+                          max_workers=min(6, len(trace_boxes_sorted))
+                      )
+
+                      futures = {
+                          executor.submit(
+                              query_trace_full,
+                              caja,
+                              jwt
+                          ): caja
+                          for caja in trace_boxes_sorted
+                      }
+
+                      try:
+                          for future in as_completed(futures, timeout=40):
+                              caja = futures[future]
+                              try:
+                                  result = future.result(timeout=1)
+                              except Exception as e:
+                                  result = {
+                                      "ok": False,
+                                      "caja": str(caja),
+                                      "error": "Error aislado: " + str(e)[:250],
+                                      "movimientos": [],
+                                      "ubicaciones": [],
+                                      "inventario": []
+                                  }
+
+                              trace_dataset_boxes[str(caja)] = result
+
+                      except Exception as e:
+                          print(
+                              "AVISO: trazabilidad de mezcla incompleta:",
+                              str(e)
+                          )
+
+                      finally:
+                          executor.shutdown(
+                              wait=False,
+                              cancel_futures=True
+                          )
+
+                      for caja in trace_boxes_sorted:
+                          trace_dataset_boxes.setdefault(
+                              str(caja),
+                              {
                                   "ok": False,
                                   "caja": str(caja),
-                                  "error": "Error aislado: " + str(e)[:250],
+                                  "error": "Trazabilidad no disponible en este ciclo",
                                   "movimientos": [],
                                   "ubicaciones": [],
                                   "inventario": []
                               }
+                          )
 
-                          trace_dataset_boxes[str(caja)] = result
-                  except Exception as e:
-                      print("AVISO: trazabilidad de mezcla incompleta:", str(e))
-                  finally:
-                      executor.shutdown(wait=False, cancel_futures=True)
-
-                  for caja in trace_boxes_sorted:
-                      trace_dataset_boxes.setdefault(
-                          str(caja),
-                          {
-                              "ok": False,
-                              "caja": str(caja),
-                              "error": "Trazabilidad no disponible en este ciclo",
-                              "movimientos": [],
-                              "ubicaciones": [],
-                              "inventario": []
-                          }
-                      )
-
-              trace_payload = {
-                  "updated_at": now_iso,
-                  "source": (
-                      "Copernico WMS · trazabilidad automática de "
-                      "cajas en posiciones con mezcla"
-                  ),
-                  "mixed_location_count": len(mixed_locations),
-                  "box_count": len(trace_dataset_boxes),
-                  "locations": mixed_locations,
-                  "boxes": trace_dataset_boxes
-              }
-
-              with open(
-                  "trazabilidad-cajas.json",
-                  "w",
-                  encoding="utf-8"
-              ) as f:
-                  json.dump(
-                      trace_payload,
-                      f,
-                      ensure_ascii=False,
-                      separators=(",", ":")
+                  save_json_file(
+                      TRACE_FILE,
+                      {
+                          "updated_at": now_iso,
+                          "source": (
+                              "Copernico WMS · trazabilidad automática "
+                              "de cajas en posiciones con mezcla"
+                          ),
+                          "mixed_location_count": len(mixed_locations),
+                          "box_count": len(trace_dataset_boxes),
+                          "locations": mixed_locations,
+                          "boxes": trace_dataset_boxes
+                      }
                   )
 
-              print("trazabilidad-cajas.json generado correctamente")
+                  print("trazabilidad-cajas.json generado correctamente")
+
+              except Exception as e:
+                  print(
+                      "AVISO: trazabilidad-cajas no pudo actualizarse. "
+                      "Se conservará el último válido:",
+                      str(e)
+                  )
+
+              # Éxito general: reset backoff.
+              status.update({
+                  "status": "ok",
+                  "fail_count": 0,
+                  "next_retry_at": None,
+                  "last_success_at": now_iso,
+                  "last_attempt_at": now_iso,
+                  "message": "Actualización correcta",
+                  "http_code": 200,
+                  "detail": ""
+              })
+
+              save_json_file(
+                  STATUS_FILE,
+                  status
+              )
+
+          except SystemExit:
+              raise
 
           except Exception as e:
               main_error = e
+
+              # Error genérico: no pisa datos válidos; deja estado.
+              fail_count = int(status.get("fail_count", 0)) + 1
+              retry = now_utc() + timedelta(
+                  minutes=2 if fail_count <= 1 else 5
+              )
+
+              status.update({
+                  "status": "error",
+                  "fail_count": fail_count,
+                  "next_retry_at": iso(retry),
+                  "last_attempt_at": iso(now_utc()),
+                  "message": "Error de actualización; se conserva último dato válido",
+                  "detail": str(e)[:300]
+              })
+
+              save_json_file(
+                  STATUS_FILE,
+                  status
+              )
 
           finally:
               if jwt and user_id is not None:
@@ -871,40 +948,46 @@ jobs:
                       logout_error = e
                       print("ERROR LOGOUT:", str(e))
 
+          # Importante:
+          # No hacemos fallar el workflow por indisponibilidad operativa.
+          # Así sí se publica sync-status.json.
           if main_error:
-              raise main_error
+              print("ERROR CONTROLADO:", str(main_error))
 
           if logout_error:
-              raise RuntimeError(
-                  "La consulta terminó pero el logout falló: "
-                  + str(logout_error)
-              )
+              print("AVISO LOGOUT:", str(logout_error))
 
-          print("=== CICLO COMPLETO OK ===")
+          print("=== CICLO FINALIZADO ===")
           PY
 
-      - name: Publicar archivos
+      - name: Publicar estado y datos válidos
         run: |
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
 
-          cp stock.json /tmp/stock-nuevo.json
-          cp pallets-proceso.json /tmp/pallets-proceso-nuevo.json
-          cp trazabilidad-cajas.json /tmp/trazabilidad-cajas-nuevo.json
+          mkdir -p /tmp/ubicaciones-sync
+
+          for f in stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json; do
+            if [ -f "$f" ]; then
+              cp "$f" "/tmp/ubicaciones-sync/$f"
+            fi
+          done
 
           git fetch origin main
           git reset --hard origin/main
 
-          cp /tmp/stock-nuevo.json stock.json
-          cp /tmp/pallets-proceso-nuevo.json pallets-proceso.json
-          cp /tmp/trazabilidad-cajas-nuevo.json trazabilidad-cajas.json
+          for f in stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json; do
+            if [ -f "/tmp/ubicaciones-sync/$f" ]; then
+              cp "/tmp/ubicaciones-sync/$f" "$f"
+            fi
+          done
 
-          git add stock.json pallets-proceso.json trazabilidad-cajas.json
+          git add stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
-            echo "Los archivos remotos ya están actualizados."
+            echo "No hay cambios para publicar."
             exit 0
           fi
 
-          git commit -m "AutoSync stock, pallets en proceso y trazabilidad"
+          git commit -m "AutoSync Copérnico · datos y estado"
           git push origin HEAD:main
