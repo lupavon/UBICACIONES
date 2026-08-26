@@ -3661,7 +3661,7 @@ async function loadPublishedStock({silent=false}={}){
   const timeout=setTimeout(()=>controller.abort(),20000);
 
   try{
-    const url='https://raw.githubusercontent.com/lupavon/UBICACIONES/main/stock.json?v='+Date.now();
+    const url='https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now();
     const res=await fetch(url,{
       cache:'no-store',
       signal:controller.signal
@@ -3718,7 +3718,7 @@ rebuild();
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },300000);
+  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },30000);
 }
 
 const refreshBtn=document.getElementById('refreshStockBtn');
@@ -3738,7 +3738,7 @@ if(refreshBtn){
 // Arranque único del dashboard:
 // 1) mostrar cache inmediatamente;
 // 2) buscar stock nuevo en segundo plano;
-// 3) refrescar cada 5 minutos.
+// 3) refrescar cada 30 segundos desde Cloudflare.
 placeDetailForMode(displayMode);
 loadCachedStock();
 refreshVisibleStockStatus();
