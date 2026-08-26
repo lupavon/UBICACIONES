@@ -1,0 +1,87 @@
+name: Probar conexion Copernico
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Probar login y consulta de stock
+        env:
+          COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
+          COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.parse
+
+          # 1. LOGIN
+          login_url = "https://services.copernicowms.com/users/api/login"
+
+          login_data = json.dumps({
+              "email": os.environ["COPERNICO_EMAIL"],
+              "password": os.environ["COPERNICO_PASSWORD"],
+              "plataforma": "Copernico WMS"
+          }).encode("utf-8")
+
+          req = urllib.request.Request(
+              login_url,
+              data=login_data,
+              headers={
+                  "Content-Type": "application/json",
+                  "Accept": "application/json"
+              },
+              method="POST"
+          )
+
+          with urllib.request.urlopen(req, timeout=30) as response:
+              login_response = json.loads(response.read().decode("utf-8"))
+
+          jwt = login_response.get("jwt")
+
+          if not jwt:
+              raise RuntimeError("Copernico respondio al login pero no devolvio JWT")
+
+          print("LOGIN OK")
+          print("JWT recibido correctamente")
+
+          # 2. CONSULTAR INVENTARIO BODEGA 47
+          stock_url = (
+              "https://services.copernicowms.com/"
+              "backweb25/inventario/obtenerrefsxcaja?bodega=47"
+          )
+
+          req = urllib.request.Request(
+              stock_url,
+              headers={
+                  "Authorization": jwt,
+                  "Accept": "application/json"
+              },
+              method="GET"
+          )
+
+          with urllib.request.urlopen(req, timeout=120) as response:
+              raw = response.read()
+              status = response.status
+
+          print("CONSULTA STOCK OK")
+          print("HTTP:", status)
+          print("Bytes recibidos:", len(raw))
+
+          # Comprobamos que realmente sea JSON.
+          stock = json.loads(raw.decode("utf-8"))
+
+          if isinstance(stock, list):
+              print("Registros recibidos:", len(stock))
+          elif isinstance(stock, dict):
+              print("Respuesta JSON recibida correctamente")
+              print("Campos principales:", list(stock.keys())[:10])
+          else:
+              print("Tipo de respuesta:", type(stock).__name__)
+
+          print("PRUEBA COMPLETADA")
+          PY
