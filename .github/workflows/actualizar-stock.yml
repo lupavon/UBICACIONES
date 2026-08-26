@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Probar login y consulta de stock
+      - name: Diagnosticar login y stock
         env:
           COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
           COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
@@ -17,9 +17,10 @@ jobs:
           import os
           import json
           import urllib.request
-          import urllib.parse
+          import urllib.error
 
-          # 1. LOGIN
+          print("=== PASO 1: LOGIN COPERNICO ===")
+
           login_url = "https://services.copernicowms.com/users/api/login"
 
           login_data = json.dumps({
@@ -28,60 +29,90 @@ jobs:
               "plataforma": "Copernico WMS"
           }).encode("utf-8")
 
-          req = urllib.request.Request(
+          login_req = urllib.request.Request(
               login_url,
               data=login_data,
               headers={
                   "Content-Type": "application/json",
-                  "Accept": "application/json"
+                  "Accept": "application/json, text/plain, */*",
+                  "Origin": "https://copernicowms.com",
+                  "Referer": "https://copernicowms.com/",
+                  "User-Agent": "Mozilla/5.0"
               },
               method="POST"
           )
 
-          with urllib.request.urlopen(req, timeout=30) as response:
-              login_response = json.loads(response.read().decode("utf-8"))
+          try:
+              with urllib.request.urlopen(login_req, timeout=30) as response:
+                  login_raw = response.read().decode("utf-8")
+                  print("LOGIN HTTP:", response.status)
+          except urllib.error.HTTPError as e:
+              print("LOGIN ERROR HTTP:", e.code)
+              try:
+                  print("LOGIN RESPUESTA:", e.read().decode("utf-8")[:500])
+              except:
+                  pass
+              raise SystemExit("FALLO EN PASO 1: LOGIN")
 
-          jwt = login_response.get("jwt")
+          try:
+              login_json = json.loads(login_raw)
+          except Exception:
+              raise SystemExit("LOGIN respondio pero no devolvio JSON valido")
+
+          jwt = login_json.get("jwt")
 
           if not jwt:
-              raise RuntimeError("Copernico respondio al login pero no devolvio JWT")
+              print("Campos devueltos:", list(login_json.keys()))
+              raise SystemExit("LOGIN OK pero no devolvio jwt")
 
           print("LOGIN OK")
           print("JWT recibido correctamente")
+          print()
 
-          # 2. CONSULTAR INVENTARIO BODEGA 47
+          print("=== PASO 2: CONSULTA STOCK BODEGA 47 ===")
+
           stock_url = (
               "https://services.copernicowms.com/"
               "backweb25/inventario/obtenerrefsxcaja?bodega=47"
           )
 
-          req = urllib.request.Request(
+          stock_req = urllib.request.Request(
               stock_url,
               headers={
                   "Authorization": jwt,
-                  "Accept": "application/json"
+                  "Accept": "application/json, text/plain, */*",
+                  "Origin": "https://copernicowms.com",
+                  "Referer": "https://copernicowms.com/",
+                  "User-Agent": "Mozilla/5.0"
               },
               method="GET"
           )
 
-          with urllib.request.urlopen(req, timeout=120) as response:
-              raw = response.read()
-              status = response.status
+          try:
+              with urllib.request.urlopen(stock_req, timeout=120) as response:
+                  raw = response.read()
+                  print("STOCK HTTP:", response.status)
+          except urllib.error.HTTPError as e:
+              print("STOCK ERROR HTTP:", e.code)
+              try:
+                  print("STOCK RESPUESTA:", e.read().decode("utf-8")[:500])
+              except:
+                  pass
+              raise SystemExit("FALLO EN PASO 2: STOCK")
 
-          print("CONSULTA STOCK OK")
-          print("HTTP:", status)
           print("Bytes recibidos:", len(raw))
 
-          # Comprobamos que realmente sea JSON.
-          stock = json.loads(raw.decode("utf-8"))
+          try:
+              stock = json.loads(raw.decode("utf-8"))
+          except Exception:
+              raise SystemExit("STOCK respondio pero no era JSON valido")
 
           if isinstance(stock, list):
               print("Registros recibidos:", len(stock))
           elif isinstance(stock, dict):
-              print("Respuesta JSON recibida correctamente")
+              print("Respuesta JSON OK")
               print("Campos principales:", list(stock.keys())[:10])
-          else:
-              print("Tipo de respuesta:", type(stock).__name__)
 
-          print("PRUEBA COMPLETADA")
+          print()
+          print("=== PRUEBA COMPLETADA OK ===")
           PY
