@@ -89,6 +89,56 @@ jobs:
                   encoding="utf-8"
               )
 
+          def force_logout_by_id(user_id, jwt=None):
+              """
+              Libera una sesión técnica anterior usando el ID ya aprendido
+              en una ejecución exitosa. Se usa solo cuando el login responde
+              explícitamente 'sesión activa'.
+              """
+              if user_id is None:
+                  return False
+
+              headers = dict(BASE_HEADERS)
+              headers["Content-Type"] = "application/json"
+
+              if jwt:
+                  headers["Authorization"] = jwt
+
+              req = urllib.request.Request(
+                  LOGOUT_URL,
+                  data=json.dumps({"id": user_id}).encode("utf-8"),
+                  headers=headers,
+                  method="POST"
+              )
+
+              try:
+                  with opener.open(req, timeout=20) as response:
+                      response.read()
+                      print("LOGOUT DE RECUPERACIÓN HTTP:", response.status)
+                      return 200 <= response.status < 300
+              except urllib.error.HTTPError as e:
+                  try:
+                      detail = e.read().decode("utf-8", errors="replace")[:300]
+                  except Exception:
+                      detail = ""
+                  print("LOGOUT DE RECUPERACIÓN FALLÓ:", e.code, detail)
+                  return False
+              except Exception as e:
+                  print("LOGOUT DE RECUPERACIÓN FALLÓ:", str(e))
+                  return False
+
+          def login_once():
+              return request_json(
+                  LOGIN_URL,
+                  method="POST",
+                  data={
+                      "email": EMAIL,
+                      "password": PASSWORD,
+                      "plataforma": "Copernico WMS"
+                  },
+                  timeout=30
+              )
+
           def request_json(url, method="GET", data=None, jwt=None, timeout=120):
               headers = dict(BASE_HEADERS)
 
@@ -452,53 +502,98 @@ jobs:
               print("=== 1. LOGIN ===")
 
               try:
-                  login, _, _ = request_json(
-                      LOGIN_URL,
-                      method="POST",
-                      data={
-                          "email": EMAIL,
-                          "password": PASSWORD,
-                          "plataforma": "Copernico WMS"
-                      },
-                      timeout=30
-                  )
+                  login, _, _ = login_once()
+
               except ApiError as e:
-                  # 403 de login se trata como indisponibilidad operativa:
-                  # licencia/cupo/sesión. NO se pisa ningún archivo de datos.
                   if e.code == 403:
-                      fail_count = int(status.get("fail_count", 0)) + 1
-
-                      # Cloudflare dispara este workflow cada minuto.
-                      # No aplicamos backoff: se conserva el último dato válido
-                      # y se vuelve a intentar en el próximo ciclo.
-                      retry = now + timedelta(minutes=1)
-
                       detail_lower = (e.detail or "").lower()
-                      if "sesión activa" in detail_lower or "sesion activa" in detail_lower:
-                          reason = "Usuario técnico con sesión activa"
-                      elif "licen" in detail_lower or "cupo" in detail_lower:
-                          reason = "Sin licencia/cupo disponible"
-                      else:
-                          reason = "Copérnico rechazó temporalmente el login (HTTP 403)"
+                      session_active = (
+                          "sesión activa" in detail_lower
+                          or "sesion activa" in detail_lower
+                      )
 
-                      status.update({
-                          "status": "copernico_unavailable",
-                          "fail_count": fail_count,
-                          "next_retry_at": iso(retry),
-                          "last_attempt_at": iso(now),
-                          "message": reason,
-                          "http_code": 403,
-                          "detail": (e.detail or "")[:300]
-                      })
+                      # Si el usuario técnico quedó con una sesión huérfana,
+                      # usamos el ID aprendido en el último login exitoso,
+                      # cerramos esa sesión y reintentamos UNA sola vez.
+                      if session_active:
+                          known_user_id = status.get("copernico_user_id")
 
-                      save_json_file(STATUS_FILE, status)
+                          if known_user_id is not None:
+                              print(
+                                  "SESIÓN ACTIVA DETECTADA. "
+                                  "Intentando liberar sesión técnica anterior..."
+                              )
 
-                      print("CONTINGENCIA:", reason)
-                      print("Se conserva stock/pallets/trazabilidad anteriores.")
-                      print("Se reintentará automáticamente en el próximo minuto.")
-                      raise SystemExit(0)
+                              released = force_logout_by_id(
+                                  known_user_id
+                              )
 
-                  raise
+                              if released:
+                                  print(
+                                      "Sesión anterior liberada. "
+                                      "Reintentando login..."
+                                  )
+
+                                  try:
+                                      login, _, _ = login_once()
+                                      print("LOGIN RECUPERADO OK")
+                                  except ApiError as retry_error:
+                                      e = retry_error
+                                  else:
+                                      e = None
+
+                      if e is not None:
+                          fail_count = int(status.get("fail_count", 0)) + 1
+                          retry = now + timedelta(minutes=1)
+
+                          detail_lower = (e.detail or "").lower()
+
+                          if (
+                              "sesión activa" in detail_lower
+                              or "sesion activa" in detail_lower
+                          ):
+                              reason = "Usuario técnico con sesión activa"
+                          elif "licen" in detail_lower or "cupo" in detail_lower:
+                              reason = "Sin licencia/cupo disponible"
+                          else:
+                              reason = (
+                                  "Copérnico rechazó temporalmente "
+                                  "el login (HTTP 403)"
+                              )
+
+                          status.update({
+                              "status": "copernico_unavailable",
+                              "fail_count": fail_count,
+                              "next_retry_at": iso(retry),
+                              "last_attempt_at": iso(now),
+                              "message": reason,
+                              "http_code": 403,
+                              "detail": (e.detail or "")[:300]
+                          })
+
+                          save_json_file(STATUS_FILE, status)
+
+                          print("CONTINGENCIA:", reason)
+
+                          if session_active and status.get(
+                              "copernico_user_id"
+                          ) is None:
+                              print(
+                                  "Todavía no hay ID técnico aprendido "
+                                  "para liberar automáticamente la sesión."
+                              )
+
+                          print(
+                              "Se conserva stock/pallets/trazabilidad anteriores."
+                          )
+                          print(
+                              "Se reintentará automáticamente "
+                              "en el próximo minuto."
+                          )
+                          raise SystemExit(0)
+
+                  else:
+                      raise
 
               jwt = login.get("jwt")
 
@@ -960,7 +1055,8 @@ jobs:
                   "last_attempt_at": now_iso,
                   "message": "Actualización correcta",
                   "http_code": 200,
-                  "detail": ""
+                  "detail": "",
+                  "copernico_user_id": user_id
               })
 
               save_json_file(
