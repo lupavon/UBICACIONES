@@ -875,7 +875,7 @@ jobs:
                   )
 
               # -----------------------------
-              # TRAZABILIDAD DE MEZCLA · INCREMENTAL POR POSICIÓN
+              # TRAZABILIDAD DE MEZCLA · 1 CAJA REPRESENTATIVA POR SKU
               # -----------------------------
               print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
 
@@ -905,14 +905,15 @@ jobs:
                       if saldo <= 0:
                           continue
 
-                      by_location.setdefault(ubicacion, []).append(row)
+                      by_location.setdefault(
+                          ubicacion,
+                          []
+                      ).append(row)
 
                   current_mixed = {}
 
                   for ubicacion, loc_rows in by_location.items():
-                      sku_map = {}
-                      box_skus = {}
-                      boxes = []
+                      sku_rows = {}
 
                       for row in loc_rows:
                           sku = str(
@@ -923,116 +924,159 @@ jobs:
                               )
                           ).strip()
 
-                          if sku:
-                              sku_map.setdefault(
-                                  sku,
-                                  {
-                                      "ean": str(
-                                          field(row, "EAN", "ean")
-                                      ).strip(),
-                                      "referencia": str(
-                                          field(
-                                              row,
-                                              "referencia",
-                                              "Referencia"
-                                          )
-                                      ).strip(),
-                                      "descripcion": str(
-                                          field(
-                                              row,
-                                              "Descripcion",
-                                              "descripcion",
-                                              "Descripción"
-                                          )
-                                      ).strip()
-                                  }
+                          if not sku:
+                              continue
+
+                          sku_rows.setdefault(sku, []).append(row)
+
+                      if len(sku_rows) < 2:
+                          continue
+
+                      # Para cada SKU actual elegimos la caja con el movimiento
+                      # más antiguo visible en stock. Esa caja representa el
+                      # comienzo más antiguo que todavía sigue presente del SKU.
+                      sku_candidates = {}
+
+                      for sku, sku_current_rows in sku_rows.items():
+                          def movement_ts(r):
+                              return parse_date(
+                                  field(
+                                      r,
+                                      "f_ultimo_movimiento",
+                                      "F_Ultimo_Movimiento",
+                                      "ultimo_movimiento",
+                                      "UltimoMovimiento",
+                                      "fechaRegistro",
+                                      "FechaRegistro"
+                                  )
                               )
+
+                          ordered = sorted(
+                              sku_current_rows,
+                              key=movement_ts
+                          )
+
+                          candidate = ordered[0]
 
                           caja = str(
                               field(
-                                  row,
+                                  candidate,
                                   "Caja", "caja",
                                   "numeroCaja", "NroCaja"
                               )
                           ).strip()
 
-                          if caja:
-                              if caja not in boxes:
-                                  boxes.append(caja)
+                          if not caja:
+                              # Buscar otra fila del mismo SKU que sí tenga caja.
+                              for alt in ordered:
+                                  caja = str(
+                                      field(
+                                          alt,
+                                          "Caja", "caja",
+                                          "numeroCaja", "NroCaja"
+                                      )
+                                  ).strip()
+                                  if caja:
+                                      candidate = alt
+                                      break
 
-                              if sku:
-                                  box_skus.setdefault(caja, [])
-                                  if sku not in box_skus[caja]:
-                                      box_skus[caja].append(sku)
+                          sku_candidates[sku] = {
+                              "sku": sku,
+                              "caja": caja,
+                              "stock_last_move": str(
+                                  field(
+                                      candidate,
+                                      "f_ultimo_movimiento",
+                                      "F_Ultimo_Movimiento",
+                                      "ultimo_movimiento",
+                                      "UltimoMovimiento",
+                                      "fechaRegistro",
+                                      "FechaRegistro"
+                                  )
+                              ).strip(),
+                              "referencia": str(
+                                  field(
+                                      candidate,
+                                      "referencia",
+                                      "Referencia"
+                                  )
+                              ).strip(),
+                              "descripcion": str(
+                                  field(
+                                      candidate,
+                                      "Descripcion",
+                                      "descripcion",
+                                      "Descripción"
+                                  )
+                              ).strip()
+                          }
 
-                      if len(sku_map) < 2:
-                          continue
-
-                      boxes = sorted(boxes)
                       signature = "|".join(
-                          boxes
-                          + ["#"]
-                          + sorted(sku_map.keys())
-                          + ["#"]
-                          + [
-                              caja + ":" + ",".join(
-                                  sorted(box_skus.get(caja, []))
-                              )
-                              for caja in boxes
-                          ]
+                          sorted(
+                              f"{sku}:{x.get('caja','')}:{x.get('stock_last_move','')}"
+                              for sku, x in sku_candidates.items()
+                          )
                       )
 
                       current_mixed[ubicacion] = {
-                          "sku_count": len(sku_map),
-                          "boxes": boxes,
-                          "current_skus": list(sku_map.values()),
-                          "box_skus": box_skus,
-                          "signature": signature
+                          "sku_count": len(sku_rows),
+                          "signature": signature,
+                          "sku_candidates": sku_candidates,
+                          "analysis": {
+                              "status": "pending"
+                          }
                       }
 
-                  resolved_locations = {}
-                  pending_locations = {}
+                  resolved = {}
+                  pending = {}
 
                   for ubicacion, info in current_mixed.items():
-                      old = previous_locations.get(ubicacion, {})
+                      old = previous_locations.get(
+                          ubicacion,
+                          {}
+                      )
 
-                      # Reutilizar únicamente resultados DETECTADOS cuya
-                      # composición actual no cambió.
                       if (
                           old.get("signature") == info["signature"]
                           and old.get("analysis", {}).get("status")
                           == "detected"
                       ):
-                          resolved_locations[ubicacion] = old
+                          resolved[ubicacion] = old
                       else:
-                          pending_locations[ubicacion] = info
+                          pending[ubicacion] = info
+
+                  candidate_boxes = sorted({
+                      x.get("caja", "")
+                      for info in pending.values()
+                      for x in info.get(
+                          "sku_candidates",
+                          {}
+                      ).values()
+                      if x.get("caja")
+                  })
 
                   print(
                       "Posiciones mezcladas actuales:",
                       len(current_mixed),
                       "| cache resuelta:",
-                      len(resolved_locations),
+                      len(resolved),
                       "| pendientes:",
-                      len(pending_locations)
+                      len(pending)
                   )
-
-                  # Consultar solo cajas pertenecientes a posiciones pendientes.
-                  boxes_needed = sorted({
-                      caja
-                      for info in pending_locations.values()
-                      for caja in info.get("boxes", [])
-                  })
-
                   print(
-                      "Cajas únicas a consultar este ciclo:",
-                      len(boxes_needed)
+                      "Cajas representativas a consultar:",
+                      len(candidate_boxes)
                   )
 
                   box_history = {}
 
-                  def query_box_location_history(caja):
+                  def query_candidate_box(caja):
                       try:
-                          hist = query_ubicaciones(caja, jwt)
+                          hist = query_ubicaciones(
+                              caja,
+                              jwt
+                          )
+
                           compact = []
 
                           for m in hist:
@@ -1051,7 +1095,8 @@ jobs:
                                   ),
                                   "fecha": field(
                                       m,
-                                      "fecha", "Fecha",
+                                      "fecha",
+                                      "Fecha",
                                       "FechaMovimiento",
                                       "fecha_movimiento"
                                   ),
@@ -1080,22 +1125,20 @@ jobs:
                       except Exception as e:
                           return str(caja), [], str(e)[:300]
 
-                  # Límite de trabajo por ciclo: si aparecen muchísimas cajas,
-                  # se procesan por tandas y el próximo minuto continúa.
-                  MAX_BOXES_PER_CYCLE = 300
-                  boxes_this_cycle = boxes_needed[:MAX_BOXES_PER_CYCLE]
-
-                  if boxes_this_cycle:
+                  if candidate_boxes:
                       executor = ThreadPoolExecutor(
-                          max_workers=min(12, len(boxes_this_cycle))
+                          max_workers=min(
+                              12,
+                              len(candidate_boxes)
+                          )
                       )
 
                       futures = {
                           executor.submit(
-                              query_box_location_history,
+                              query_candidate_box,
                               caja
                           ): caja
-                          for caja in boxes_this_cycle
+                          for caja in candidate_boxes
                       }
 
                       try:
@@ -1104,20 +1147,23 @@ jobs:
                               timeout=50
                           ):
                               caja = futures[future]
+
                               try:
-                                  caja, hist, error = future.result(timeout=1)
+                                  caja, hist, error = future.result(
+                                      timeout=1
+                                  )
                               except Exception as e:
                                   hist = []
                                   error = str(e)[:300]
 
-                              box_history[str(caja)] = {
+                              box_history[caja] = {
                                   "history": hist,
                                   "error": error
                               }
 
                       except Exception as e:
                           print(
-                              "AVISO: tanda de trazabilidad incompleta:",
+                              "AVISO: consultas representativas incompletas:",
                               str(e)
                           )
 
@@ -1130,198 +1176,227 @@ jobs:
                   def norm_loc(v):
                       return str(v or "").strip().upper()
 
-                  def latest_arrival(caja, ubicacion):
+                  def arrival_to_location(caja, ubicacion):
                       hist = box_history.get(
-                          str(caja), {}
+                          str(caja),
+                          {}
                       ).get("history", [])
 
-                      candidates = [
-                          m for m in hist
+                      matches = [
+                          m
+                          for m in hist
                           if norm_loc(
                               m.get("UbicacionFinal")
                           ) == norm_loc(ubicacion)
                       ]
 
-                      if not candidates:
+                      if not matches:
                           return None
 
+                      # Si la caja entró más de una vez a la misma posición,
+                      # tomamos el ingreso más reciente de esa caja.
                       return max(
-                          candidates,
+                          matches,
                           key=lambda m: parse_date(
                               m.get("fecha")
                           )
                       )
 
                   newly_detected = 0
-                  still_pending = 0
+                  incomplete = 0
 
-                  for ubicacion, info in pending_locations.items():
-                      # Si alguna caja de esta posición no entró todavía en
-                      # la tanda, conservarla pendiente para el próximo ciclo.
-                      if any(
-                          caja not in box_history
-                          for caja in info.get("boxes", [])
-                      ):
-                          old = previous_locations.get(ubicacion, {})
-                          info["analysis"] = old.get(
-                              "analysis",
-                              {
-                                  "status": "pending",
-                                  "reason": "Pendiente de próxima tanda"
-                              }
-                          )
-                          resolved_locations[ubicacion] = info
-                          still_pending += 1
-                          continue
+                  for ubicacion, info in pending.items():
+                      sku_events = []
 
-                      arrivals = []
+                      for sku, cand in info.get(
+                          "sku_candidates",
+                          {}
+                      ).items():
+                          caja = cand.get("caja", "")
 
-                      for caja in info.get("boxes", []):
-                          event = latest_arrival(caja, ubicacion)
-                          if not event:
+                          if not caja:
                               continue
 
-                          arrivals.append({
+                          ev = arrival_to_location(
+                              caja,
+                              ubicacion
+                          )
+
+                          if not ev:
+                              continue
+
+                          sku_events.append({
+                              "sku": sku,
                               "caja": caja,
-                              "skus": info.get(
-                                  "box_skus", {}
-                              ).get(caja, []),
-                              "fecha": event.get("fecha", ""),
-                              "UbicacionInicial": event.get(
-                                  "UbicacionInicial", ""
+                              "fecha": ev.get(
+                                  "fecha",
+                                  ""
                               ),
-                              "UbicacionFinal": event.get(
-                                  "UbicacionFinal", ""
+                              "Nombre_empleado": ev.get(
+                                  "Nombre_empleado",
+                                  ""
                               ),
-                              "Nombre_empleado": event.get(
-                                  "Nombre_empleado", ""
+                              "Id_empleado": ev.get(
+                                  "Id_empleado",
+                                  ""
                               ),
-                              "Id_empleado": event.get(
-                                  "Id_empleado", ""
+                              "UbicacionInicial": ev.get(
+                                  "UbicacionInicial",
+                                  ""
                               ),
-                              "Prioridad": event.get(
-                                  "Prioridad", ""
+                              "UbicacionFinal": ev.get(
+                                  "UbicacionFinal",
+                                  ""
+                              ),
+                              "Prioridad": ev.get(
+                                  "Prioridad",
+                                  ""
+                              ),
+                              "stock_last_move": cand.get(
+                                  "stock_last_move",
+                                  ""
+                              ),
+                              "descripcion": cand.get(
+                                  "descripcion",
+                                  ""
                               )
                           })
 
-                      arrivals.sort(
-                          key=lambda a: parse_date(a.get("fecha"))
+                      sku_events.sort(
+                          key=lambda x: parse_date(
+                              x.get("fecha")
+                          )
                       )
 
-                      present_skus = set()
-                      incident = None
+                      if len(sku_events) >= 2:
+                          # El SKU representado por el evento más reciente es
+                          # el que hizo que convivieran dos SKU actuales.
+                          cause = sku_events[-1]
+                          previous = sku_events[:-1]
 
-                      for arrival in arrivals:
-                          arriving = {
-                              str(x).strip()
-                              for x in arrival.get("skus", [])
-                              if str(x).strip()
-                          }
-
-                          if not arriving:
-                              continue
-
-                          new_skus = arriving - present_skus
-
-                          if (
-                              incident is None
-                              and present_skus
-                              and new_skus
-                              and len(present_skus | arriving) >= 2
-                          ):
-                              incident = {
-                                  "responsable": arrival.get(
-                                      "Nombre_empleado", ""
-                                  ),
-                                  "id_empleado": arrival.get(
-                                      "Id_empleado", ""
-                                  ),
-                                  "fecha": arrival.get("fecha", ""),
-                                  "caja_agregada": arrival.get(
-                                      "caja", ""
-                                  ),
-                                  "sku_agregado": sorted(new_skus),
-                                  "sku_que_ya_estaba": sorted(
-                                      present_skus
-                                  ),
-                                  "origen": arrival.get(
-                                      "UbicacionInicial", ""
-                                  ),
-                                  "destino": arrival.get(
-                                      "UbicacionFinal", ""
-                                  ),
-                                  "prioridad": arrival.get(
-                                      "Prioridad", ""
-                                  )
-                              }
-
-                          present_skus.update(arriving)
-
-                      if incident:
                           info["analysis"] = {
                               "status": "detected",
-                              "responsable": incident,
-                              "arrivals": arrivals
+                              "responsable": {
+                                  "responsable": cause.get(
+                                      "Nombre_empleado",
+                                      ""
+                                  ),
+                                  "id_empleado": cause.get(
+                                      "Id_empleado",
+                                      ""
+                                  ),
+                                  "fecha": cause.get(
+                                      "fecha",
+                                      ""
+                                  ),
+                                  "caja_agregada": cause.get(
+                                      "caja",
+                                      ""
+                                  ),
+                                  "sku_agregado": [
+                                      cause.get(
+                                          "sku",
+                                          ""
+                                      )
+                                  ],
+                                  "sku_que_ya_estaba": [
+                                      x.get(
+                                          "sku",
+                                          ""
+                                      )
+                                      for x in previous
+                                  ],
+                                  "origen": cause.get(
+                                      "UbicacionInicial",
+                                      ""
+                                  ),
+                                  "destino": cause.get(
+                                      "UbicacionFinal",
+                                      ""
+                                  ),
+                                  "prioridad": cause.get(
+                                      "Prioridad",
+                                      ""
+                                  )
+                              },
+                              "arrivals": sku_events,
+                              "method": (
+                                  "Una caja representativa por SKU actual, "
+                                  "seleccionada por el movimiento visible más "
+                                  "antiguo en stock."
+                              )
                           }
+
                           newly_detected += 1
+
                       else:
                           info["analysis"] = {
                               "status": "incomplete",
                               "reason": (
-                                  "No se encontró un ingreso a la posición "
-                                  "para todas las cajas actuales."
+                                  "Copérnico no devolvió un ingreso a esta "
+                                  "posición para al menos dos SKU actuales."
                               ),
-                              "arrivals": arrivals
+                              "arrivals": sku_events
                           }
-                          still_pending += 1
+                          incomplete += 1
 
-                      resolved_locations[ubicacion] = info
+                      resolved[ubicacion] = info
 
-                  trace_payload = {
+                  payload = {
                       "updated_at": now_iso,
                       "source": (
-                          "Copernico WMS · trazabilidad incremental "
-                          "por posición mezclada"
+                          "Copernico WMS · trazabilidad por SKU "
+                          "representativo"
                       ),
                       "criterion": (
-                          "Solo se consultan posiciones mezcladas nuevas o "
-                          "cuya composición cambió. Una posición ya resuelta "
-                          "se reutiliza mientras mantenga las mismas cajas/SKU."
+                          "Para cada SKU actual se selecciona la caja con el "
+                          "movimiento más antiguo visible en stock y se consulta "
+                          "su ingreso a la posición. El SKU cuyo ingreso "
+                          "representativo ocurrió después se considera el que "
+                          "generó la convivencia actual."
                       ),
-                      "mixed_location_count": len(current_mixed),
-                      "cached_detected_count": sum(
+                      "mixed_location_count": len(
+                          current_mixed
+                      ),
+                      "detected_count": sum(
                           1
-                          for x in resolved_locations.values()
-                          if x.get("analysis", {}).get("status")
-                          == "detected"
+                          for x in resolved.values()
+                          if x.get(
+                              "analysis",
+                              {}
+                          ).get("status") == "detected"
                       ),
                       "newly_detected_count": newly_detected,
-                      "pending_count": still_pending,
-                      "locations": resolved_locations
+                      "incomplete_count": incomplete,
+                      "locations": resolved
                   }
 
-                  save_json_file(TRACE_FILE, trace_payload)
+                  save_json_file(
+                      TRACE_FILE,
+                      payload
+                  )
 
-                  trace_size_mb = (
-                      TRACE_FILE.stat().st_size / (1024 * 1024)
+                  size_mb = (
+                      TRACE_FILE.stat().st_size
+                      / (1024 * 1024)
                   )
 
                   print(
                       "Detectadas nuevas:",
                       newly_detected,
-                      "| detectadas totales/cache:",
-                      trace_payload["cached_detected_count"],
-                      "| pendientes:",
-                      still_pending
+                      "| detectadas totales:",
+                      payload["detected_count"],
+                      "| incompletas:",
+                      incomplete
                   )
                   print(
                       "trazabilidad-cajas.json generado correctamente ·",
-                      f"{trace_size_mb:.2f} MB"
+                      f"{size_mb:.2f} MB"
                   )
 
               except Exception as e:
                   print(
-                      "AVISO: trazabilidad incremental no pudo actualizarse. "
+                      "AVISO: trazabilidad por SKU no pudo actualizarse. "
                       "Se conservará el último válido:",
                       str(e)
                   )
