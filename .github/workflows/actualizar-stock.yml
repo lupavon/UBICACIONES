@@ -875,11 +875,18 @@ jobs:
                   )
 
               # -----------------------------
-              # TRAZABILIDAD DE MEZCLA
+              # TRAZABILIDAD DE MEZCLA · INCREMENTAL POR POSICIÓN
               # -----------------------------
               print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
 
               try:
+                  previous_trace = load_json_file(TRACE_FILE, {})
+                  previous_locations = (
+                      previous_trace.get("locations", {})
+                      if isinstance(previous_trace, dict)
+                      else {}
+                  )
+
                   by_location = {}
 
                   for row in rows:
@@ -898,169 +905,219 @@ jobs:
                       if saldo <= 0:
                           continue
 
-                      by_location.setdefault(
-                          ubicacion,
-                          []
-                      ).append(row)
+                      by_location.setdefault(ubicacion, []).append(row)
 
-                  mixed_locations = {}
-                  trace_boxes = set()
+                  current_mixed = {}
 
                   for ubicacion, loc_rows in by_location.items():
-                      skus = {
-                          str(
-                              field(
-                                  row,
-                                  "referencia",
-                                  "Referencia",
-                                  "EAN",
-                                  "ean"
-                              )
-                          ).strip()
-                          for row in loc_rows
-                          if str(
-                              field(
-                                  row,
-                                  "referencia",
-                                  "Referencia",
-                                  "EAN",
-                                  "ean"
-                              )
-                          ).strip()
-                      }
+                      sku_map = {}
+                      box_skus = {}
+                      boxes = []
 
-                      if len(skus) < 2:
+                      for row in loc_rows:
+                          sku = str(
+                              field(
+                                  row,
+                                  "EAN", "ean",
+                                  "referencia", "Referencia"
+                              )
+                          ).strip()
+
+                          if sku:
+                              sku_map.setdefault(
+                                  sku,
+                                  {
+                                      "ean": str(
+                                          field(row, "EAN", "ean")
+                                      ).strip(),
+                                      "referencia": str(
+                                          field(
+                                              row,
+                                              "referencia",
+                                              "Referencia"
+                                          )
+                                      ).strip(),
+                                      "descripcion": str(
+                                          field(
+                                              row,
+                                              "Descripcion",
+                                              "descripcion",
+                                              "Descripción"
+                                          )
+                                      ).strip()
+                                  }
+                              )
+
+                          caja = str(
+                              field(
+                                  row,
+                                  "Caja", "caja",
+                                  "numeroCaja", "NroCaja"
+                              )
+                          ).strip()
+
+                          if caja:
+                              if caja not in boxes:
+                                  boxes.append(caja)
+
+                              if sku:
+                                  box_skus.setdefault(caja, [])
+                                  if sku not in box_skus[caja]:
+                                      box_skus[caja].append(sku)
+
+                      if len(sku_map) < 2:
                           continue
 
-                      boxes = sorted({
-                          str(
-                              field(
-                                  row,
-                                  "Caja",
-                                  "caja",
-                                  "numeroCaja",
-                                  "NroCaja"
+                      boxes = sorted(boxes)
+                      signature = "|".join(
+                          boxes
+                          + ["#"]
+                          + sorted(sku_map.keys())
+                          + ["#"]
+                          + [
+                              caja + ":" + ",".join(
+                                  sorted(box_skus.get(caja, []))
                               )
-                          ).strip()
-                          for row in loc_rows
-                          if str(
-                              field(
-                                  row,
-                                  "Caja",
-                                  "caja",
-                                  "numeroCaja",
-                                  "NroCaja"
-                              )
-                          ).strip()
-                      })
+                              for caja in boxes
+                          ]
+                      )
 
-                      sku_detail = sorted({
-                          (
-                              str(field(row, "referencia", "Referencia")).strip(),
-                              str(field(row, "EAN", "ean")).strip(),
-                              str(field(row, "Descripcion", "descripcion", "Descripción")).strip()
-                          )
-                          for row in loc_rows
-                          if str(field(row, "referencia", "Referencia", "EAN", "ean")).strip()
-                      })
-
-                      box_skus = {}
-                      for row in loc_rows:
-                          caja_actual = str(
-                              field(row, "Caja", "caja", "numeroCaja", "NroCaja")
-                          ).strip()
-                          if not caja_actual:
-                              continue
-
-                          sku_actual = str(
-                              field(row, "EAN", "ean", "referencia", "Referencia")
-                          ).strip()
-
-                          if sku_actual:
-                              box_skus.setdefault(caja_actual, [])
-                              if sku_actual not in box_skus[caja_actual]:
-                                  box_skus[caja_actual].append(sku_actual)
-
-                      mixed_locations[ubicacion] = {
-                          "sku_count": len(skus),
+                      current_mixed[ubicacion] = {
+                          "sku_count": len(sku_map),
                           "boxes": boxes,
-                          "current_skus": [
-                              {
-                                  "referencia": ref,
-                                  "ean": ean,
-                                  "descripcion": desc
-                              }
-                              for ref, ean, desc in sku_detail
-                          ],
-                          "box_skus": box_skus
+                          "current_skus": list(sku_map.values()),
+                          "box_skus": box_skus,
+                          "signature": signature
                       }
 
-                      trace_boxes.update(boxes)
+                  resolved_locations = {}
+                  pending_locations = {}
 
-                  # Mantener datos históricos válidos como respaldo, pero
-                  # volver a consultar todas las cajas que HOY forman una mezcla.
-                  # No arrastrar el payload histórico bruto anterior:
-                  # la versión previa llegó a 111 MB y GitHub rechazó el push.
-                  # En cada ciclo reconstruimos únicamente las cajas que hoy
-                  # participan de posiciones mezcladas.
-                  trace_dataset_boxes = {}
-                  trace_boxes_sorted = sorted(trace_boxes)
+                  for ubicacion, info in current_mixed.items():
+                      old = previous_locations.get(ubicacion, {})
 
-                  trace_ok = 0
-                  trace_fail = 0
+                      # Reutilizar únicamente resultados DETECTADOS cuya
+                      # composición actual no cambió.
+                      if (
+                          old.get("signature") == info["signature"]
+                          and old.get("analysis", {}).get("status")
+                          == "detected"
+                      ):
+                          resolved_locations[ubicacion] = old
+                      else:
+                          pending_locations[ubicacion] = info
 
-                  if trace_boxes_sorted:
-                      print(
-                          "Cajas actuales en posiciones mezcladas:",
-                          len(trace_boxes_sorted)
-                      )
-                      print(
-                          "Consultando getmovimientos (1 request por caja)..."
-                      )
+                  print(
+                      "Posiciones mezcladas actuales:",
+                      len(current_mixed),
+                      "| cache resuelta:",
+                      len(resolved_locations),
+                      "| pendientes:",
+                      len(pending_locations)
+                  )
 
+                  # Consultar solo cajas pertenecientes a posiciones pendientes.
+                  boxes_needed = sorted({
+                      caja
+                      for info in pending_locations.values()
+                      for caja in info.get("boxes", [])
+                  })
+
+                  print(
+                      "Cajas únicas a consultar este ciclo:",
+                      len(boxes_needed)
+                  )
+
+                  box_history = {}
+
+                  def query_box_location_history(caja):
+                      try:
+                          hist = query_ubicaciones(caja, jwt)
+                          compact = []
+
+                          for m in hist:
+                              compact.append({
+                                  "UbicacionInicial": field(
+                                      m,
+                                      "UbicacionInicial",
+                                      "ubicacion_inicial",
+                                      "ubicacionInicial"
+                                  ),
+                                  "UbicacionFinal": field(
+                                      m,
+                                      "UbicacionFinal",
+                                      "ubicacion_final",
+                                      "ubicacionFinal"
+                                  ),
+                                  "fecha": field(
+                                      m,
+                                      "fecha", "Fecha",
+                                      "FechaMovimiento",
+                                      "fecha_movimiento"
+                                  ),
+                                  "Nombre_empleado": field(
+                                      m,
+                                      "Nombre_empleado",
+                                      "NombreEmpleado",
+                                      "nombreEmpleado",
+                                      "Empleado"
+                                  ),
+                                  "Id_empleado": field(
+                                      m,
+                                      "Id_empleado",
+                                      "IdEmpleado",
+                                      "idEmpleado"
+                                  ),
+                                  "Prioridad": field(
+                                      m,
+                                      "Prioridad",
+                                      "prioridad"
+                                  )
+                              })
+
+                          return str(caja), compact, ""
+
+                      except Exception as e:
+                          return str(caja), [], str(e)[:300]
+
+                  # Límite de trabajo por ciclo: si aparecen muchísimas cajas,
+                  # se procesan por tandas y el próximo minuto continúa.
+                  MAX_BOXES_PER_CYCLE = 300
+                  boxes_this_cycle = boxes_needed[:MAX_BOXES_PER_CYCLE]
+
+                  if boxes_this_cycle:
                       executor = ThreadPoolExecutor(
-                          max_workers=min(12, len(trace_boxes_sorted))
+                          max_workers=min(12, len(boxes_this_cycle))
                       )
 
                       futures = {
                           executor.submit(
-                              query_trace_full,
-                              caja,
-                              jwt
+                              query_box_location_history,
+                              caja
                           ): caja
-                          for caja in trace_boxes_sorted
+                          for caja in boxes_this_cycle
                       }
 
                       try:
-                          for future in as_completed(futures, timeout=50):
+                          for future in as_completed(
+                              futures,
+                              timeout=50
+                          ):
                               caja = futures[future]
-
                               try:
-                                  result = future.result(timeout=1)
+                                  caja, hist, error = future.result(timeout=1)
                               except Exception as e:
-                                  result = {
-                                      "ok": False,
-                                      "caja": str(caja),
-                                      "error": "Error aislado: " + str(e)[:250],
-                                      "movimientos": []
-                                  }
+                                  hist = []
+                                  error = str(e)[:300]
 
-                              # Solo pisar un resultado histórico bueno si la
-                              # consulta nueva también trajo algo utilizable.
-                              movs = extract_rows(result.get("movimientos"))
-
-                              if result.get("ok") and movs:
-                                  trace_dataset_boxes[str(caja)] = result
-                                  trace_ok += 1
-                              else:
-                                  trace_fail += 1
-
-                                  if str(caja) not in trace_dataset_boxes:
-                                      trace_dataset_boxes[str(caja)] = result
+                              box_history[str(caja)] = {
+                                  "history": hist,
+                                  "error": error
+                              }
 
                       except Exception as e:
                           print(
-                              "AVISO: trazabilidad de mezcla incompleta:",
+                              "AVISO: tanda de trazabilidad incompleta:",
                               str(e)
                           )
 
@@ -1070,65 +1127,201 @@ jobs:
                               cancel_futures=True
                           )
 
-                  # El JSON final solo necesita mantener las cajas actualmente
-                  # involucradas en mezclas. Evita crecimiento indefinido.
-                  trace_dataset_boxes = {
-                      str(caja): trace_dataset_boxes.get(
-                          str(caja),
-                          {
-                              "ok": False,
-                              "caja": str(caja),
-                              "error": "Sin movimientos disponibles en este ciclo",
-                              "movimientos": []
-                          }
+                  def norm_loc(v):
+                      return str(v or "").strip().upper()
+
+                  def latest_arrival(caja, ubicacion):
+                      hist = box_history.get(
+                          str(caja), {}
+                      ).get("history", [])
+
+                      candidates = [
+                          m for m in hist
+                          if norm_loc(
+                              m.get("UbicacionFinal")
+                          ) == norm_loc(ubicacion)
+                      ]
+
+                      if not candidates:
+                          return None
+
+                      return max(
+                          candidates,
+                          key=lambda m: parse_date(
+                              m.get("fecha")
+                          )
                       )
-                      for caja in trace_boxes_sorted
+
+                  newly_detected = 0
+                  still_pending = 0
+
+                  for ubicacion, info in pending_locations.items():
+                      # Si alguna caja de esta posición no entró todavía en
+                      # la tanda, conservarla pendiente para el próximo ciclo.
+                      if any(
+                          caja not in box_history
+                          for caja in info.get("boxes", [])
+                      ):
+                          old = previous_locations.get(ubicacion, {})
+                          info["analysis"] = old.get(
+                              "analysis",
+                              {
+                                  "status": "pending",
+                                  "reason": "Pendiente de próxima tanda"
+                              }
+                          )
+                          resolved_locations[ubicacion] = info
+                          still_pending += 1
+                          continue
+
+                      arrivals = []
+
+                      for caja in info.get("boxes", []):
+                          event = latest_arrival(caja, ubicacion)
+                          if not event:
+                              continue
+
+                          arrivals.append({
+                              "caja": caja,
+                              "skus": info.get(
+                                  "box_skus", {}
+                              ).get(caja, []),
+                              "fecha": event.get("fecha", ""),
+                              "UbicacionInicial": event.get(
+                                  "UbicacionInicial", ""
+                              ),
+                              "UbicacionFinal": event.get(
+                                  "UbicacionFinal", ""
+                              ),
+                              "Nombre_empleado": event.get(
+                                  "Nombre_empleado", ""
+                              ),
+                              "Id_empleado": event.get(
+                                  "Id_empleado", ""
+                              ),
+                              "Prioridad": event.get(
+                                  "Prioridad", ""
+                              )
+                          })
+
+                      arrivals.sort(
+                          key=lambda a: parse_date(a.get("fecha"))
+                      )
+
+                      present_skus = set()
+                      incident = None
+
+                      for arrival in arrivals:
+                          arriving = {
+                              str(x).strip()
+                              for x in arrival.get("skus", [])
+                              if str(x).strip()
+                          }
+
+                          if not arriving:
+                              continue
+
+                          new_skus = arriving - present_skus
+
+                          if (
+                              incident is None
+                              and present_skus
+                              and new_skus
+                              and len(present_skus | arriving) >= 2
+                          ):
+                              incident = {
+                                  "responsable": arrival.get(
+                                      "Nombre_empleado", ""
+                                  ),
+                                  "id_empleado": arrival.get(
+                                      "Id_empleado", ""
+                                  ),
+                                  "fecha": arrival.get("fecha", ""),
+                                  "caja_agregada": arrival.get(
+                                      "caja", ""
+                                  ),
+                                  "sku_agregado": sorted(new_skus),
+                                  "sku_que_ya_estaba": sorted(
+                                      present_skus
+                                  ),
+                                  "origen": arrival.get(
+                                      "UbicacionInicial", ""
+                                  ),
+                                  "destino": arrival.get(
+                                      "UbicacionFinal", ""
+                                  ),
+                                  "prioridad": arrival.get(
+                                      "Prioridad", ""
+                                  )
+                              }
+
+                          present_skus.update(arriving)
+
+                      if incident:
+                          info["analysis"] = {
+                              "status": "detected",
+                              "responsable": incident,
+                              "arrivals": arrivals
+                          }
+                          newly_detected += 1
+                      else:
+                          info["analysis"] = {
+                              "status": "incomplete",
+                              "reason": (
+                                  "No se encontró un ingreso a la posición "
+                                  "para todas las cajas actuales."
+                              ),
+                              "arrivals": arrivals
+                          }
+                          still_pending += 1
+
+                      resolved_locations[ubicacion] = info
+
+                  trace_payload = {
+                      "updated_at": now_iso,
+                      "source": (
+                          "Copernico WMS · trazabilidad incremental "
+                          "por posición mezclada"
+                      ),
+                      "criterion": (
+                          "Solo se consultan posiciones mezcladas nuevas o "
+                          "cuya composición cambió. Una posición ya resuelta "
+                          "se reutiliza mientras mantenga las mismas cajas/SKU."
+                      ),
+                      "mixed_location_count": len(current_mixed),
+                      "cached_detected_count": sum(
+                          1
+                          for x in resolved_locations.values()
+                          if x.get("analysis", {}).get("status")
+                          == "detected"
+                      ),
+                      "newly_detected_count": newly_detected,
+                      "pending_count": still_pending,
+                      "locations": resolved_locations
                   }
 
+                  save_json_file(TRACE_FILE, trace_payload)
+
+                  trace_size_mb = (
+                      TRACE_FILE.stat().st_size / (1024 * 1024)
+                  )
+
                   print(
-                      "Trazabilidad cajas OK:",
-                      trace_ok,
-                      "| sin datos/error:",
-                      trace_fail
+                      "Detectadas nuevas:",
+                      newly_detected,
+                      "| detectadas totales/cache:",
+                      trace_payload["cached_detected_count"],
+                      "| pendientes:",
+                      still_pending
                   )
-
-                  save_json_file(
-                      TRACE_FILE,
-                      {
-                          "updated_at": now_iso,
-                          "source": (
-                              "Copernico WMS · trazabilidad automática "
-                              "de cajas en posiciones con mezcla"
-                          ),
-                          "criterion": (
-                              "Para cada SKU actualmente presente se reconstruye "
-                              "el inicio de su saldo positivo actual. El SKU cuya "
-                              "presencia comenzó último es el que generó la mezcla; "
-                              "Nombre_empleado de ese movimiento es el responsable."
-                          ),
-                          "mixed_location_count": len(mixed_locations),
-                          "box_count": len(trace_dataset_boxes),
-                          "locations": mixed_locations,
-                          "boxes": trace_dataset_boxes
-                      }
-                  )
-
-                  trace_size_mb = TRACE_FILE.stat().st_size / (1024 * 1024)
                   print(
                       "trazabilidad-cajas.json generado correctamente ·",
                       f"{trace_size_mb:.2f} MB"
                   )
 
-                  if trace_size_mb >= 90:
-                      raise RuntimeError(
-                          "trazabilidad-cajas.json quedó demasiado grande "
-                          f"({trace_size_mb:.2f} MB). No se publicará para "
-                          "evitar superar el límite de GitHub."
-                      )
-
               except Exception as e:
                   print(
-                      "AVISO: trazabilidad-cajas no pudo actualizarse. "
+                      "AVISO: trazabilidad incremental no pudo actualizarse. "
                       "Se conservará el último válido:",
                       str(e)
                   )
