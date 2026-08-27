@@ -334,14 +334,116 @@ jobs:
               )
               return payload
 
-          def query_trace_full(caja, jwt):
+          def compact_trace_for_skus(caja, movimientos, current_skus):
               """
-              Para la detección de responsable de mezcla el dashboard usa
-              únicamente MOVIMIENTOS (EAN, Movimiento, Saldo, Fecha y empleado).
-              Evitamos getubicaciones + getinventario en este ciclo porque
-              triplicaban las llamadas y podían dejar cajas nuevas sin publicar
-              antes del timeout general.
+              Reduce el historial completo de la caja a UN solo movimiento por
+              SKU actual: el movimiento que inició la racha de saldo positivo
+              que sigue vigente. Es exactamente la evidencia que consume el
+              dashboard para decidir qué SKU llegó último y quién lo ingresó.
               """
+              wanted = {str(x).strip() for x in current_skus if str(x).strip()}
+              if not wanted:
+                  return []
+
+              def pick(m, *names):
+                  return field(m, *names)
+
+              def movement_sku(m):
+                  return str(pick(m, "EAN", "ean")).strip()
+
+              def number(v):
+                  try:
+                      return float(str(v).replace(",", "."))
+                  except Exception:
+                      return None
+
+              compact = []
+
+              for sku in sorted(wanted):
+                  sku_rows = [
+                      m for m in extract_rows(movimientos)
+                      if movement_sku(m) == sku
+                  ]
+
+                  sku_rows.sort(
+                      key=lambda m: parse_date(
+                          pick(
+                              m,
+                              "Fecha", "fecha",
+                              "FechaHora", "Fecha Hora",
+                              "FechaMovimiento", "Fecha Mov"
+                          )
+                      )
+                  )
+
+                  if not sku_rows:
+                      continue
+
+                  with_saldo = [
+                      (m, number(pick(m, "Saldo", "saldo")))
+                      for m in sku_rows
+                  ]
+                  with_saldo = [(m, saldo) for m, saldo in with_saldo if saldo is not None]
+
+                  start = None
+
+                  if with_saldo:
+                      # Mismo criterio del dashboard: si el último saldo quedó en
+                      # cero, esa caja/SKU ya no sostiene stock actual.
+                      if with_saldo[-1][1] <= 0:
+                          continue
+
+                      last_zero = -1
+                      for i in range(len(with_saldo) - 2, -1, -1):
+                          if with_saldo[i][1] <= 0:
+                              last_zero = i
+                              break
+
+                      start = with_saldo[last_zero + 1][0]
+
+                  if start is None:
+                      positives = []
+                      for m in sku_rows:
+                          mov = number(pick(m, "Movimiento", "movimiento"))
+                          estado = str(pick(m, "Estado", "estado")).strip().upper()
+                          if (mov is not None and mov > 0) or estado == "ENTRADA":
+                              positives.append(m)
+                      start = positives[-1] if positives else sku_rows[0]
+
+                  # Solo publicar los campos que usa el front. Esto reduce el JSON
+                  # de >100 MB a unos pocos KB/MB aun con muchas posiciones mezcladas.
+                  compact.append({
+                      "Fecha": pick(
+                          start,
+                          "Fecha", "fecha",
+                          "FechaHora", "Fecha Hora",
+                          "FechaMovimiento", "Fecha Mov"
+                      ),
+                      "EAN": pick(start, "EAN", "ean"),
+                      "Estado": pick(start, "Estado", "estado"),
+                      "Movimiento": pick(start, "Movimiento", "movimiento"),
+                      "Saldo": pick(start, "Saldo", "saldo"),
+                      "Transaccion": pick(
+                          start,
+                          "Transaccion", "Transacción", "transaccion"
+                      ),
+                      "Nombre_empleado": pick(
+                          start,
+                          "Nombre_empleado", "Nombre empleado", "NombreEmpleado"
+                      ),
+                      "Id_empleado": pick(
+                          start,
+                          "Id_empleado", "ID empleado", "IdEmpleado"
+                      ),
+                      "NoControl": pick(
+                          start,
+                          "NoControl", "No Control", "nocontrol"
+                      )
+                  })
+
+              return compact
+
+          def query_trace_compact(caja, jwt, current_skus):
               try:
                   movimientos = caja_api(
                       "getmovimientos",
@@ -350,12 +452,19 @@ jobs:
                       timeout=30
                   )
 
+                  compact = compact_trace_for_skus(
+                      caja,
+                      movimientos,
+                      current_skus
+                  )
+
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
-                      "movimientos": movimientos,
+                      "movimientos": compact,
                       "ubicaciones": [],
-                      "inventario": []
+                      "inventario": [],
+                      "compact": True
                   }
               except Exception as e:
                   return {
@@ -364,7 +473,8 @@ jobs:
                       "error": str(e)[:300],
                       "movimientos": [],
                       "ubicaciones": [],
-                      "inventario": []
+                      "inventario": [],
+                      "compact": True
                   }
 
           def query_ubicaciones(caja, jwt):
@@ -804,9 +914,9 @@ jobs:
                   )
 
               # -----------------------------
-              # TRAZABILIDAD DE MEZCLA
+              # TRAZABILIDAD DE MEZCLA · COMPACTA v13
               # -----------------------------
-              print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
+              print("=== 4. TRAZABILIDAD DE MEZCLAS · COMPACTA ===")
 
               try:
                   by_location = {}
@@ -827,33 +937,26 @@ jobs:
                       if saldo <= 0:
                           continue
 
-                      by_location.setdefault(
-                          ubicacion,
-                          []
-                      ).append(row)
+                      by_location.setdefault(ubicacion, []).append(row)
 
                   mixed_locations = {}
-                  trace_boxes = set()
+                  box_skus = {}
 
                   for ubicacion, loc_rows in by_location.items():
                       skus = {
                           str(
                               field(
                                   row,
-                                  "referencia",
-                                  "Referencia",
-                                  "EAN",
-                                  "ean"
+                                  "EAN", "ean",
+                                  "referencia", "Referencia"
                               )
                           ).strip()
                           for row in loc_rows
                           if str(
                               field(
                                   row,
-                                  "referencia",
-                                  "Referencia",
-                                  "EAN",
-                                  "ean"
+                                  "EAN", "ean",
+                                  "referencia", "Referencia"
                               )
                           ).strip()
                       }
@@ -861,47 +964,50 @@ jobs:
                       if len(skus) < 2:
                           continue
 
-                      boxes = sorted({
-                          str(
+                      boxes = set()
+                      for row in loc_rows:
+                          caja = str(
                               field(
                                   row,
-                                  "Caja",
-                                  "caja",
-                                  "numeroCaja",
-                                  "NroCaja"
+                                  "Caja", "caja",
+                                  "numeroCaja", "NroCaja"
                               )
                           ).strip()
-                          for row in loc_rows
-                          if str(
-                              field(
-                                  row,
-                                  "Caja",
-                                  "caja",
-                                  "numeroCaja",
-                                  "NroCaja"
-                              )
+                          if not caja:
+                              continue
+
+                          boxes.add(caja)
+
+                          # El dashboard filtra movimientos por EAN exacto. Asociamos
+                          # a cada caja todos los EAN actuales que aparecen en stock.
+                          ean = str(field(row, "EAN", "ean")).strip()
+                          referencia = str(
+                              field(row, "referencia", "Referencia")
                           ).strip()
-                      })
+                          sku_for_trace = ean or referencia
+                          if sku_for_trace:
+                              box_skus.setdefault(caja, set()).add(sku_for_trace)
+
+                      boxes = sorted(boxes)
 
                       mixed_locations[ubicacion] = {
                           "sku_count": len(skus),
                           "boxes": boxes
                       }
 
-                      trace_boxes.update(boxes)
+                  trace_boxes_sorted = sorted(box_skus)
 
-                  # Conservar trazabilidad válida del ciclo anterior como respaldo.
-                  # Esto evita que una caja ya publicada desaparezca por un timeout
-                  # aislado de Copérnico en el ciclo actual.
                   previous_trace = load_json_file(TRACE_FILE, {})
-                  previous_boxes = (
-                      previous_trace.get("boxes", {})
-                      if isinstance(previous_trace, dict)
-                      else {}
-                  )
+                  previous_boxes = {}
+                  # Solo reutilizamos trazabilidad anterior si ya era compacta v13.
+                  # Así jamás volvemos a arrastrar históricos gigantes de versiones viejas.
+                  if (
+                      isinstance(previous_trace, dict)
+                      and previous_trace.get("schema_version") == 13
+                  ):
+                      previous_boxes = previous_trace.get("boxes", {}) or {}
 
                   trace_dataset_boxes = {}
-                  trace_boxes_sorted = sorted(trace_boxes)
 
                   if trace_boxes_sorted:
                       executor = ThreadPoolExecutor(
@@ -910,9 +1016,10 @@ jobs:
 
                       futures = {
                           executor.submit(
-                              query_trace_full,
+                              query_trace_compact,
                               caja,
-                              jwt
+                              jwt,
+                              box_skus.get(caja, set())
                           ): caja
                           for caja in trace_boxes_sorted
                       }
@@ -929,19 +1036,17 @@ jobs:
                                       "error": "Error aislado: " + str(e)[:250],
                                       "movimientos": [],
                                       "ubicaciones": [],
-                                      "inventario": []
+                                      "inventario": [],
+                                      "compact": True
                                   }
 
-                              # Si este ciclo falla para una caja pero ya existía una
-                              # traza válida, conservar la anterior.
                               if not result.get("ok"):
                                   old_box = previous_boxes.get(str(caja))
                                   if isinstance(old_box, dict) and old_box.get("ok"):
-                                      result = old_box
-                                      result = dict(result)
+                                      result = dict(old_box)
                                       result["stale_trace"] = True
                                       result["stale_reason"] = (
-                                          "Se conservó trazabilidad válida anterior "
+                                          "Se conservó trazabilidad compacta anterior "
                                           "porque Copérnico falló en este ciclo."
                                       )
 
@@ -949,7 +1054,7 @@ jobs:
 
                       except Exception as e:
                           print(
-                              "AVISO: trazabilidad de mezcla incompleta:",
+                              "AVISO: trazabilidad compacta incompleta:",
                               str(e)
                           )
 
@@ -969,8 +1074,8 @@ jobs:
                               kept = dict(old_box)
                               kept["stale_trace"] = True
                               kept["stale_reason"] = (
-                                  "No terminó la consulta de esta caja en el ciclo "
-                                  "actual; se conserva la última trazabilidad válida."
+                                  "No terminó la consulta en este ciclo; se conserva "
+                                  "la última trazabilidad compacta válida."
                               )
                               trace_dataset_boxes[key] = kept
                           else:
@@ -980,33 +1085,50 @@ jobs:
                                   "error": "Trazabilidad no disponible en este ciclo",
                                   "movimientos": [],
                                   "ubicaciones": [],
-                                  "inventario": []
+                                  "inventario": [],
+                                  "compact": True
                               }
 
-                  save_json_file(
-                      TRACE_FILE,
-                      {
-                          "updated_at": now_iso,
-                          "source": (
-                              "Copernico WMS · trazabilidad automática "
-                              "de cajas en posiciones con mezcla"
-                          ),
-                          "mixed_location_count": len(mixed_locations),
-                          "box_count": len(trace_dataset_boxes),
-                          "box_ok_count": sum(
-                              1 for x in trace_dataset_boxes.values()
-                              if isinstance(x, dict) and x.get("ok")
-                          ),
-                          "box_error_count": sum(
-                              1 for x in trace_dataset_boxes.values()
-                              if not (isinstance(x, dict) and x.get("ok"))
-                          ),
-                          "locations": mixed_locations,
-                          "boxes": trace_dataset_boxes
-                      }
+                  payload_trace = {
+                      "schema_version": 13,
+                      "updated_at": now_iso,
+                      "source": (
+                          "Copernico WMS · trazabilidad compacta de mezclas"
+                      ),
+                      "criterion": (
+                          "Por caja y SKU actual se publica únicamente el movimiento "
+                          "que inicia la racha de saldo positivo vigente."
+                      ),
+                      "mixed_location_count": len(mixed_locations),
+                      "box_count": len(trace_dataset_boxes),
+                      "box_ok_count": sum(
+                          1 for x in trace_dataset_boxes.values()
+                          if isinstance(x, dict) and x.get("ok")
+                      ),
+                      "box_error_count": sum(
+                          1 for x in trace_dataset_boxes.values()
+                          if not (isinstance(x, dict) and x.get("ok"))
+                      ),
+                      "locations": mixed_locations,
+                      "boxes": trace_dataset_boxes
+                  }
+
+                  save_json_file(TRACE_FILE, payload_trace)
+
+                  size_mb = TRACE_FILE.stat().st_size / (1024 * 1024)
+                  print(
+                      "trazabilidad-cajas.json compacto generado ·",
+                      f"{size_mb:.2f} MB",
+                      "· cajas:",
+                      len(trace_dataset_boxes)
                   )
 
-                  print("trazabilidad-cajas.json generado correctamente")
+                  # Guardia explícita para evitar volver a chocar contra el límite
+                  # duro de GitHub (100 MB). Con formato compacto debería quedar muy lejos.
+                  if size_mb > 25:
+                      raise RuntimeError(
+                          f"Trazabilidad compacta inesperadamente grande: {size_mb:.2f} MB"
+                      )
 
               except Exception as e:
                   print(
