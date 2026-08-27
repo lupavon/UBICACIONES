@@ -48,6 +48,10 @@ jobs:
           STOCK_FILE = Path("stock.json")
           PALLETS_FILE = Path("pallets-proceso.json")
           TRACE_FILE = Path("trazabilidad-cajas.json")
+          GHOST_FILE = Path("cajas-fantasma-movimientos.json")
+
+          # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
+          GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
           DEFAULT_TECH_USER_ID = 11257
 
           jar = http.cookiejar.CookieJar()
@@ -475,6 +479,101 @@ jobs:
                       "ubicaciones": [],
                       "inventario": [],
                       "compact": True
+                  }
+
+          def compact_movement_event(m):
+              return {
+                  "Fecha": field(
+                      m,
+                      "Fecha", "fecha",
+                      "FechaHora", "Fecha Hora",
+                      "FechaMovimiento", "Fecha Mov"
+                  ),
+                  "EAN": field(m, "EAN", "ean"),
+                  "Estado": field(m, "Estado", "estado"),
+                  "Movimiento": field(m, "Movimiento", "movimiento"),
+                  "Saldo": field(m, "Saldo", "saldo"),
+                  "Transaccion": field(
+                      m,
+                      "Transaccion", "Transacción", "transaccion"
+                  ),
+                  "Nombre_empleado": field(
+                      m,
+                      "Nombre_empleado", "Nombre empleado", "NombreEmpleado"
+                  ),
+                  "Id_empleado": field(
+                      m,
+                      "Id_empleado", "ID empleado", "IdEmpleado"
+                  ),
+                  "NoControl": field(
+                      m,
+                      "NoControl", "No Control", "nocontrol"
+                  )
+              }
+
+          def audit_ghost_box(caja, jwt):
+              """
+              Revisa getmovimientos de una caja relevada como etiqueta fantasma.
+              No guarda el historial completo: solo cantidad, primer/último evento
+              y COUNTING_ERROR, para mantener el archivo muy liviano.
+              """
+              try:
+                  payload = caja_api(
+                      "getmovimientos",
+                      caja,
+                      jwt,
+                      timeout=30
+                  )
+                  moves = extract_rows(payload)
+                  ordered = sorted(
+                      moves,
+                      key=lambda m: parse_date(
+                          field(
+                              m,
+                              "Fecha", "fecha",
+                              "FechaHora", "Fecha Hora",
+                              "FechaMovimiento", "Fecha Mov"
+                          )
+                      )
+                  )
+
+                  counting = [
+                      m for m in ordered
+                      if "COUNTING_ERROR" in str(
+                          field(
+                              m,
+                              "Transaccion", "Transacción", "transaccion"
+                          )
+                      ).upper().replace(" ", "_")
+                  ]
+
+                  return {
+                      "ok": True,
+                      "caja": str(caja).strip(),
+                      "tiene_movimientos": bool(ordered),
+                      "movimientos_count": len(ordered),
+                      "primer_movimiento": (
+                          compact_movement_event(ordered[0])
+                          if ordered else None
+                      ),
+                      "ultimo_movimiento": (
+                          compact_movement_event(ordered[-1])
+                          if ordered else None
+                      ),
+                      "counting_error_count": len(counting),
+                      "ultimo_counting_error": (
+                          compact_movement_event(counting[-1])
+                          if counting else None
+                      )
+                  }
+              except Exception as e:
+                  return {
+                      "ok": False,
+                      "caja": str(caja).strip(),
+                      "tiene_movimientos": None,
+                      "movimientos_count": None,
+                      "counting_error_count": None,
+                      "error": str(e)[:300]
                   }
 
           def query_ubicaciones(caja, jwt):
@@ -914,7 +1013,7 @@ jobs:
                   )
 
               # -----------------------------
-              # TRAZABILIDAD DE MEZCLA · COMPACTA v13
+              # TRAZABILIDAD DE MEZCLA · COMPACTA v14
               # -----------------------------
               print("=== 4. TRAZABILIDAD DE MEZCLAS · COMPACTA ===")
 
@@ -1003,7 +1102,7 @@ jobs:
                   # Así jamás volvemos a arrastrar históricos gigantes de versiones viejas.
                   if (
                       isinstance(previous_trace, dict)
-                      and previous_trace.get("schema_version") == 13
+                      and previous_trace.get("schema_version") in (13, 14)
                   ):
                       previous_boxes = previous_trace.get("boxes", {}) or {}
 
@@ -1090,7 +1189,7 @@ jobs:
                               }
 
                   payload_trace = {
-                      "schema_version": 13,
+                      "schema_version": 14,
                       "updated_at": now_iso,
                       "source": (
                           "Copernico WMS · trazabilidad compacta de mezclas"
@@ -1133,6 +1232,152 @@ jobs:
               except Exception as e:
                   print(
                       "AVISO: trazabilidad-cajas no pudo actualizarse. "
+                      "Se conservará el último válido:",
+                      str(e)
+                  )
+
+              # -----------------------------
+              # 4B. AUDITORÍA DE CAJAS FANTASMA
+              # -----------------------------
+              print("=== 4B. AUDITORÍA CAJAS FANTASMA ===")
+
+              try:
+                  previous_ghost = load_json_file(GHOST_FILE, {})
+                  previous_ghost_boxes = (
+                      previous_ghost.get("boxes", {})
+                      if isinstance(previous_ghost, dict)
+                      else {}
+                  )
+
+                  ghost_results = {}
+                  executor = ThreadPoolExecutor(
+                      max_workers=min(8, len(GHOST_BOXES))
+                  )
+
+                  futures = {
+                      executor.submit(
+                          audit_ghost_box,
+                          caja,
+                          jwt
+                      ): caja
+                      for caja in GHOST_BOXES
+                  }
+
+                  try:
+                      for future in as_completed(futures, timeout=50):
+                          caja = futures[future]
+                          try:
+                              result = future.result(timeout=1)
+                          except Exception as e:
+                              result = {
+                                  "ok": False,
+                                  "caja": str(caja),
+                                  "tiene_movimientos": None,
+                                  "movimientos_count": None,
+                                  "counting_error_count": None,
+                                  "error": "Error aislado: " + str(e)[:250]
+                              }
+
+                          if not result.get("ok"):
+                              old = previous_ghost_boxes.get(str(caja))
+                              if isinstance(old, dict) and old.get("ok"):
+                                  result = dict(old)
+                                  result["stale_trace"] = True
+                                  result["stale_reason"] = (
+                                      "Se conserva auditoría anterior porque "
+                                      "la consulta no terminó en este ciclo."
+                                  )
+
+                          ghost_results[str(caja)] = result
+
+                  except Exception as e:
+                      print(
+                          "AVISO: auditoría de cajas fantasma incompleta:",
+                          str(e)
+                      )
+
+                  finally:
+                      executor.shutdown(
+                          wait=False,
+                          cancel_futures=True
+                      )
+
+                  for caja in GHOST_BOXES:
+                      key = str(caja)
+                      if key in ghost_results:
+                          continue
+
+                      old = previous_ghost_boxes.get(key)
+                      if isinstance(old, dict) and old.get("ok"):
+                          kept = dict(old)
+                          kept["stale_trace"] = True
+                          kept["stale_reason"] = (
+                              "No terminó la consulta en este ciclo; "
+                              "se conserva el último resultado válido."
+                          )
+                          ghost_results[key] = kept
+                      else:
+                          ghost_results[key] = {
+                              "ok": False,
+                              "caja": key,
+                              "tiene_movimientos": None,
+                              "movimientos_count": None,
+                              "counting_error_count": None,
+                              "error": "Auditoría no disponible en este ciclo"
+                          }
+
+                  ghost_payload = {
+                      "schema_version": 1,
+                      "updated_at": now_iso,
+                      "source": (
+                          "Copernico WMS · auditoría de etiquetas/cajas fantasma"
+                      ),
+                      "criterion": (
+                          "Se consulta getmovimientos para las 119 cajas únicas "
+                          "de la columna ETIQUETA del relevamiento. Se publica solo "
+                          "un resumen, sin historial completo."
+                      ),
+                      "box_count": len(GHOST_BOXES),
+                      "consulted_ok_count": sum(
+                          1 for x in ghost_results.values()
+                          if isinstance(x, dict) and x.get("ok")
+                      ),
+                      "with_movements_count": sum(
+                          1 for x in ghost_results.values()
+                          if isinstance(x, dict)
+                          and x.get("ok")
+                          and x.get("tiene_movimientos") is True
+                      ),
+                      "without_movements_count": sum(
+                          1 for x in ghost_results.values()
+                          if isinstance(x, dict)
+                          and x.get("ok")
+                          and x.get("tiene_movimientos") is False
+                      ),
+                      "counting_error_boxes_count": sum(
+                          1 for x in ghost_results.values()
+                          if isinstance(x, dict)
+                          and x.get("ok")
+                          and (x.get("counting_error_count") or 0) > 0
+                      ),
+                      "boxes": ghost_results
+                  }
+
+                  save_json_file(GHOST_FILE, ghost_payload)
+
+                  ghost_size_mb = GHOST_FILE.stat().st_size / (1024 * 1024)
+                  print(
+                      "cajas-fantasma-movimientos.json generado ·",
+                      f"{ghost_size_mb:.2f} MB",
+                      "· cajas con movimientos:",
+                      ghost_payload["with_movements_count"],
+                      "· cajas con COUNTING_ERROR:",
+                      ghost_payload["counting_error_boxes_count"]
+                  )
+
+              except Exception as e:
+                  print(
+                      "AVISO: auditoría de cajas fantasma no pudo actualizarse. "
                       "Se conservará el último válido:",
                       str(e)
                   )
@@ -1217,7 +1462,7 @@ jobs:
 
           mkdir -p /tmp/ubicaciones-sync
 
-          for f in stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json; do
+          for f in stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
@@ -1226,13 +1471,13 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          for f in stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json; do
+          for f in stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "/tmp/ubicaciones-sync/$f" ]; then
               cp "/tmp/ubicaciones-sync/$f" "$f"
             fi
           done
 
-          git add stock.json pallets-proceso.json trazabilidad-cajas.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
