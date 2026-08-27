@@ -293,26 +293,39 @@ jobs:
               return payload
 
           def query_trace_full(caja, jwt):
+              """
+              Para detectar quién generó una mezcla actual, el dashboard usa
+              exclusivamente el historial de MOVIMIENTOS por caja/SKU:
+              Fecha, EAN, Movimiento, Saldo, Estado, Nombre_empleado e Id_empleado.
+
+              Evitamos consultar getubicaciones + getinventario para cada caja
+              porque triplicaba las llamadas y dejaba muchas cajas sin datos
+              antes del timeout.
+              """
               try:
-                  movimientos = caja_api("getmovimientos", caja, jwt)
-                  ubicaciones = caja_api("getubicaciones", caja, jwt)
-                  inventario = caja_api("getinventario", caja, jwt)
+                  movimientos = caja_api(
+                      "getmovimientos",
+                      caja,
+                      jwt,
+                      timeout=25
+                  )
+
+                  rows_mov = extract_rows(movimientos)
 
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
+                      # Conservar el payload original si la API devuelve
+                      # {"data":[...]}; el dashboard soporta lista o .data.
                       "movimientos": movimientos,
-                      "ubicaciones": ubicaciones,
-                      "inventario": inventario
+                      "movimiento_count": len(rows_mov)
                   }
               except Exception as e:
                   return {
                       "ok": False,
                       "caja": str(caja).strip(),
                       "error": str(e)[:300],
-                      "movimientos": [],
-                      "ubicaciones": [],
-                      "inventario": []
+                      "movimientos": []
                   }
 
           def query_ubicaciones(caja, jwt):
@@ -767,19 +780,75 @@ jobs:
                           ).strip()
                       })
 
+                      sku_detail = sorted({
+                          (
+                              str(field(row, "referencia", "Referencia")).strip(),
+                              str(field(row, "EAN", "ean")).strip(),
+                              str(field(row, "Descripcion", "descripcion", "Descripción")).strip()
+                          )
+                          for row in loc_rows
+                          if str(field(row, "referencia", "Referencia", "EAN", "ean")).strip()
+                      })
+
+                      box_skus = {}
+                      for row in loc_rows:
+                          caja_actual = str(
+                              field(row, "Caja", "caja", "numeroCaja", "NroCaja")
+                          ).strip()
+                          if not caja_actual:
+                              continue
+
+                          sku_actual = str(
+                              field(row, "EAN", "ean", "referencia", "Referencia")
+                          ).strip()
+
+                          if sku_actual:
+                              box_skus.setdefault(caja_actual, [])
+                              if sku_actual not in box_skus[caja_actual]:
+                                  box_skus[caja_actual].append(sku_actual)
+
                       mixed_locations[ubicacion] = {
                           "sku_count": len(skus),
-                          "boxes": boxes
+                          "boxes": boxes,
+                          "current_skus": [
+                              {
+                                  "referencia": ref,
+                                  "ean": ean,
+                                  "descripcion": desc
+                              }
+                              for ref, ean, desc in sku_detail
+                          ],
+                          "box_skus": box_skus
                       }
 
                       trace_boxes.update(boxes)
 
-                  trace_dataset_boxes = {}
+                  # Mantener datos históricos válidos como respaldo, pero
+                  # volver a consultar todas las cajas que HOY forman una mezcla.
+                  previous_trace = load_json_file(TRACE_FILE, {})
+                  previous_boxes = (
+                      previous_trace.get("boxes", {})
+                      if isinstance(previous_trace, dict)
+                      else {}
+                  )
+
+                  trace_dataset_boxes = dict(previous_boxes)
                   trace_boxes_sorted = sorted(trace_boxes)
 
+                  trace_ok = 0
+                  trace_fail = 0
+
                   if trace_boxes_sorted:
+                      print(
+                          "Cajas actuales en posiciones mezcladas:",
+                          len(trace_boxes_sorted)
+                      )
+                      print(
+                          "Consultando getmovimientos (1 request por caja)..."
+                      )
+
                       executor = ThreadPoolExecutor(
-                          max_workers=min(6, len(trace_boxes_sorted))
+                          max_workers=min(12, len(trace_boxes_sorted))
                       )
 
                       futures = {
@@ -792,8 +861,9 @@ jobs:
                       }
 
                       try:
-                          for future in as_completed(futures, timeout=40):
+                          for future in as_completed(futures, timeout=50):
                               caja = futures[future]
+
                               try:
                                   result = future.result(timeout=1)
                               except Exception as e:
@@ -801,12 +871,21 @@ jobs:
                                       "ok": False,
                                       "caja": str(caja),
                                       "error": "Error aislado: " + str(e)[:250],
-                                      "movimientos": [],
-                                      "ubicaciones": [],
-                                      "inventario": []
+                                      "movimientos": []
                                   }
 
-                              trace_dataset_boxes[str(caja)] = result
+                              # Solo pisar un resultado histórico bueno si la
+                              # consulta nueva también trajo algo utilizable.
+                              movs = extract_rows(result.get("movimientos"))
+
+                              if result.get("ok") and movs:
+                                  trace_dataset_boxes[str(caja)] = result
+                                  trace_ok += 1
+                              else:
+                                  trace_fail += 1
+
+                                  if str(caja) not in trace_dataset_boxes:
+                                      trace_dataset_boxes[str(caja)] = result
 
                       except Exception as e:
                           print(
@@ -820,18 +899,27 @@ jobs:
                               cancel_futures=True
                           )
 
-                      for caja in trace_boxes_sorted:
-                          trace_dataset_boxes.setdefault(
-                              str(caja),
-                              {
-                                  "ok": False,
-                                  "caja": str(caja),
-                                  "error": "Trazabilidad no disponible en este ciclo",
-                                  "movimientos": [],
-                                  "ubicaciones": [],
-                                  "inventario": []
-                              }
-                          )
+                  # El JSON final solo necesita mantener las cajas actualmente
+                  # involucradas en mezclas. Evita crecimiento indefinido.
+                  trace_dataset_boxes = {
+                      str(caja): trace_dataset_boxes.get(
+                          str(caja),
+                          {
+                              "ok": False,
+                              "caja": str(caja),
+                              "error": "Sin movimientos disponibles en este ciclo",
+                              "movimientos": []
+                          }
+                      )
+                      for caja in trace_boxes_sorted
+                  }
+
+                  print(
+                      "Trazabilidad cajas OK:",
+                      trace_ok,
+                      "| sin datos/error:",
+                      trace_fail
+                  )
 
                   save_json_file(
                       TRACE_FILE,
@@ -840,6 +928,12 @@ jobs:
                           "source": (
                               "Copernico WMS · trazabilidad automática "
                               "de cajas en posiciones con mezcla"
+                          ),
+                          "criterion": (
+                              "Para cada SKU actualmente presente se reconstruye "
+                              "el inicio de su saldo positivo actual. El SKU cuya "
+                              "presencia comenzó último es el que generó la mezcla; "
+                              "Nombre_empleado de ese movimiento es el responsable."
                           ),
                           "mixed_location_count": len(mixed_locations),
                           "box_count": len(trace_dataset_boxes),
