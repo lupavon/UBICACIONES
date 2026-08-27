@@ -343,6 +343,85 @@ jobs:
               )
               return payload
 
+          def compact_trace_movements(payload, max_rows=250):
+              """
+              Conserva solamente los campos que usa el dashboard para determinar
+              quién generó la mezcla. Esto evita publicar el payload bruto de
+              Copérnico (que superó 100 MB en GitHub).
+              """
+              rows = extract_rows(payload)
+
+              compact = []
+              for r in rows:
+                  if not isinstance(r, dict):
+                      continue
+
+                  item = {
+                      "Fecha": field(
+                          r,
+                          "Fecha",
+                          "FechaHora",
+                          "Fecha Hora",
+                          "FechaMovimiento",
+                          "Fecha Mov"
+                      ),
+                      "EAN": field(r, "EAN", "ean"),
+                      "Saldo": field(r, "Saldo", "saldo"),
+                      "Movimiento": field(r, "Movimiento", "movimiento"),
+                      "Estado": field(r, "Estado", "estado"),
+                      "Transaccion": field(
+                          r,
+                          "Transaccion",
+                          "Transacción",
+                          "transaccion"
+                      ),
+                      "Nombre_empleado": field(
+                          r,
+                          "Nombre_empleado",
+                          "Nombre empleado",
+                          "NombreEmpleado"
+                      ),
+                      "Id_empleado": field(
+                          r,
+                          "Id_empleado",
+                          "ID empleado",
+                          "IdEmpleado"
+                      ),
+                      "NoControl": field(
+                          r,
+                          "NoControl",
+                          "No Control",
+                          "nocontrol"
+                      )
+                  }
+
+                  # Eliminar claves vacías para reducir todavía más el JSON.
+                  item = {
+                      k: v
+                      for k, v in item.items()
+                      if v is not None and str(v).strip() != ""
+                  }
+
+                  if item:
+                      compact.append(item)
+
+              # Orden cronológico, y limitar a los últimos movimientos.
+              compact.sort(
+                  key=lambda x: parse_date(
+                      field(
+                          x,
+                          "Fecha",
+                          "FechaHora",
+                          "FechaMovimiento"
+                      )
+                  )
+              )
+
+              if max_rows and len(compact) > max_rows:
+                  compact = compact[-max_rows:]
+
+              return compact
+
           def query_trace_full(caja, jwt):
               """
               Para detectar quién generó una mezcla actual, el dashboard usa
@@ -354,22 +433,23 @@ jobs:
               antes del timeout.
               """
               try:
-                  movimientos = caja_api(
+                  movimientos_raw = caja_api(
                       "getmovimientos",
                       caja,
                       jwt,
                       timeout=25
                   )
 
-                  rows_mov = extract_rows(movimientos)
+                  movimientos = compact_trace_movements(
+                      movimientos_raw,
+                      max_rows=250
+                  )
 
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
-                      # Conservar el payload original si la API devuelve
-                      # {"data":[...]}; el dashboard soporta lista o .data.
                       "movimientos": movimientos,
-                      "movimiento_count": len(rows_mov)
+                      "movimiento_count": len(movimientos)
                   }
               except Exception as e:
                   return {
@@ -919,14 +999,11 @@ jobs:
 
                   # Mantener datos históricos válidos como respaldo, pero
                   # volver a consultar todas las cajas que HOY forman una mezcla.
-                  previous_trace = load_json_file(TRACE_FILE, {})
-                  previous_boxes = (
-                      previous_trace.get("boxes", {})
-                      if isinstance(previous_trace, dict)
-                      else {}
-                  )
-
-                  trace_dataset_boxes = dict(previous_boxes)
+                  # No arrastrar el payload histórico bruto anterior:
+                  # la versión previa llegó a 111 MB y GitHub rechazó el push.
+                  # En cada ciclo reconstruimos únicamente las cajas que hoy
+                  # participan de posiciones mezcladas.
+                  trace_dataset_boxes = {}
                   trace_boxes_sorted = sorted(trace_boxes)
 
                   trace_ok = 0
@@ -1036,7 +1113,18 @@ jobs:
                       }
                   )
 
-                  print("trazabilidad-cajas.json generado correctamente")
+                  trace_size_mb = TRACE_FILE.stat().st_size / (1024 * 1024)
+                  print(
+                      "trazabilidad-cajas.json generado correctamente ·",
+                      f"{trace_size_mb:.2f} MB"
+                  )
+
+                  if trace_size_mb >= 90:
+                      raise RuntimeError(
+                          "trazabilidad-cajas.json quedó demasiado grande "
+                          f"({trace_size_mb:.2f} MB). No se publicará para "
+                          "evitar superar el límite de GitHub."
+                      )
 
               except Exception as e:
                   print(
