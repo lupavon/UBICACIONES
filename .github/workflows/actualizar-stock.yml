@@ -335,17 +335,27 @@ jobs:
               return payload
 
           def query_trace_full(caja, jwt):
+              """
+              Para la detección de responsable de mezcla el dashboard usa
+              únicamente MOVIMIENTOS (EAN, Movimiento, Saldo, Fecha y empleado).
+              Evitamos getubicaciones + getinventario en este ciclo porque
+              triplicaban las llamadas y podían dejar cajas nuevas sin publicar
+              antes del timeout general.
+              """
               try:
-                  movimientos = caja_api("getmovimientos", caja, jwt)
-                  ubicaciones = caja_api("getubicaciones", caja, jwt)
-                  inventario = caja_api("getinventario", caja, jwt)
+                  movimientos = caja_api(
+                      "getmovimientos",
+                      caja,
+                      jwt,
+                      timeout=30
+                  )
 
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
                       "movimientos": movimientos,
-                      "ubicaciones": ubicaciones,
-                      "inventario": inventario
+                      "ubicaciones": [],
+                      "inventario": []
                   }
               except Exception as e:
                   return {
@@ -880,12 +890,22 @@ jobs:
 
                       trace_boxes.update(boxes)
 
+                  # Conservar trazabilidad válida del ciclo anterior como respaldo.
+                  # Esto evita que una caja ya publicada desaparezca por un timeout
+                  # aislado de Copérnico en el ciclo actual.
+                  previous_trace = load_json_file(TRACE_FILE, {})
+                  previous_boxes = (
+                      previous_trace.get("boxes", {})
+                      if isinstance(previous_trace, dict)
+                      else {}
+                  )
+
                   trace_dataset_boxes = {}
                   trace_boxes_sorted = sorted(trace_boxes)
 
                   if trace_boxes_sorted:
                       executor = ThreadPoolExecutor(
-                          max_workers=min(6, len(trace_boxes_sorted))
+                          max_workers=min(10, len(trace_boxes_sorted))
                       )
 
                       futures = {
@@ -898,7 +918,7 @@ jobs:
                       }
 
                       try:
-                          for future in as_completed(futures, timeout=40):
+                          for future in as_completed(futures, timeout=55):
                               caja = futures[future]
                               try:
                                   result = future.result(timeout=1)
@@ -911,6 +931,19 @@ jobs:
                                       "ubicaciones": [],
                                       "inventario": []
                                   }
+
+                              # Si este ciclo falla para una caja pero ya existía una
+                              # traza válida, conservar la anterior.
+                              if not result.get("ok"):
+                                  old_box = previous_boxes.get(str(caja))
+                                  if isinstance(old_box, dict) and old_box.get("ok"):
+                                      result = old_box
+                                      result = dict(result)
+                                      result["stale_trace"] = True
+                                      result["stale_reason"] = (
+                                          "Se conservó trazabilidad válida anterior "
+                                          "porque Copérnico falló en este ciclo."
+                                      )
 
                               trace_dataset_boxes[str(caja)] = result
 
@@ -927,17 +960,28 @@ jobs:
                           )
 
                       for caja in trace_boxes_sorted:
-                          trace_dataset_boxes.setdefault(
-                              str(caja),
-                              {
+                          key = str(caja)
+                          if key in trace_dataset_boxes:
+                              continue
+
+                          old_box = previous_boxes.get(key)
+                          if isinstance(old_box, dict) and old_box.get("ok"):
+                              kept = dict(old_box)
+                              kept["stale_trace"] = True
+                              kept["stale_reason"] = (
+                                  "No terminó la consulta de esta caja en el ciclo "
+                                  "actual; se conserva la última trazabilidad válida."
+                              )
+                              trace_dataset_boxes[key] = kept
+                          else:
+                              trace_dataset_boxes[key] = {
                                   "ok": False,
-                                  "caja": str(caja),
+                                  "caja": key,
                                   "error": "Trazabilidad no disponible en este ciclo",
                                   "movimientos": [],
                                   "ubicaciones": [],
                                   "inventario": []
                               }
-                          )
 
                   save_json_file(
                       TRACE_FILE,
@@ -949,6 +993,14 @@ jobs:
                           ),
                           "mixed_location_count": len(mixed_locations),
                           "box_count": len(trace_dataset_boxes),
+                          "box_ok_count": sum(
+                              1 for x in trace_dataset_boxes.values()
+                              if isinstance(x, dict) and x.get("ok")
+                          ),
+                          "box_error_count": sum(
+                              1 for x in trace_dataset_boxes.values()
+                              if not (isinstance(x, dict) and x.get("ok"))
+                          ),
                           "locations": mixed_locations,
                           "boxes": trace_dataset_boxes
                       }
