@@ -1150,7 +1150,7 @@ jobs:
 
                   # Un lote acotado permite terminar el workflow cada minuto y, a la vez,
                   # acumular progreso hasta completar todas las mezclas.
-                  TRACE_MAX_QUERIES_PER_CYCLE = 120
+                  TRACE_MAX_QUERIES_PER_CYCLE = 300
                   priority_queue = []
                   seen_queue = set()
                   for caja in unresolved_boxes + changed_boxes + legacy_boxes:
