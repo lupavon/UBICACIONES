@@ -2394,49 +2394,19 @@ function analyzeMixTrace(loc,items,results){
 function mixTraceHtml(state){
   if(!state)return '';
   if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Reconstruyendo los movimientos de las cajas/SKU de esta posición…</div></div>';
-  if(state.status==='unavailable'){const declared=state.declaredBoxes?.length;return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">SIN MOVIMIENTOS</span></div><div class="mixTraceResult">'+(declared?'La caja está identificada en la posición, pero todavía no tiene movimientos de trazabilidad publicados.':'No hay trazabilidad publicada para esta caja.')+(state.traceUpdatedAt?'<br><small>Archivo de trazabilidad: '+esc(state.traceUpdatedAt)+'</small>':'')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';}
+  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">SIN DATOS</span></div><div class="mixTraceResult">La trazabilidad automática todavía no está publicada para estas cajas.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
   if(state.status==='error')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState bad">ERROR</span></div><div class="mixTraceResult">'+esc(state.error||'No se pudo consultar la trazabilidad.')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
 
-  if(state.status==='direct'){
-    const d=state.direct||{};
-    let x='<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState ok">RESPONSABLE DETECTADO</span></div>';
-    x+='<div class="mixTraceResult"><strong>Persona que agregó un SKU distinto sobre una posición que ya tenía otro SKU:</strong><br>';
-    x+='<strong class="mixTraceUser">'+esc(d.employee||'Empleado no informado')+'</strong>';
-    if(d.employeeId)x+=' · ID '+esc(d.employeeId);
-    if(d.fecha)x+='<br>'+esc(d.fecha);
-    if(d.caja)x+='<br>Caja agregada: <strong>'+esc(d.caja)+'</strong>';
-    if(d.addedSkus?.length)x+='<br>SKU agregado: <span class="mixTraceSku">'+d.addedSkus.map(esc).join(', ')+'</span>';
-    if(d.previousSkus?.length)x+='<br>SKU que ya estaba: <strong>'+d.previousSkus.map(esc).join(', ')+'</strong>';
-    if(d.origen||d.destino)x+='<br>Movimiento: '+esc(d.origen||'—')+' → '+esc(d.destino||'—');
-    if(d.prioridad)x+='<br>Prioridad: '+esc(d.prioridad);
-    x+='</div>';
-
-    if(d.arrivals?.length){
-      x+='<div class="mixTraceEvidence"><div class="mixTraceNote" style="margin:0 0 4px">Ingresos actuales usados para reconstruir la mezcla:</div>';
-      d.arrivals.forEach(a=>{
-        x+='<div class="mixTraceEvent"><span>'+esc(a.fecha||'—')+'</span><div>';
-        x+='<b>Caja '+esc(a.caja||'—')+'</b>';
-        if(a.skus?.length)x+=' · SKU '+a.skus.map(esc).join(', ');
-        x+='<br>'+esc(a.UbicacionInicial||'—')+' → '+esc(a.UbicacionFinal||'—');
-        if(a.Nombre_empleado)x+='<br><span class="mixTraceUser">'+esc(a.Nombre_empleado)+'</span>';
-        if(a.Id_empleado)x+=' (ID '+esc(a.Id_empleado)+')';
-        x+='</div></div>';
-      });
-      x+='</div>';
-    }
-
-    x+='<div class="mixTraceNote">Criterio: se ordena el último ingreso a esta posición de cada caja que sigue actualmente allí. La primera llegada que introduce un SKU distinto a los ya presentes es la que generó la mezcla actual.</div></div>';
-    return x;
-  }
-
   const a=state.analysis||{},cause=a.cause;
-  let h='<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState '+(cause?'ok':'warn')+'">'+(cause?'DETECTADO':'REVISAR')+'</span></div>';
+  let h='<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState '+(cause?'ok':'warn')+'">'+(cause?'RESPONSABLE DETECTADO':'REVISAR')+'</span></div>';
 
   if(cause){
-    h+='<div class="mixTraceResult"><strong>Responsable registrado del ingreso que generó la mezcla actual:</strong><br>';
+    const previousSkus=(a.skuEvents||[]).filter(ev=>ev!==cause).map(ev=>ev.ean||ev.sku).filter(Boolean);
+    h+='<div class="mixTraceResult"><strong>Persona que incorporó el SKU que generó la mezcla actual:</strong><br>';
     h+='<strong class="mixTraceUser">'+esc(cause.employee)+'</strong>';
     if(cause.employeeId)h+=' · ID '+esc(cause.employeeId);
-    h+='<br>SKU <span class="mixTraceSku">'+esc(cause.ean||cause.sku)+'</span> · Caja <strong>'+esc(cause.caja)+'</strong>';
+    h+='<br>SKU agregado: <span class="mixTraceSku">'+esc(cause.ean||cause.sku)+'</span> · Caja <strong>'+esc(cause.caja)+'</strong>';
+    if(previousSkus.length)h+='<br>SKU que ya estaba: <strong>'+previousSkus.map(esc).join(', ')+'</strong>';
     h+='<br>'+esc(cause.timeLabel)+'';
     if(cause.transaccion)h+='<br>'+esc(cause.transaccion);
     if(!isNaN(cause.movimiento))h+=' · Movimiento '+Number(cause.movimiento).toLocaleString('es-AR');
@@ -2489,34 +2459,14 @@ async function loadTraceDataset(force=false){
   if(TRACE_DATASET_PROMISE && !force)return TRACE_DATASET_PROMISE;
 
   TRACE_DATASET_PROMISE=(async()=>{
-    const urls=[
-      './trazabilidad-cajas.json?v='+Date.now(),
-      'https://raw.githubusercontent.com/lupavon/UBICACIONES/refs/heads/main/trazabilidad-cajas.json?v='+Date.now()
-    ];
-
-    let lastErr=null;
-
-    for(const url of urls){
-      try{
-        const res=await fetch(url,{
-          cache:'no-store',
-          headers:{'Cache-Control':'no-cache'}
-        });
-
-        if(!res.ok)throw new Error('HTTP '+res.status);
-
-        const payload=await res.json();
-        TRACE_DATASET=payload||{};
-        return TRACE_DATASET;
-
-      }catch(e){
-        lastErr=e;
-      }
-    }
-
-    throw lastErr||new Error(
-      'No se pudo cargar trazabilidad-cajas.json'
-    );
+    const res=await fetch('./trazabilidad-cajas.json?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    TRACE_DATASET=payload||{};
+    return TRACE_DATASET;
   })();
 
   try{
@@ -2526,42 +2476,14 @@ async function loadTraceDataset(force=false){
   }
 }
 
-function directTraceAnalysisToUi(loc,data){
-  const analysis=data?.analysis||{};
-
-  if(analysis.status!=='detected'){
-    return {
-      status:'unavailable',
-      traceUpdatedAt:TRACE_DATASET?.updated_at||'',
-      directReason:analysis.reason||''
-    };
-  }
-
-  const r=analysis.responsable||{};
-
-  return {
-    status:'direct',
-    direct:{
-      loc,
-      employee:String(r.responsable||'').trim(),
-      employeeId:String(r.id_empleado||'').trim(),
-      fecha:String(r.fecha||'').trim(),
-      caja:String(r.caja_agregada||'').trim(),
-      addedSkus:Array.isArray(r.sku_agregado)
-        ? r.sku_agregado : [],
-      previousSkus:Array.isArray(r.sku_que_ya_estaba)
-        ? r.sku_que_ya_estaba : [],
-      origen:String(r.origen||'').trim(),
-      destino:String(r.destino||loc||'').trim(),
-      prioridad:String(r.prioridad||'').trim(),
-      arrivals:Array.isArray(analysis.arrivals)
-        ? analysis.arrivals : []
-    }
-  };
-}
-
 async function requestMixTrace(loc,items,force=false){
   if(!loc||!items?.length)return;
+
+  const boxes=[...new Set(
+    items.map(x=>String(x.caja||'').trim()).filter(Boolean)
+  )];
+
+  if(!boxes.length)return;
 
   const key=trNorm(loc);
 
@@ -2572,47 +2494,48 @@ async function requestMixTrace(loc,items,force=false){
 
   try{
     const dataset=await loadTraceDataset(force);
+    const boxMap=dataset?.boxes||{};
+    const results=[];
 
-    const locations=dataset?.locations||{};
+    for(const caja of boxes){
+      const r=boxMap[String(caja)];
 
-    let locData=
-      locations[loc]
-      || locations[String(loc).trim()]
-      || null;
-
-    if(!locData){
-      const wanted=trNorm(loc);
-
-      for(const [k,v] of Object.entries(locations)){
-        if(trNorm(k)===wanted){
-          locData=v;
-          break;
-        }
+      if(r){
+        results.push({
+          ...r,
+          caja:String(caja),
+          ok:r.ok!==false
+        });
+      }else{
+        results.push({
+          ok:false,
+          caja:String(caja),
+          error:'Caja sin trazabilidad publicada'
+        });
       }
     }
 
-    if(!locData){
+    const okResults=results.filter(r=>r.ok);
+
+    if(!okResults.length){
       MIX_TRACE_CACHE.set(key,{
-        status:'unavailable',
-        traceUpdatedAt:dataset?.updated_at||'',
-        directReason:'La posición no está en el archivo de trazabilidad.'
+        status:'unavailable'
       });
     }else{
-      MIX_TRACE_CACHE.set(
-        key,
-        directTraceAnalysisToUi(
+      MIX_TRACE_CACHE.set(key,{
+        status:'ok',
+        analysis:analyzeMixTrace(
           loc,
-          locData
+          items,
+          results
         )
-      );
+      });
     }
 
   }catch(err){
     MIX_TRACE_CACHE.set(key,{
       status:'error',
-      error:
-        'No se pudo cargar la trazabilidad automática: '
-        +(err?.message||String(err))
+      error:'No se pudo cargar la trazabilidad automática: '+(err?.message||String(err))
     });
   }
 
