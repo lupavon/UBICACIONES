@@ -47,6 +47,7 @@ jobs:
           STOCK_FILE = Path("stock.json")
           PALLETS_FILE = Path("pallets-proceso.json")
           TRACE_FILE = Path("trazabilidad-cajas.json")
+          DEFAULT_TECH_USER_ID = 11257
 
           jar = http.cookiejar.CookieJar()
           opener = urllib.request.build_opener(
@@ -516,7 +517,7 @@ jobs:
                       # usamos el ID aprendido en el último login exitoso,
                       # cerramos esa sesión y reintentamos UNA sola vez.
                       if session_active:
-                          known_user_id = status.get("copernico_user_id")
+                          known_user_id = status.get("copernico_user_id") or DEFAULT_TECH_USER_ID
 
                           if known_user_id is not None:
                               print(
@@ -575,12 +576,10 @@ jobs:
 
                           print("CONTINGENCIA:", reason)
 
-                          if session_active and status.get(
-                              "copernico_user_id"
-                          ) is None:
+                          if session_active:
                               print(
-                                  "Todavía no hay ID técnico aprendido "
-                                  "para liberar automáticamente la sesión."
+                                  "ID técnico usado para recuperación:",
+                                  known_user_id
                               )
 
                           print(
