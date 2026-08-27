@@ -2457,14 +2457,40 @@ async function loadTraceDataset(force=false){
   if(TRACE_DATASET_PROMISE && !force)return TRACE_DATASET_PROMISE;
 
   TRACE_DATASET_PROMISE=(async()=>{
-    const res=await fetch('./trazabilidad-cajas.json?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache'}
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json();
-    TRACE_DATASET=payload||{};
-    return TRACE_DATASET;
+    const urls=[
+      './trazabilidad-cajas.json?v='+Date.now(),
+      'https://raw.githubusercontent.com/lupavon/UBICACIONES/main/trazabilidad-cajas.json?v='+Date.now()
+    ];
+
+    let lastErr=null;
+
+    for(const u of urls){
+      try{
+        const res=await fetch(u,{
+          cache:'no-store',
+          headers:{'Cache-Control':'no-cache'}
+        });
+        if(!res.ok)throw new Error('HTTP '+res.status);
+
+        const payload=await res.json();
+
+        const boxes =
+          payload && payload.boxes && typeof payload.boxes==='object'
+            ? payload.boxes
+            : payload;
+
+        TRACE_DATASET={
+          raw:payload||{},
+          boxes:boxes||{}
+        };
+
+        return TRACE_DATASET;
+      }catch(err){
+        lastErr=err;
+      }
+    }
+
+    throw lastErr||new Error('No se pudo cargar trazabilidad-cajas.json');
   })();
 
   try{
@@ -2472,6 +2498,34 @@ async function loadTraceDataset(force=false){
   }finally{
     TRACE_DATASET_PROMISE=null;
   }
+}
+
+function traceLookup(boxMap,caja){
+  if(!boxMap)return null;
+
+  const raw=String(caja??'').trim();
+  if(!raw)return null;
+
+  if(Object.prototype.hasOwnProperty.call(boxMap,raw)){
+    return boxMap[raw];
+  }
+
+  const n=Number(raw);
+  if(Number.isFinite(n)){
+    const numeric=String(n);
+    if(Object.prototype.hasOwnProperty.call(boxMap,numeric)){
+      return boxMap[numeric];
+    }
+  }
+
+  const target=raw.replace(/^0+/,'');
+  for(const [k,v] of Object.entries(boxMap)){
+    const nk=String(k).trim();
+    if(nk===raw)return v;
+    if(nk.replace(/^0+/,'')===target)return v;
+  }
+
+  return null;
 }
 
 async function requestMixTrace(loc,items,force=false){
@@ -2496,7 +2550,7 @@ async function requestMixTrace(loc,items,force=false){
     const results=[];
 
     for(const caja of boxes){
-      const r=boxMap[String(caja)];
+      const r=traceLookup(boxMap,caja);
 
       if(r){
         results.push({
@@ -2517,7 +2571,11 @@ async function requestMixTrace(loc,items,force=false){
 
     if(!okResults.length){
       MIX_TRACE_CACHE.set(key,{
-        status:'unavailable'
+        status:'unavailable',
+        debug:{
+          boxesBuscadas:boxes,
+          totalClaves:Object.keys(boxMap).length
+        }
       });
     }else{
       MIX_TRACE_CACHE.set(key,{
