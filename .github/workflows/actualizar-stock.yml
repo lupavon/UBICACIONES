@@ -31,6 +31,7 @@ jobs:
           import urllib.error
           import urllib.parse
           import http.cookiejar
+          import time
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
@@ -90,56 +91,6 @@ jobs:
                   encoding="utf-8"
               )
 
-          def force_logout_by_id(user_id, jwt=None):
-              """
-              Libera una sesión técnica anterior usando el ID ya aprendido
-              en una ejecución exitosa. Se usa solo cuando el login responde
-              explícitamente 'sesión activa'.
-              """
-              if user_id is None:
-                  return False
-
-              headers = dict(BASE_HEADERS)
-              headers["Content-Type"] = "application/json"
-
-              if jwt:
-                  headers["Authorization"] = jwt
-
-              req = urllib.request.Request(
-                  LOGOUT_URL,
-                  data=json.dumps({"id": user_id}).encode("utf-8"),
-                  headers=headers,
-                  method="POST"
-              )
-
-              try:
-                  with opener.open(req, timeout=20) as response:
-                      response.read()
-                      print("LOGOUT DE RECUPERACIÓN HTTP:", response.status)
-                      return 200 <= response.status < 300
-              except urllib.error.HTTPError as e:
-                  try:
-                      detail = e.read().decode("utf-8", errors="replace")[:300]
-                  except Exception:
-                      detail = ""
-                  print("LOGOUT DE RECUPERACIÓN FALLÓ:", e.code, detail)
-                  return False
-              except Exception as e:
-                  print("LOGOUT DE RECUPERACIÓN FALLÓ:", str(e))
-                  return False
-
-          def login_once():
-              return request_json(
-                  LOGIN_URL,
-                  method="POST",
-                  data={
-                      "email": EMAIL,
-                      "password": PASSWORD,
-                      "plataforma": "Copernico WMS"
-                  },
-                  timeout=30
-              )
-
           def request_json(url, method="GET", data=None, jwt=None, timeout=120):
               headers = dict(BASE_HEADERS)
 
@@ -182,6 +133,46 @@ jobs:
                   )
 
               return parsed, status, len(raw)
+
+          def force_logout_by_id(user_id):
+              """
+              Intento de contingencia para liberar una sesión técnica anterior.
+              Copérnico recibe el mismo POST /logout que usa el frontend, con
+              {"id": user_id}. Es best-effort: si el 418 corresponde a que
+              otra persona ocupa la última licencia, este intento no la libera.
+              """
+              if user_id is None:
+                  return False
+
+              headers = dict(BASE_HEADERS)
+              headers["Content-Type"] = "application/json"
+
+              req = urllib.request.Request(
+                  LOGOUT_URL,
+                  data=json.dumps({"id": int(user_id)}).encode("utf-8"),
+                  headers=headers,
+                  method="POST"
+              )
+
+              try:
+                  with opener.open(req, timeout=15) as response:
+                      raw = response.read().decode("utf-8", errors="replace")
+                      print(
+                          "LOGOUT CONTINGENCIA HTTP:",
+                          response.status,
+                          raw[:180]
+                      )
+                      return 200 <= response.status < 300
+              except urllib.error.HTTPError as e:
+                  try:
+                      detail = e.read().decode("utf-8", errors="replace")[:180]
+                  except Exception:
+                      detail = ""
+                  print("LOGOUT CONTINGENCIA FALLÓ:", e.code, detail)
+                  return False
+              except Exception as e:
+                  print("LOGOUT CONTINGENCIA FALLÓ:", str(e)[:180])
+                  return False
 
           def recursive_user_id(obj):
               preferred = {
@@ -343,120 +334,27 @@ jobs:
               )
               return payload
 
-          def compact_trace_movements(payload, max_rows=250):
-              """
-              Conserva solamente los campos que usa el dashboard para determinar
-              quién generó la mezcla. Esto evita publicar el payload bruto de
-              Copérnico (que superó 100 MB en GitHub).
-              """
-              rows = extract_rows(payload)
-
-              compact = []
-              for r in rows:
-                  if not isinstance(r, dict):
-                      continue
-
-                  item = {
-                      "Fecha": field(
-                          r,
-                          "Fecha",
-                          "FechaHora",
-                          "Fecha Hora",
-                          "FechaMovimiento",
-                          "Fecha Mov"
-                      ),
-                      "EAN": field(r, "EAN", "ean"),
-                      "Saldo": field(r, "Saldo", "saldo"),
-                      "Movimiento": field(r, "Movimiento", "movimiento"),
-                      "Estado": field(r, "Estado", "estado"),
-                      "Transaccion": field(
-                          r,
-                          "Transaccion",
-                          "Transacción",
-                          "transaccion"
-                      ),
-                      "Nombre_empleado": field(
-                          r,
-                          "Nombre_empleado",
-                          "Nombre empleado",
-                          "NombreEmpleado"
-                      ),
-                      "Id_empleado": field(
-                          r,
-                          "Id_empleado",
-                          "ID empleado",
-                          "IdEmpleado"
-                      ),
-                      "NoControl": field(
-                          r,
-                          "NoControl",
-                          "No Control",
-                          "nocontrol"
-                      )
-                  }
-
-                  # Eliminar claves vacías para reducir todavía más el JSON.
-                  item = {
-                      k: v
-                      for k, v in item.items()
-                      if v is not None and str(v).strip() != ""
-                  }
-
-                  if item:
-                      compact.append(item)
-
-              # Orden cronológico, y limitar a los últimos movimientos.
-              compact.sort(
-                  key=lambda x: parse_date(
-                      field(
-                          x,
-                          "Fecha",
-                          "FechaHora",
-                          "FechaMovimiento"
-                      )
-                  )
-              )
-
-              if max_rows and len(compact) > max_rows:
-                  compact = compact[-max_rows:]
-
-              return compact
-
           def query_trace_full(caja, jwt):
-              """
-              Para detectar quién generó una mezcla actual, el dashboard usa
-              exclusivamente el historial de MOVIMIENTOS por caja/SKU:
-              Fecha, EAN, Movimiento, Saldo, Estado, Nombre_empleado e Id_empleado.
-
-              Evitamos consultar getubicaciones + getinventario para cada caja
-              porque triplicaba las llamadas y dejaba muchas cajas sin datos
-              antes del timeout.
-              """
               try:
-                  movimientos_raw = caja_api(
-                      "getmovimientos",
-                      caja,
-                      jwt,
-                      timeout=25
-                  )
-
-                  movimientos = compact_trace_movements(
-                      movimientos_raw,
-                      max_rows=250
-                  )
+                  movimientos = caja_api("getmovimientos", caja, jwt)
+                  ubicaciones = caja_api("getubicaciones", caja, jwt)
+                  inventario = caja_api("getinventario", caja, jwt)
 
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
                       "movimientos": movimientos,
-                      "movimiento_count": len(movimientos)
+                      "ubicaciones": ubicaciones,
+                      "inventario": inventario
                   }
               except Exception as e:
                   return {
                       "ok": False,
                       "caja": str(caja).strip(),
                       "error": str(e)[:300],
-                      "movimientos": []
+                      "movimientos": [],
+                      "ubicaciones": [],
+                      "inventario": []
                   }
 
           def query_ubicaciones(caja, jwt):
@@ -583,63 +481,71 @@ jobs:
               print("=== 1. LOGIN ===")
 
               try:
-                  login, _, _ = login_once()
-
+                  login, _, _ = request_json(
+                      LOGIN_URL,
+                      method="POST",
+                      data={
+                          "email": EMAIL,
+                          "password": PASSWORD,
+                          "plataforma": "Copernico WMS"
+                      },
+                      timeout=30
+                  )
               except ApiError as e:
-                  if e.code == 403:
-                      detail_lower = (e.detail or "").lower()
-                      session_active = (
+                  # Copérnico usa 403/418 para rechazos operativos de login
+                  # (sesión técnica activa o falta de licencia/cupo).
+                  detail_lower = (e.detail or "").lower()
+                  recoverable = (
+                      e.code in (403, 418)
+                      and (
                           "sesión activa" in detail_lower
                           or "sesion activa" in detail_lower
+                          or "licen" in detail_lower
+                          or "cupo" in detail_lower
+                      )
+                  )
+
+                  if recoverable:
+                      learned_id = status.get("copernico_user_id")
+                      tech_user_id = learned_id or DEFAULT_TECH_USER_ID
+
+                      print(
+                          f"LOGIN HTTP {e.code}. Intentando liberar sesión "
+                          f"técnica ID {tech_user_id} y reintentar una vez..."
                       )
 
-                      # Si el usuario técnico quedó con una sesión huérfana,
-                      # usamos el ID aprendido en el último login exitoso,
-                      # cerramos esa sesión y reintentamos UNA sola vez.
-                      if session_active:
-                          known_user_id = status.get("copernico_user_id") or DEFAULT_TECH_USER_ID
+                      force_logout_by_id(tech_user_id)
+                      time.sleep(2)
 
-                          if known_user_id is not None:
-                              print(
-                                  "SESIÓN ACTIVA DETECTADA. "
-                                  "Intentando liberar sesión técnica anterior..."
-                              )
+                      try:
+                          login, _, _ = request_json(
+                              LOGIN_URL,
+                              method="POST",
+                              data={
+                                  "email": EMAIL,
+                                  "password": PASSWORD,
+                                  "plataforma": "Copernico WMS"
+                              },
+                              timeout=30
+                          )
+                          print("LOGIN RECUPERADO OK")
 
-                              released = force_logout_by_id(
-                                  known_user_id
-                              )
-
-                              if released:
-                                  print(
-                                      "Sesión anterior liberada. "
-                                      "Reintentando login..."
-                                  )
-
-                                  try:
-                                      login, _, _ = login_once()
-                                      print("LOGIN RECUPERADO OK")
-                                  except ApiError as retry_error:
-                                      e = retry_error
-                                  else:
-                                      e = None
-
-                      if e is not None:
+                      except ApiError as retry_error:
                           fail_count = int(status.get("fail_count", 0)) + 1
                           retry = now + timedelta(minutes=1)
-
-                          detail_lower = (e.detail or "").lower()
+                          retry_detail = (retry_error.detail or "").lower()
 
                           if (
-                              "sesión activa" in detail_lower
-                              or "sesion activa" in detail_lower
+                              "sesión activa" in retry_detail
+                              or "sesion activa" in retry_detail
                           ):
                               reason = "Usuario técnico con sesión activa"
-                          elif "licen" in detail_lower or "cupo" in detail_lower:
+                          elif "licen" in retry_detail or "cupo" in retry_detail:
                               reason = "Sin licencia/cupo disponible"
                           else:
                               reason = (
-                                  "Copérnico rechazó temporalmente "
-                                  "el login (HTTP 403)"
+                                  "Copérnico rechazó temporalmente el login "
+                                  f"(HTTP {retry_error.code})"
                               )
 
                           status.update({
@@ -648,29 +554,42 @@ jobs:
                               "next_retry_at": iso(retry),
                               "last_attempt_at": iso(now),
                               "message": reason,
-                              "http_code": 403,
-                              "detail": (e.detail or "")[:300]
+                              "http_code": retry_error.code,
+                              "detail": (retry_error.detail or "")[:300]
                           })
 
                           save_json_file(STATUS_FILE, status)
 
                           print("CONTINGENCIA:", reason)
-
-                          if session_active:
-                              print(
-                                  "ID técnico usado para recuperación:",
-                                  known_user_id
-                              )
-
                           print(
-                              "Se conserva stock/pallets/trazabilidad anteriores."
+                              "El logout técnico no liberó una licencia; "
+                              "se conserva el último dato válido."
                           )
                           print(
-                              "Se reintentará automáticamente "
-                              "en el próximo minuto."
+                              "Se reintentará automáticamente en el próximo minuto."
                           )
                           raise SystemExit(0)
 
+                  elif e.code in (403, 418):
+                      # Rechazo operativo no reconocido: conservar datos válidos.
+                      fail_count = int(status.get("fail_count", 0)) + 1
+                      retry = now + timedelta(minutes=1)
+                      reason = (
+                          "Copérnico rechazó temporalmente el login "
+                          f"(HTTP {e.code})"
+                      )
+                      status.update({
+                          "status": "copernico_unavailable",
+                          "fail_count": fail_count,
+                          "next_retry_at": iso(retry),
+                          "last_attempt_at": iso(now),
+                          "message": reason,
+                          "http_code": e.code,
+                          "detail": (e.detail or "")[:300]
+                      })
+                      save_json_file(STATUS_FILE, status)
+                      print("CONTINGENCIA:", reason)
+                      raise SystemExit(0)
                   else:
                       raise
 
@@ -875,18 +794,11 @@ jobs:
                   )
 
               # -----------------------------
-              # TRAZABILIDAD DE MEZCLA · 1 CAJA REPRESENTATIVA POR SKU
+              # TRAZABILIDAD DE MEZCLA
               # -----------------------------
               print("=== 4. TRAZABILIDAD DE MEZCLAS ===")
 
               try:
-                  previous_trace = load_json_file(TRACE_FILE, {})
-                  previous_locations = (
-                      previous_trace.get("locations", {})
-                      if isinstance(previous_trace, dict)
-                      else {}
-                  )
-
                   by_location = {}
 
                   for row in rows:
@@ -910,260 +822,101 @@ jobs:
                           []
                       ).append(row)
 
-                  current_mixed = {}
+                  mixed_locations = {}
+                  trace_boxes = set()
 
                   for ubicacion, loc_rows in by_location.items():
-                      sku_rows = {}
-
-                      for row in loc_rows:
-                          sku = str(
+                      skus = {
+                          str(
                               field(
                                   row,
-                                  "EAN", "ean",
-                                  "referencia", "Referencia"
+                                  "referencia",
+                                  "Referencia",
+                                  "EAN",
+                                  "ean"
                               )
                           ).strip()
-
-                          if not sku:
-                              continue
-
-                          sku_rows.setdefault(sku, []).append(row)
-
-                      if len(sku_rows) < 2:
-                          continue
-
-                      # Para cada SKU actual elegimos la caja con el movimiento
-                      # más antiguo visible en stock. Esa caja representa el
-                      # comienzo más antiguo que todavía sigue presente del SKU.
-                      sku_candidates = {}
-
-                      for sku, sku_current_rows in sku_rows.items():
-                          def movement_ts(r):
-                              return parse_date(
-                                  field(
-                                      r,
-                                      "f_ultimo_movimiento",
-                                      "F_Ultimo_Movimiento",
-                                      "ultimo_movimiento",
-                                      "UltimoMovimiento",
-                                      "fechaRegistro",
-                                      "FechaRegistro"
-                                  )
-                              )
-
-                          ordered = sorted(
-                              sku_current_rows,
-                              key=movement_ts
-                          )
-
-                          candidate = ordered[0]
-
-                          caja = str(
+                          for row in loc_rows
+                          if str(
                               field(
-                                  candidate,
-                                  "Caja", "caja",
-                                  "numeroCaja", "NroCaja"
+                                  row,
+                                  "referencia",
+                                  "Referencia",
+                                  "EAN",
+                                  "ean"
                               )
                           ).strip()
-
-                          if not caja:
-                              # Buscar otra fila del mismo SKU que sí tenga caja.
-                              for alt in ordered:
-                                  caja = str(
-                                      field(
-                                          alt,
-                                          "Caja", "caja",
-                                          "numeroCaja", "NroCaja"
-                                      )
-                                  ).strip()
-                                  if caja:
-                                      candidate = alt
-                                      break
-
-                          sku_candidates[sku] = {
-                              "sku": sku,
-                              "caja": caja,
-                              "stock_last_move": str(
-                                  field(
-                                      candidate,
-                                      "f_ultimo_movimiento",
-                                      "F_Ultimo_Movimiento",
-                                      "ultimo_movimiento",
-                                      "UltimoMovimiento",
-                                      "fechaRegistro",
-                                      "FechaRegistro"
-                                  )
-                              ).strip(),
-                              "referencia": str(
-                                  field(
-                                      candidate,
-                                      "referencia",
-                                      "Referencia"
-                                  )
-                              ).strip(),
-                              "descripcion": str(
-                                  field(
-                                      candidate,
-                                      "Descripcion",
-                                      "descripcion",
-                                      "Descripción"
-                                  )
-                              ).strip()
-                          }
-
-                      signature = "|".join(
-                          sorted(
-                              f"{sku}:{x.get('caja','')}:{x.get('stock_last_move','')}"
-                              for sku, x in sku_candidates.items()
-                          )
-                      )
-
-                      current_mixed[ubicacion] = {
-                          "sku_count": len(sku_rows),
-                          "signature": signature,
-                          "sku_candidates": sku_candidates,
-                          "analysis": {
-                              "status": "pending"
-                          }
                       }
 
-                  resolved = {}
-                  pending = {}
+                      if len(skus) < 2:
+                          continue
 
-                  for ubicacion, info in current_mixed.items():
-                      old = previous_locations.get(
-                          ubicacion,
-                          {}
-                      )
+                      boxes = sorted({
+                          str(
+                              field(
+                                  row,
+                                  "Caja",
+                                  "caja",
+                                  "numeroCaja",
+                                  "NroCaja"
+                              )
+                          ).strip()
+                          for row in loc_rows
+                          if str(
+                              field(
+                                  row,
+                                  "Caja",
+                                  "caja",
+                                  "numeroCaja",
+                                  "NroCaja"
+                              )
+                          ).strip()
+                      })
 
-                      if (
-                          old.get("signature") == info["signature"]
-                          and old.get("analysis", {}).get("status")
-                          == "detected"
-                      ):
-                          resolved[ubicacion] = old
-                      else:
-                          pending[ubicacion] = info
+                      mixed_locations[ubicacion] = {
+                          "sku_count": len(skus),
+                          "boxes": boxes
+                      }
 
-                  candidate_boxes = sorted({
-                      x.get("caja", "")
-                      for info in pending.values()
-                      for x in info.get(
-                          "sku_candidates",
-                          {}
-                      ).values()
-                      if x.get("caja")
-                  })
+                      trace_boxes.update(boxes)
 
-                  print(
-                      "Posiciones mezcladas actuales:",
-                      len(current_mixed),
-                      "| cache resuelta:",
-                      len(resolved),
-                      "| pendientes:",
-                      len(pending)
-                  )
-                  print(
-                      "Cajas representativas a consultar:",
-                      len(candidate_boxes)
-                  )
+                  trace_dataset_boxes = {}
+                  trace_boxes_sorted = sorted(trace_boxes)
 
-                  box_history = {}
-
-                  def query_candidate_box(caja):
-                      try:
-                          hist = query_ubicaciones(
-                              caja,
-                              jwt
-                          )
-
-                          compact = []
-
-                          for m in hist:
-                              compact.append({
-                                  "UbicacionInicial": field(
-                                      m,
-                                      "UbicacionInicial",
-                                      "ubicacion_inicial",
-                                      "ubicacionInicial"
-                                  ),
-                                  "UbicacionFinal": field(
-                                      m,
-                                      "UbicacionFinal",
-                                      "ubicacion_final",
-                                      "ubicacionFinal"
-                                  ),
-                                  "fecha": field(
-                                      m,
-                                      "fecha",
-                                      "Fecha",
-                                      "FechaMovimiento",
-                                      "fecha_movimiento"
-                                  ),
-                                  "Nombre_empleado": field(
-                                      m,
-                                      "Nombre_empleado",
-                                      "NombreEmpleado",
-                                      "nombreEmpleado",
-                                      "Empleado"
-                                  ),
-                                  "Id_empleado": field(
-                                      m,
-                                      "Id_empleado",
-                                      "IdEmpleado",
-                                      "idEmpleado"
-                                  ),
-                                  "Prioridad": field(
-                                      m,
-                                      "Prioridad",
-                                      "prioridad"
-                                  )
-                              })
-
-                          return str(caja), compact, ""
-
-                      except Exception as e:
-                          return str(caja), [], str(e)[:300]
-
-                  if candidate_boxes:
+                  if trace_boxes_sorted:
                       executor = ThreadPoolExecutor(
-                          max_workers=min(
-                              12,
-                              len(candidate_boxes)
-                          )
+                          max_workers=min(6, len(trace_boxes_sorted))
                       )
 
                       futures = {
                           executor.submit(
-                              query_candidate_box,
-                              caja
+                              query_trace_full,
+                              caja,
+                              jwt
                           ): caja
-                          for caja in candidate_boxes
+                          for caja in trace_boxes_sorted
                       }
 
                       try:
-                          for future in as_completed(
-                              futures,
-                              timeout=50
-                          ):
+                          for future in as_completed(futures, timeout=40):
                               caja = futures[future]
-
                               try:
-                                  caja, hist, error = future.result(
-                                      timeout=1
-                                  )
+                                  result = future.result(timeout=1)
                               except Exception as e:
-                                  hist = []
-                                  error = str(e)[:300]
+                                  result = {
+                                      "ok": False,
+                                      "caja": str(caja),
+                                      "error": "Error aislado: " + str(e)[:250],
+                                      "movimientos": [],
+                                      "ubicaciones": [],
+                                      "inventario": []
+                                  }
 
-                              box_history[caja] = {
-                                  "history": hist,
-                                  "error": error
-                              }
+                              trace_dataset_boxes[str(caja)] = result
 
                       except Exception as e:
                           print(
-                              "AVISO: consultas representativas incompletas:",
+                              "AVISO: trazabilidad de mezcla incompleta:",
                               str(e)
                           )
 
@@ -1173,230 +926,39 @@ jobs:
                               cancel_futures=True
                           )
 
-                  def norm_loc(v):
-                      return str(v or "").strip().upper()
-
-                  def arrival_to_location(caja, ubicacion):
-                      hist = box_history.get(
-                          str(caja),
-                          {}
-                      ).get("history", [])
-
-                      matches = [
-                          m
-                          for m in hist
-                          if norm_loc(
-                              m.get("UbicacionFinal")
-                          ) == norm_loc(ubicacion)
-                      ]
-
-                      if not matches:
-                          return None
-
-                      # Si la caja entró más de una vez a la misma posición,
-                      # tomamos el ingreso más reciente de esa caja.
-                      return max(
-                          matches,
-                          key=lambda m: parse_date(
-                              m.get("fecha")
+                      for caja in trace_boxes_sorted:
+                          trace_dataset_boxes.setdefault(
+                              str(caja),
+                              {
+                                  "ok": False,
+                                  "caja": str(caja),
+                                  "error": "Trazabilidad no disponible en este ciclo",
+                                  "movimientos": [],
+                                  "ubicaciones": [],
+                                  "inventario": []
+                              }
                           )
-                      )
-
-                  newly_detected = 0
-                  incomplete = 0
-
-                  for ubicacion, info in pending.items():
-                      sku_events = []
-
-                      for sku, cand in info.get(
-                          "sku_candidates",
-                          {}
-                      ).items():
-                          caja = cand.get("caja", "")
-
-                          if not caja:
-                              continue
-
-                          ev = arrival_to_location(
-                              caja,
-                              ubicacion
-                          )
-
-                          if not ev:
-                              continue
-
-                          sku_events.append({
-                              "sku": sku,
-                              "caja": caja,
-                              "fecha": ev.get(
-                                  "fecha",
-                                  ""
-                              ),
-                              "Nombre_empleado": ev.get(
-                                  "Nombre_empleado",
-                                  ""
-                              ),
-                              "Id_empleado": ev.get(
-                                  "Id_empleado",
-                                  ""
-                              ),
-                              "UbicacionInicial": ev.get(
-                                  "UbicacionInicial",
-                                  ""
-                              ),
-                              "UbicacionFinal": ev.get(
-                                  "UbicacionFinal",
-                                  ""
-                              ),
-                              "Prioridad": ev.get(
-                                  "Prioridad",
-                                  ""
-                              ),
-                              "stock_last_move": cand.get(
-                                  "stock_last_move",
-                                  ""
-                              ),
-                              "descripcion": cand.get(
-                                  "descripcion",
-                                  ""
-                              )
-                          })
-
-                      sku_events.sort(
-                          key=lambda x: parse_date(
-                              x.get("fecha")
-                          )
-                      )
-
-                      if len(sku_events) >= 2:
-                          # El SKU representado por el evento más reciente es
-                          # el que hizo que convivieran dos SKU actuales.
-                          cause = sku_events[-1]
-                          previous = sku_events[:-1]
-
-                          info["analysis"] = {
-                              "status": "detected",
-                              "responsable": {
-                                  "responsable": cause.get(
-                                      "Nombre_empleado",
-                                      ""
-                                  ),
-                                  "id_empleado": cause.get(
-                                      "Id_empleado",
-                                      ""
-                                  ),
-                                  "fecha": cause.get(
-                                      "fecha",
-                                      ""
-                                  ),
-                                  "caja_agregada": cause.get(
-                                      "caja",
-                                      ""
-                                  ),
-                                  "sku_agregado": [
-                                      cause.get(
-                                          "sku",
-                                          ""
-                                      )
-                                  ],
-                                  "sku_que_ya_estaba": [
-                                      x.get(
-                                          "sku",
-                                          ""
-                                      )
-                                      for x in previous
-                                  ],
-                                  "origen": cause.get(
-                                      "UbicacionInicial",
-                                      ""
-                                  ),
-                                  "destino": cause.get(
-                                      "UbicacionFinal",
-                                      ""
-                                  ),
-                                  "prioridad": cause.get(
-                                      "Prioridad",
-                                      ""
-                                  )
-                              },
-                              "arrivals": sku_events,
-                              "method": (
-                                  "Una caja representativa por SKU actual, "
-                                  "seleccionada por el movimiento visible más "
-                                  "antiguo en stock."
-                              )
-                          }
-
-                          newly_detected += 1
-
-                      else:
-                          info["analysis"] = {
-                              "status": "incomplete",
-                              "reason": (
-                                  "Copérnico no devolvió un ingreso a esta "
-                                  "posición para al menos dos SKU actuales."
-                              ),
-                              "arrivals": sku_events
-                          }
-                          incomplete += 1
-
-                      resolved[ubicacion] = info
-
-                  payload = {
-                      "updated_at": now_iso,
-                      "source": (
-                          "Copernico WMS · trazabilidad por SKU "
-                          "representativo"
-                      ),
-                      "criterion": (
-                          "Para cada SKU actual se selecciona la caja con el "
-                          "movimiento más antiguo visible en stock y se consulta "
-                          "su ingreso a la posición. El SKU cuyo ingreso "
-                          "representativo ocurrió después se considera el que "
-                          "generó la convivencia actual."
-                      ),
-                      "mixed_location_count": len(
-                          current_mixed
-                      ),
-                      "detected_count": sum(
-                          1
-                          for x in resolved.values()
-                          if x.get(
-                              "analysis",
-                              {}
-                          ).get("status") == "detected"
-                      ),
-                      "newly_detected_count": newly_detected,
-                      "incomplete_count": incomplete,
-                      "locations": resolved
-                  }
 
                   save_json_file(
                       TRACE_FILE,
-                      payload
+                      {
+                          "updated_at": now_iso,
+                          "source": (
+                              "Copernico WMS · trazabilidad automática "
+                              "de cajas en posiciones con mezcla"
+                          ),
+                          "mixed_location_count": len(mixed_locations),
+                          "box_count": len(trace_dataset_boxes),
+                          "locations": mixed_locations,
+                          "boxes": trace_dataset_boxes
+                      }
                   )
 
-                  size_mb = (
-                      TRACE_FILE.stat().st_size
-                      / (1024 * 1024)
-                  )
-
-                  print(
-                      "Detectadas nuevas:",
-                      newly_detected,
-                      "| detectadas totales:",
-                      payload["detected_count"],
-                      "| incompletas:",
-                      incomplete
-                  )
-                  print(
-                      "trazabilidad-cajas.json generado correctamente ·",
-                      f"{size_mb:.2f} MB"
-                  )
+                  print("trazabilidad-cajas.json generado correctamente")
 
               except Exception as e:
                   print(
-                      "AVISO: trazabilidad por SKU no pudo actualizarse. "
+                      "AVISO: trazabilidad-cajas no pudo actualizarse. "
                       "Se conservará el último válido:",
                       str(e)
                   )
@@ -1410,8 +972,7 @@ jobs:
                   "last_attempt_at": now_iso,
                   "message": "Actualización correcta",
                   "http_code": 200,
-                  "detail": "",
-                  "copernico_user_id": user_id
+                  "detail": ""
               })
 
               save_json_file(
