@@ -1098,19 +1098,83 @@ jobs:
 
                   previous_trace = load_json_file(TRACE_FILE, {})
                   previous_boxes = {}
-                  # Solo reutilizamos trazabilidad anterior si ya era compacta v13.
-                  # Así jamás volvemos a arrastrar históricos gigantes de versiones viejas.
+                  # v15 vuelve incremental la trazabilidad: cada ciclo conserva
+                  # las cajas válidas ya resueltas y prioriza las que faltan.
                   if (
                       isinstance(previous_trace, dict)
-                      and previous_trace.get("schema_version") in (13, 14)
+                      and previous_trace.get("schema_version") in (13, 14, 15)
                   ):
                       previous_boxes = previous_trace.get("boxes", {}) or {}
 
                   trace_dataset_boxes = {}
 
-                  if trace_boxes_sorted:
+                  # Mantener lo ya resuelto evita que una caja vuelva a SIN DATOS
+                  # sólo porque el endpoint de Copérnico estuvo lento en este ciclo.
+                  for caja in trace_boxes_sorted:
+                      key = str(caja)
+                      old_box = previous_boxes.get(key)
+                      if isinstance(old_box, dict) and old_box.get("ok"):
+                          trace_dataset_boxes[key] = dict(old_box)
+
+                  # Prioridad 1: cajas nunca resueltas / fallidas.
+                  unresolved_boxes = [
+                      caja for caja in trace_boxes_sorted
+                      if not (
+                          isinstance(previous_boxes.get(str(caja)), dict)
+                          and previous_boxes.get(str(caja), {}).get("ok")
+                      )
+                  ]
+
+                  # Prioridad 2: cajas válidas cuya firma de SKU cambió.
+                  changed_boxes = []
+                  legacy_boxes = []
+                  for caja in trace_boxes_sorted:
+                      old_box = previous_boxes.get(str(caja))
+                      if not (isinstance(old_box, dict) and old_box.get("ok")):
+                          continue
+
+                      current_signature = sorted(
+                          str(x).strip()
+                          for x in box_skus.get(caja, set())
+                          if str(x).strip()
+                      )
+                      old_signature = old_box.get("requested_skus")
+
+                      if isinstance(old_signature, list):
+                          if sorted(str(x).strip() for x in old_signature) != current_signature:
+                              changed_boxes.append(caja)
+                      elif previous_trace.get("schema_version") != 15:
+                          # Las trazas v13/v14 siguen siendo utilizables. Se refrescan
+                          # después de resolver todas las cajas que hoy están sin datos.
+                          legacy_boxes.append(caja)
+
+                  # Un lote acotado permite terminar el workflow cada minuto y, a la vez,
+                  # acumular progreso hasta completar todas las mezclas.
+                  TRACE_MAX_QUERIES_PER_CYCLE = 120
+                  priority_queue = []
+                  seen_queue = set()
+                  for caja in unresolved_boxes + changed_boxes + legacy_boxes:
+                      if caja in seen_queue:
+                          continue
+                      seen_queue.add(caja)
+                      priority_queue.append(caja)
+
+                  trace_query_boxes = priority_queue[:TRACE_MAX_QUERIES_PER_CYCLE]
+
+                  print(
+                      "Trazabilidad mezcla · cajas totales:",
+                      len(trace_boxes_sorted),
+                      "· ya válidas:",
+                      len(trace_dataset_boxes),
+                      "· pendientes:",
+                      len(unresolved_boxes),
+                      "· a consultar este ciclo:",
+                      len(trace_query_boxes)
+                  )
+
+                  if trace_query_boxes:
                       executor = ThreadPoolExecutor(
-                          max_workers=min(10, len(trace_boxes_sorted))
+                          max_workers=min(10, len(trace_query_boxes))
                       )
 
                       futures = {
@@ -1120,11 +1184,11 @@ jobs:
                               jwt,
                               box_skus.get(caja, set())
                           ): caja
-                          for caja in trace_boxes_sorted
+                          for caja in trace_query_boxes
                       }
 
                       try:
-                          for future in as_completed(futures, timeout=55):
+                          for future in as_completed(futures, timeout=52):
                               caja = futures[future]
                               try:
                                   result = future.result(timeout=1)
@@ -1139,21 +1203,33 @@ jobs:
                                       "compact": True
                                   }
 
-                              if not result.get("ok"):
+                              if result.get("ok"):
+                                  result["requested_skus"] = sorted(
+                                      str(x).strip()
+                                      for x in box_skus.get(caja, set())
+                                      if str(x).strip()
+                                  )
+                                  result["trace_resolved_at"] = now_iso
+                                  result.pop("stale_trace", None)
+                                  result.pop("stale_reason", None)
+                                  trace_dataset_boxes[str(caja)] = result
+                              else:
                                   old_box = previous_boxes.get(str(caja))
                                   if isinstance(old_box, dict) and old_box.get("ok"):
-                                      result = dict(old_box)
-                                      result["stale_trace"] = True
-                                      result["stale_reason"] = (
-                                          "Se conservó trazabilidad compacta anterior "
-                                          "porque Copérnico falló en este ciclo."
+                                      kept = dict(old_box)
+                                      kept["stale_trace"] = True
+                                      kept["stale_reason"] = (
+                                          "Copérnico falló en este ciclo; se conserva "
+                                          "la última trazabilidad válida."
                                       )
-
-                              trace_dataset_boxes[str(caja)] = result
+                                      trace_dataset_boxes[str(caja)] = kept
+                                  else:
+                                      trace_dataset_boxes[str(caja)] = result
 
                       except Exception as e:
                           print(
-                              "AVISO: trazabilidad compacta incompleta:",
+                              "AVISO: lote de trazabilidad incompleto; "
+                              "el progreso válido se conserva para el próximo ciclo:",
                               str(e)
                           )
 
@@ -1163,33 +1239,39 @@ jobs:
                               cancel_futures=True
                           )
 
-                      for caja in trace_boxes_sorted:
-                          key = str(caja)
-                          if key in trace_dataset_boxes:
-                              continue
+                  # Toda caja actual debe quedar representada en el JSON. Las que no
+                  # alcanzaron a resolverse quedan pendientes y se priorizan en el próximo ciclo.
+                  for caja in trace_boxes_sorted:
+                      key = str(caja)
+                      if key in trace_dataset_boxes:
+                          continue
 
-                          old_box = previous_boxes.get(key)
-                          if isinstance(old_box, dict) and old_box.get("ok"):
-                              kept = dict(old_box)
-                              kept["stale_trace"] = True
-                              kept["stale_reason"] = (
-                                  "No terminó la consulta en este ciclo; se conserva "
-                                  "la última trazabilidad compacta válida."
+                      old_box = previous_boxes.get(key)
+                      if isinstance(old_box, dict) and old_box.get("ok"):
+                          kept = dict(old_box)
+                          kept["stale_trace"] = True
+                          kept["stale_reason"] = (
+                              "Pendiente de refresco; se conserva la última trazabilidad válida."
+                          )
+                          trace_dataset_boxes[key] = kept
+                      else:
+                          trace_dataset_boxes[key] = {
+                              "ok": False,
+                              "caja": key,
+                              "error": "Pendiente de trazabilidad; se reintentará automáticamente",
+                              "movimientos": [],
+                              "ubicaciones": [],
+                              "inventario": [],
+                              "compact": True,
+                              "requested_skus": sorted(
+                                  str(x).strip()
+                                  for x in box_skus.get(caja, set())
+                                  if str(x).strip()
                               )
-                              trace_dataset_boxes[key] = kept
-                          else:
-                              trace_dataset_boxes[key] = {
-                                  "ok": False,
-                                  "caja": key,
-                                  "error": "Trazabilidad no disponible en este ciclo",
-                                  "movimientos": [],
-                                  "ubicaciones": [],
-                                  "inventario": [],
-                                  "compact": True
-                              }
+                          }
 
                   payload_trace = {
-                      "schema_version": 14,
+                      "schema_version": 15,
                       "updated_at": now_iso,
                       "source": (
                           "Copernico WMS · trazabilidad compacta de mezclas"
@@ -1199,6 +1281,11 @@ jobs:
                           "que inicia la racha de saldo positivo vigente."
                       ),
                       "mixed_location_count": len(mixed_locations),
+                      "pending_box_count": sum(
+                          1 for x in trace_dataset_boxes.values()
+                          if not (isinstance(x, dict) and x.get("ok"))
+                      ),
+                      "queried_this_cycle": len(trace_query_boxes),
                       "box_count": len(trace_dataset_boxes),
                       "box_ok_count": sum(
                           1 for x in trace_dataset_boxes.values()
