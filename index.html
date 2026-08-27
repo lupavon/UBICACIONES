@@ -2394,7 +2394,7 @@ function analyzeMixTrace(loc,items,results){
 function mixTraceHtml(state){
   if(!state)return '';
   if(state.status==='loading')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState">CONSULTANDO</span></div><div class="mixTraceResult">Reconstruyendo los movimientos de las cajas/SKU de esta posición…</div></div>';
-  if(state.status==='unavailable')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">SIN DATOS</span></div><div class="mixTraceResult">La trazabilidad automática todavía no está publicada para estas cajas.</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
+  if(state.status==='unavailable'){const declared=state.declaredBoxes?.length;return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState warn">SIN MOVIMIENTOS</span></div><div class="mixTraceResult">'+(declared?'La caja está identificada en la posición, pero todavía no tiene movimientos de trazabilidad publicados.':'No hay trazabilidad publicada para esta caja.')+(state.traceUpdatedAt?'<br><small>Archivo de trazabilidad: '+esc(state.traceUpdatedAt)+'</small>':'')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';}
   if(state.status==='error')return '<div class="mixTraceBox"><div class="mixTraceHead"><b>🧭 Trazabilidad de mezcla</b><span class="mixTraceState bad">ERROR</span></div><div class="mixTraceResult">'+esc(state.error||'No se pudo consultar la trazabilidad.')+'</div><button class="btn mixTraceRetry" type="button" onclick="retryMixTrace()">Reintentar</button></div>';
 
   const a=state.analysis||{},cause=a.cause;
@@ -2459,86 +2459,57 @@ async function loadTraceDataset(force=false){
   TRACE_DATASET_PROMISE=(async()=>{
     const urls=[
       './trazabilidad-cajas.json?v='+Date.now(),
-      'https://raw.githubusercontent.com/lupavon/UBICACIONES/main/trazabilidad-cajas.json?v='+Date.now()
+      'https://raw.githubusercontent.com/lupavon/UBICACIONES/refs/heads/main/trazabilidad-cajas.json?v='+Date.now()
     ];
-
     let lastErr=null;
-
-    for(const u of urls){
+    for(const url of urls){
       try{
-        const res=await fetch(u,{
-          cache:'no-store',
-          headers:{'Cache-Control':'no-cache'}
-        });
+        const res=await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
         if(!res.ok)throw new Error('HTTP '+res.status);
-
         const payload=await res.json();
-
-        const boxes =
-          payload && payload.boxes && typeof payload.boxes==='object'
-            ? payload.boxes
-            : payload;
-
-        TRACE_DATASET={
-          raw:payload||{},
-          boxes:boxes||{}
-        };
-
+        TRACE_DATASET=payload||{};
         return TRACE_DATASET;
-      }catch(err){
-        lastErr=err;
-      }
+      }catch(e){ lastErr=e; }
     }
-
     throw lastErr||new Error('No se pudo cargar trazabilidad-cajas.json');
   })();
 
-  try{
-    return await TRACE_DATASET_PROMISE;
-  }finally{
-    TRACE_DATASET_PROMISE=null;
-  }
+  try{return await TRACE_DATASET_PROMISE}
+  finally{TRACE_DATASET_PROMISE=null}
 }
 
-function traceLookup(boxMap,caja){
-  if(!boxMap)return null;
+function traceResultForBox(dataset,caja){
+  const id=String(caja||'').trim();
+  if(!id)return null;
 
-  const raw=String(caja??'').trim();
-  if(!raw)return null;
-
-  if(Object.prototype.hasOwnProperty.call(boxMap,raw)){
-    return boxMap[raw];
+  // Esquema actual esperado: { locations:{...}, boxes:{"272687":{movimientos...}} }
+  if(dataset?.boxes && Object.prototype.hasOwnProperty.call(dataset.boxes,id)){
+    return dataset.boxes[id];
   }
 
-  const n=Number(raw);
-  if(Number.isFinite(n)){
-    const numeric=String(n);
-    if(Object.prototype.hasOwnProperty.call(boxMap,numeric)){
-      return boxMap[numeric];
-    }
-  }
-
-  const target=raw.replace(/^0+/,'');
-  for(const [k,v] of Object.entries(boxMap)){
-    const nk=String(k).trim();
-    if(nk===raw)return v;
-    if(nk.replace(/^0+/,'')===target)return v;
+  // Compatibilidad con versiones antiguas donde el mapa de cajas podía venir directo.
+  if(Object.prototype.hasOwnProperty.call(dataset||{},id) && typeof dataset[id]==='object'){
+    return dataset[id];
   }
 
   return null;
 }
 
+function traceBoxIsDeclared(dataset,caja){
+  const id=String(caja||'').trim();
+  const locations=dataset?.locations||{};
+  return Object.values(locations).some(v=>
+    Array.isArray(v?.boxes) && v.boxes.map(String).includes(id)
+  );
+}
+
 async function requestMixTrace(loc,items,force=false){
   if(!loc||!items?.length)return;
 
-  const boxes=[...new Set(
-    items.map(x=>String(x.caja||'').trim()).filter(Boolean)
-  )];
-
+  const boxes=[...new Set(items.map(x=>String(x.caja||'').trim()).filter(Boolean))];
   if(!boxes.length)return;
 
   const key=trNorm(loc);
-
   if(!force && MIX_TRACE_CACHE.has(key))return;
 
   MIX_TRACE_CACHE.set(key,{status:'loading'});
@@ -2546,24 +2517,16 @@ async function requestMixTrace(loc,items,force=false){
 
   try{
     const dataset=await loadTraceDataset(force);
-    const boxMap=dataset?.boxes||{};
     const results=[];
+    const declared=[];
 
     for(const caja of boxes){
-      const r=traceLookup(boxMap,caja);
-
+      const r=traceResultForBox(dataset,caja);
       if(r){
-        results.push({
-          ...r,
-          caja:String(caja),
-          ok:r.ok!==false
-        });
+        results.push({...r,caja:String(caja),ok:r.ok!==false});
       }else{
-        results.push({
-          ok:false,
-          caja:String(caja),
-          error:'Caja sin trazabilidad publicada'
-        });
+        if(traceBoxIsDeclared(dataset,caja))declared.push(String(caja));
+        results.push({ok:false,caja:String(caja),error:'Caja sin movimientos publicados'});
       }
     }
 
@@ -2572,22 +2535,16 @@ async function requestMixTrace(loc,items,force=false){
     if(!okResults.length){
       MIX_TRACE_CACHE.set(key,{
         status:'unavailable',
-        debug:{
-          boxesBuscadas:boxes,
-          totalClaves:Object.keys(boxMap).length
-        }
+        declaredBoxes:declared,
+        requestedBoxes:boxes,
+        traceUpdatedAt:dataset?.updated_at||''
       });
     }else{
       MIX_TRACE_CACHE.set(key,{
         status:'ok',
-        analysis:analyzeMixTrace(
-          loc,
-          items,
-          results
-        )
+        analysis:analyzeMixTrace(loc,items,results)
       });
     }
-
   }catch(err){
     MIX_TRACE_CACHE.set(key,{
       status:'error',
