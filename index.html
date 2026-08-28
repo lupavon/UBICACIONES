@@ -2944,12 +2944,86 @@ function receiptField(r,key){
     caja:['Caja','caja'], sku:['EAN','ean','SKU','sku'], desc:['Descripcion','descripcion'],
     saldo:['Saldo','saldo','Cantidad','cantidad'], fv:['FV','fv'],
     origen:['PosicionOrigen','posicion_origen','UbicacionInicial'],
-    responsable:['Responsable','responsable','Nombre_empleado','Empleado'],
-    id:['Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
-    fecha:['FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
+    responsable:['_receiptResponsable','Responsable','responsable','Nombre_empleado','Empleado'],
+    id:['_receiptEmployeeId','Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
+    fecha:['_receiptIngreso','FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
   };
-  if(key==='equipo') return receiptTeamForRow(r);
+  if(key==='equipo'){
+    // Si la trazabilidad ya identificó al empleado de ingreso, clasificar ESE empleado.
+    if(r && r._receiptEmployeeId){
+      const p=COPERNICO_BY_ID.get(receiptNorm(r._receiptEmployeeId));
+      return p ? (receiptTeamFromProfile(p.perfil)||'Sin clasificar') : 'Sin clasificar';
+    }
+    return receiptTeamForRow(r);
+  }
   return processVal(r,map[key]||[key]);
+}
+
+function receiptTraceEntryForRow(r,result){
+  if(!result||result.ok===false)return null;
+  const skuInfo={
+    sku:String(receiptField(r,'sku')||'').trim(),
+    ean:String(receiptField(r,'sku')||'').trim(),
+    referencia:String(processVal(r,['Referencia','referencia'])||'').trim()
+  };
+  let rows=trRowsForSku(result,skuInfo,{strict:false});
+  if(!rows.length)return null;
+
+  // Reconstruir la racha positiva ACTUAL de esa caja/SKU.
+  const withSaldo=rows.filter(x=>!isNaN(x.saldo));
+  let activeRows=rows;
+  if(withSaldo.length){
+    const last=withSaldo[withSaldo.length-1];
+    if(last.saldo<=0)return null;
+    let lastZero=-1;
+    for(let i=withSaldo.length-2;i>=0;i--){
+      if(withSaldo[i].saldo<=0){lastZero=i;break}
+    }
+    const startTime=(withSaldo[lastZero+1]||last).time;
+    activeRows=rows.filter(x=>x.time>=startTime);
+  }
+
+  // Dentro de la presencia activa actual, priorizar el primer movimiento que entra a RECIBO.
+  // Copérnico suele informarlo como "RECIBE DESDE ..." + Estado Entrada.
+  const explicit=activeRows.find(x=>{
+    const tx=receiptNorm(x.transaccion);
+    const est=receiptNorm(x.estado);
+    return tx.includes('recibe desde') && (est==='entrada' || (!isNaN(x.mov)&&x.mov>0));
+  });
+  const fallback=activeRows.find(x=>receiptNorm(x.estado)==='entrada' || (!isNaN(x.mov)&&x.mov>0)) || activeRows[0];
+  const ev=explicit||fallback;
+  if(!ev)return null;
+  return {
+    employee:ev.employee||'',
+    employeeId:ev.employeeId||'',
+    time:ev.time,
+    timeLabel:trDateLabel(ev.time,trDateRaw(ev.raw)),
+    transaccion:ev.transaccion||''
+  };
+}
+
+function enrichReceiptRowsWithTrace(rows,dataset){
+  const boxMap=dataset?.boxes||{};
+  return (rows||[]).map(src=>{
+    const r={...src};
+    const caja=String(processVal(r,['Caja','caja'])||'').trim();
+    const result=caja ? boxMap[caja] : null;
+    const ev=receiptTraceEntryForRow(r,result);
+    if(ev){
+      r._receiptResponsable=ev.employee||'';
+      r._receiptEmployeeId=ev.employeeId||'';
+      r._receiptIngreso=!isNaN(ev.time) ? new Date(ev.time).toISOString() : (ev.timeLabel||'');
+      r._receiptIngresoLabel=ev.timeLabel||'';
+      r._receiptTraceTx=ev.transaccion||'';
+      r._receiptTraceFound=true;
+    }else{
+      r._receiptResponsable='';
+      r._receiptEmployeeId='';
+      r._receiptIngreso='';
+      r._receiptTraceFound=false;
+    }
+    return r;
+  });
 }
 function receiptCmp(a,b,key){
   let av=receiptField(a,key),bv=receiptField(b,key);
@@ -3022,7 +3096,7 @@ function renderReceipt(){
       '<td class="who">'+esc(receiptField(r,'responsable')||'—')+'</td>'+
       '<td>'+esc(receiptField(r,'id')||'—')+'</td>'+
       '<td class="team">'+esc(equipo)+'</td>'+
-      '<td>'+esc(receiptField(r,'fecha')||'—')+'</td>'+
+      '<td>'+esc(r._receiptIngresoLabel||receiptField(r,'fecha')||'Sin identificar')+'</td>'+
     '</tr>';
   };
   body.innerHTML=groupedRowsHtml(rows,groupKey,receiptField,receiptRowHtml,10,'saldo');
@@ -3038,13 +3112,32 @@ function renderReceipt(){
 }
 async function buildReceiptPanel(force=false){
   if(RECEIPT_LOADED&&!force){renderReceipt();return}
-  const st=$('receiptStatus');if(st){st.className='processStatus';st.textContent='Cargando unidades actualmente en RECIBO…'}
+  const st=$('receiptStatus');if(st){st.className='processStatus';st.textContent='Cargando Inventario Referencia → RECIBO y cruzando trazabilidad…'}
   try{
     const res=await fetch('./en-recibo.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json();
-    RECEIPT_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);RECEIPT_LOADED=true;fillReceiptTeams();
-    if(st){const d=payload?.updated_at?new Date(payload.updated_at):null;st.className='processStatus ok';st.textContent='● Información actualizada'+(d&&!isNaN(d)?' · '+d.toLocaleString('es-AR'):'')}
+    const baseRows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+
+    let trace=null;
+    try{
+      trace=await loadTraceDataset(force);
+    }catch(traceErr){
+      console.warn('No se pudo cargar trazabilidad-cajas.json para En recibo',traceErr);
+    }
+
+    RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(baseRows,trace) : baseRows.map(r=>({...r,_receiptTraceFound:false}));
+    RECEIPT_LOADED=true;
+    fillReceiptTeams();
+    if(st){
+      const d=payload?.updated_at?new Date(payload.updated_at):null;
+      const identified=RECEIPT_ROWS.filter(r=>r._receiptTraceFound).length;
+      const missing=RECEIPT_ROWS.length-identified;
+      st.className=missing?'processStatus':'processStatus ok';
+      st.textContent='● Información actualizada'+(d&&!isNaN(d)?' · '+d.toLocaleString('es-AR'):'')+
+        ' · ingreso inicial identificado: '+identified.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
+        (missing?' · '+missing.toLocaleString('es-AR')+' sin trazabilidad':'');
+    }
     renderReceipt();
   }catch(err){RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();if(st){st.className='processStatus bad';st.textContent='Todavía no está publicado en-recibo.json · '+(err.message||String(err))}}
 }
