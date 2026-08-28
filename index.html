@@ -984,6 +984,18 @@ body.heatSplit .layoutHeatGrid{
 @media(max-width:900px){.processKpis{grid-template-columns:1fr}.processToolbar{flex-wrap:wrap}.processToolbar input{width:100%}}
 
 
+/* ===== En recibo ===== */
+.receiptToolbar{display:flex;gap:9px;align-items:center;margin:12px 0;flex-wrap:wrap}
+.receiptToolbar input,.receiptToolbar select{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:9px 11px}
+.receiptToolbar input{flex:1;min-width:260px}.receiptToolbar select{min-width:180px}
+.receiptTableWrap{overflow:auto;border:1px solid #303a47;border-radius:9px;background:#0d1218;max-height:68vh}
+.receiptTable{width:100%;border-collapse:collapse;min-width:1450px}
+.receiptTable th{position:sticky;top:0;z-index:1;background:#171e27;color:#dbe2ea;text-align:left;font-size:11px;padding:10px;border-bottom:1px solid #394452;cursor:pointer;user-select:none;white-space:nowrap}
+.receiptTable th:hover{background:#202a36}.receiptTable th .sortMark{opacity:.55;margin-left:4px}
+.receiptTable td{padding:10px;font-size:12px;border-bottom:1px solid #242d38;vertical-align:top}
+.receiptTable tr:hover td{background:#121a23}.receiptTable .who{font-weight:800;color:#67d5ff}.receiptTable .team{font-weight:900;color:#9ce5ba}.receiptTable .origin{font-weight:800;color:#f1c178}
+@media(max-width:900px){.receiptToolbar input,.receiptToolbar select{width:100%;min-width:0}}
+
 .syncHealth{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px}
 .syncHealth .dot{width:8px;height:8px;border-radius:50%;background:#8d98a5}
 .syncHealth.ok{color:#78d79a}.syncHealth.ok .dot{background:#78d79a}
@@ -1622,6 +1634,7 @@ body.heatSplit .layoutHeatGrid{
     <button class="btn" id="kpiModeBtn">📊 KPIs</button>
     <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
     <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
+    <button class="btn" id="receiptModeBtn">📥 En recibo</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -1846,6 +1859,42 @@ body.heatSplit .layoutHeatGrid{
         <tbody id="processBody"></tbody>
       </table>
       <div id="processEmpty" class="processEmpty" style="display:none">No hay pallets actualmente en EN_PROCESO.</div>
+    </div>
+  </div>
+
+  <div id="receiptView" style="display:none">
+    <div class="layoutHeatTitle">En recibo</div>
+    <div class="layoutHeatSubtitle">
+      Unidades que actualmente figuran en <b>RECIBO</b>. Se identifica quién realizó el movimiento hacia Recibo, su equipo y la posición de origen.
+    </div>
+    <div class="processKpis">
+      <div class="processKpi"><small>CAJAS</small><b id="receiptBoxCount">0</b><span>cajas distintas</span></div>
+      <div class="processKpi"><small>UNIDADES</small><b id="receiptUnitCount">0</b><span>saldo actual en recibo</span></div>
+      <div class="processKpi"><small>IDENTIFICADAS</small><b id="receiptIdentifiedCount">0</b><span>con responsable</span></div>
+    </div>
+    <div class="receiptToolbar">
+      <input id="receiptSearch" placeholder="Buscar caja, SKU, descripción, origen, responsable o equipo...">
+      <select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
+      <button class="btn" id="receiptRefreshBtn">↻ Actualizar</button>
+    </div>
+    <div id="receiptStatus" class="processStatus">Cargando unidades en recibo…</div>
+    <div class="receiptTableWrap">
+      <table class="receiptTable">
+        <thead><tr>
+          <th data-receipt-sort="caja">Caja <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="sku">SKU / EAN <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="desc">Descripción <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="saldo">Unidades <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="fv">FV <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="origen">Desde posición <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="responsable">Responsable <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="id">ID empleado <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="equipo">Equipo <span class="sortMark">↕</span></th>
+          <th data-receipt-sort="fecha">Ingreso a recibo <span class="sortMark">↕</span></th>
+        </tr></thead>
+        <tbody id="receiptBody"></tbody>
+      </table>
+      <div id="receiptEmpty" class="processEmpty" style="display:none">No hay unidades actualmente en RECIBO.</div>
     </div>
   </div>
 
@@ -2639,6 +2688,7 @@ function setDisplayMode(mode){
   $('kpiView').style.display=mode==='kpi'?'block':'none';
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
+  $('receiptView').style.display=mode==='receipt'?'block':'none';
 
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -2646,12 +2696,14 @@ function setDisplayMode(mode){
   $('kpiModeBtn').classList.toggle('active',mode==='kpi');
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
+  $('receiptModeBtn').classList.toggle('active',mode==='receipt');
 
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
   if(mode==='sanitation') buildSanitationPanel();
   if(mode==='process') buildPalletsProcessPanel();
+  if(mode==='receipt') buildReceiptPanel();
 }
 
 
@@ -2758,6 +2810,82 @@ async function buildPalletsProcessPanel(force=false){
       st.textContent='Todavía no está publicado pallets-proceso.json · '+(err.message||String(err));
     }
   }
+}
+
+
+let RECEIPT_ROWS=[];
+let RECEIPT_LOADED=false;
+let RECEIPT_SORT={key:'fecha',dir:-1};
+
+function receiptField(r,key){
+  const map={
+    caja:['Caja','caja'], sku:['EAN','ean','SKU','sku'], desc:['Descripcion','descripcion'],
+    saldo:['Saldo','saldo','Cantidad','cantidad'], fv:['FV','fv'],
+    origen:['PosicionOrigen','posicion_origen','UbicacionInicial'],
+    responsable:['Responsable','responsable','Nombre_empleado','Empleado'],
+    id:['Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
+    fecha:['FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
+  };
+  return processVal(r,map[key]||[key]);
+}
+function receiptCmp(a,b,key){
+  let av=receiptField(a,key),bv=receiptField(b,key);
+  if(key==='saldo'){av=Number(String(av).replace(',','.'))||0;bv=Number(String(bv).replace(',','.'))||0;return av-bv}
+  if(key==='fecha'){const ad=new Date(av).getTime(),bd=new Date(bv).getTime();return (isNaN(ad)?0:ad)-(isNaN(bd)?0:bd)}
+  return String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});
+}
+function fillReceiptTeams(){
+  const sel=$('receiptTeamFilter');if(!sel)return;
+  const current=sel.value;
+  const teams=[...new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'equipo')||'Sin clasificar').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  sel.innerHTML='<option value="">Todos los equipos</option>'+teams.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+  if(teams.includes(current))sel.value=current;
+}
+function renderReceipt(){
+  const body=$('receiptBody'),empty=$('receiptEmpty');if(!body||!empty)return;
+  const q=String($('receiptSearch')?.value||'').trim().toLowerCase();
+  const team=String($('receiptTeamFilter')?.value||'').trim();
+  let rows=RECEIPT_ROWS.slice();
+  if(q)rows=rows.filter(r=>['caja','sku','desc','origen','responsable','id','equipo','fecha'].map(k=>receiptField(r,k)).join(' ').toLowerCase().includes(q));
+  if(team)rows=rows.filter(r=>String(receiptField(r,'equipo')||'Sin clasificar')===team);
+  rows.sort((a,b)=>receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir);
+  empty.style.display=rows.length?'none':'block';
+  body.innerHTML=rows.map(r=>{
+    const equipo=receiptField(r,'equipo')||'Sin clasificar';
+    return '<tr>'+
+      '<td><b>'+esc(receiptField(r,'caja'))+'</b></td>'+
+      '<td>'+esc(receiptField(r,'sku'))+'</td>'+
+      '<td>'+esc(receiptField(r,'desc'))+'</td>'+
+      '<td>'+esc(receiptField(r,'saldo'))+'</td>'+
+      '<td>'+esc(receiptField(r,'fv'))+'</td>'+
+      '<td class="origin">'+esc(receiptField(r,'origen')||'—')+'</td>'+
+      '<td class="who">'+esc(receiptField(r,'responsable')||'—')+'</td>'+
+      '<td>'+esc(receiptField(r,'id')||'—')+'</td>'+
+      '<td class="team">'+esc(equipo)+'</td>'+
+      '<td>'+esc(receiptField(r,'fecha')||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+  document.querySelectorAll('[data-receipt-sort]').forEach(th=>{
+    const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.receiptSort===RECEIPT_SORT.key?(RECEIPT_SORT.dir===1?'↑':'↓'):'↕';
+  });
+  const boxes=new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
+  const units=RECEIPT_ROWS.reduce((a,r)=>a+(Number(String(receiptField(r,'saldo')).replace(',','.'))||0),0);
+  const identified=RECEIPT_ROWS.filter(r=>receiptField(r,'responsable')).length;
+  $('receiptBoxCount').textContent=boxes.size.toLocaleString('es-AR');
+  $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
+  $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
+}
+async function buildReceiptPanel(force=false){
+  if(RECEIPT_LOADED&&!force){renderReceipt();return}
+  const st=$('receiptStatus');if(st){st.className='processStatus';st.textContent='Cargando unidades actualmente en RECIBO…'}
+  try{
+    const res=await fetch('./en-recibo.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    RECEIPT_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);RECEIPT_LOADED=true;fillReceiptTeams();
+    if(st){const d=payload?.updated_at?new Date(payload.updated_at):null;st.className='processStatus ok';st.textContent='● Información actualizada'+(d&&!isNaN(d)?' · '+d.toLocaleString('es-AR'):'')}
+    renderReceipt();
+  }catch(err){RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();if(st){st.className='processStatus bad';st.textContent='Todavía no está publicado en-recibo.json · '+(err.message||String(err))}}
 }
 
 
@@ -3610,6 +3738,11 @@ $('sanitationModeBtn').onclick=()=>setDisplayMode('sanitation');
 $('palletsProcessModeBtn').onclick=()=>setDisplayMode('process');
 $('processSearch').oninput=()=>renderPalletsProcess();
 $('processRefreshBtn').onclick=()=>buildPalletsProcessPanel(true);
+$('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
+$('receiptSearch').oninput=()=>renderReceipt();
+$('receiptTeamFilter').onchange=()=>renderReceipt();
+$('receiptRefreshBtn').onclick=()=>buildReceiptPanel(true);
+document.querySelectorAll('[data-receipt-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.receiptSort;if(RECEIPT_SORT.key===k)RECEIPT_SORT.dir*=-1;else{RECEIPT_SORT.key=k;RECEIPT_SORT.dir=1}renderReceipt();});
 $('sanGroupSelect').onchange=()=>{
   localStorage.setItem('sanSelectedGroup',$('sanGroupSelect').value||'');
   sanOperatorIndex=0;
