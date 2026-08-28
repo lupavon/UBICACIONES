@@ -1443,12 +1443,67 @@ jobs:
                       1 for row in receipt_rows
                       if row.get("Proveedor") and row.get("Proveedor") != "Sin asociar"
                   )
+
+                  unmatched_provider_rows = []
+                  for stock_row, receipt_row in zip(receipt_stock_rows, receipt_rows):
+                      if receipt_row.get("Proveedor") != "Sin asociar":
+                          continue
+
+                      raw_ord_no = str(
+                          field(stock_row, "ord_no", "OrdNo", "ordno") or ""
+                      ).strip()
+
+                      unmatched_provider_rows.append({
+                          "Caja": receipt_row.get("Caja"),
+                          "EAN": receipt_row.get("EAN"),
+                          "Referencia": receipt_row.get("Referencia"),
+                          "Descripcion": receipt_row.get("Descripcion"),
+                          "ord_no": raw_ord_no,
+                          "documentooc": str(
+                              field(
+                                  stock_row,
+                                  "documentooc", "DocumentoOC",
+                                  "documento_oc", "DocumentoOc"
+                              ) or ""
+                          ).strip(),
+                          "PedProv": str(
+                              field(stock_row, "PedProv", "pedprov", "pedProv") or ""
+                          ).strip(),
+                          "NumControl": str(
+                              field(stock_row, "NumControl", "numcontrol", "numControl") or ""
+                          ).strip(),
+                          "Factura": str(
+                              field(stock_row, "Factura", "factura") or ""
+                          ).strip(),
+                          "fecharegistro": str(
+                              field(stock_row, "fecharegistro", "FechaRegistro") or ""
+                          ).strip()
+                      })
+
+                  unmatched_ord_nos = sorted({
+                      x["ord_no"] for x in unmatched_provider_rows if x["ord_no"]
+                  })
+
                   print(
                       "Proveedor asociado:",
                       suppliers_identified,
                       "de",
                       len(receipt_rows),
                       "líneas actuales en RECIBO"
+                  )
+                  print(
+                      "Sin proveedor:",
+                      len(unmatched_provider_rows),
+                      "líneas · ord_no únicos:",
+                      len(unmatched_ord_nos)
+                  )
+                  print(
+                      "MUESTRA SIN PROVEEDOR:",
+                      unmatched_provider_rows[:20]
+                  )
+                  print(
+                      "ORD_NO SIN PROVEEDOR:",
+                      unmatched_ord_nos[:80]
                   )
                   save_json_file(
                       RECEIPT_FILE,
@@ -1459,6 +1514,9 @@ jobs:
                           "total_cajas": len(receipt_boxes),
                           "identificados": identified_receipt,
                           "proveedores_identificados": suppliers_identified,
+                          "proveedores_sin_asociar": len(unmatched_provider_rows),
+                          "ord_no_sin_proveedor": unmatched_ord_nos,
+                          "diagnostico_sin_proveedor": unmatched_provider_rows,
                           "rows": receipt_rows
                       }
                   )
