@@ -777,6 +777,65 @@ jobs:
                   "PLANRECIBO documentooc disparador:",
                   documentooc_trigger or "(vacío)"
               )
+
+              # V12: detectar automáticamente qué valores de tipodeplaneacion
+              # devuelven información. Probamos contra el período más reciente,
+              # que es donde están las cajas actuales en RECIBO.
+              probe_end = datetime.strptime(fecha_final, "%Y%m%d").date()
+              probe_start = max(
+                  datetime.strptime(fecha_inicial, "%Y%m%d").date(),
+                  probe_end.replace(day=1)
+              )
+
+              tipodeplaneacion_con_datos = []
+              probe_resultados = {}
+
+              for tipo_plan in range(1, 31):
+                  probe_params = urllib.parse.urlencode({
+                      "documentooc": documentooc_trigger,
+                      "tipodeplaneacion": str(tipo_plan),
+                      "estado": "1",
+                      "tipodocto": "",
+                      "bodega": "47",
+                      "fecha_inicial": probe_start.strftime("%Y%m%d"),
+                      "fecha_final": probe_end.strftime("%Y%m%d")
+                  })
+
+                  try:
+                      probe_payload, probe_http, probe_size = request_json(
+                          PLANRECIBO_URL + "?" + probe_params,
+                          method="GET",
+                          jwt=jwt,
+                          timeout=120
+                      )
+                      probe_rows = extract_rows(probe_payload)
+                  except Exception as e:
+                      print(
+                          "PLANRECIBO PROBE ERROR:",
+                          "tipodeplaneacion", tipo_plan,
+                          "·", str(e)[:160]
+                      )
+                      continue
+
+                  probe_resultados[str(tipo_plan)] = len(probe_rows)
+
+                  if probe_rows:
+                      tipodeplaneacion_con_datos.append(str(tipo_plan))
+
+                  print(
+                      "PLANRECIBO PROBE:",
+                      "tipodeplaneacion", tipo_plan,
+                      "· HTTP:", probe_http,
+                      "· filas:", len(probe_rows)
+                  )
+
+              if not tipodeplaneacion_con_datos:
+                  tipodeplaneacion_con_datos = ["12"]
+
+              print(
+                  "TIPODEPLANEACION CON DATOS:",
+                  tipodeplaneacion_con_datos
+              )
               # Consulta Recibo: mantenemos los parámetros obligatorios de la
               # pantalla y agregamos el rango de fechas que usa el endpoint para
               # devolver recepciones históricas/actuales.
@@ -792,9 +851,8 @@ jobs:
               estado_calls = 0
               estados_con_datos = set()
 
-              # Copérnico filtra por "estado". Para no perder documentos ya
-              # terminados/cerrados, consultamos todos los estados operativos
-              # observables del módulo y acumulamos los resultados.
+              # Copérnico filtra por estado y tipodeplaneacion. Usamos los
+              # tipos detectados arriba y todos los estados operativos.
               estados_planrecibo = [str(x) for x in range(1, 10)]
 
               cursor = start_dt.replace(day=1)
@@ -814,53 +872,56 @@ jobs:
                   chunk_start = max(start_dt, cursor)
                   chunk_end = min(end_dt, next_month - timedelta(days=1))
 
-                  for estado_value in estados_planrecibo:
-                      chunk_params = urllib.parse.urlencode({
-                          "documentooc": documentooc_trigger,
-                          "tipodeplaneacion": "12",
-                          "estado": estado_value,
-                          "tipodocto": "",
-                          "bodega": "47",
-                          "fecha_inicial": chunk_start.strftime("%Y%m%d"),
-                          "fecha_final": chunk_end.strftime("%Y%m%d")
-                      })
+                  for tipo_plan in tipodeplaneacion_con_datos:
+                      for estado_value in estados_planrecibo:
+                          chunk_params = urllib.parse.urlencode({
+                              "documentooc": documentooc_trigger,
+                              "tipodeplaneacion": tipo_plan,
+                              "estado": estado_value,
+                              "tipodocto": "",
+                              "bodega": "47",
+                              "fecha_inicial": chunk_start.strftime("%Y%m%d"),
+                              "fecha_final": chunk_end.strftime("%Y%m%d")
+                          })
 
-                      try:
-                          payload, http_status, size = request_json(
-                              PLANRECIBO_URL + "?" + chunk_params,
-                              method="GET",
-                              jwt=jwt,
-                              timeout=120
-                          )
-                          chunk_rows = extract_rows(payload)
-                      except Exception as e:
+                          try:
+                              payload, http_status, size = request_json(
+                                  PLANRECIBO_URL + "?" + chunk_params,
+                                  method="GET",
+                                  jwt=jwt,
+                                  timeout=120
+                              )
+                              chunk_rows = extract_rows(payload)
+                          except Exception as e:
+                              print(
+                                  "PLANRECIBO BLOQUE ERROR:",
+                                  chunk_start.strftime("%Y%m%d"),
+                                  "a",
+                                  chunk_end.strftime("%Y%m%d"),
+                                  "· tipodeplaneacion:", tipo_plan,
+                                  "· estado:", estado_value,
+                                  "·", str(e)[:180]
+                              )
+                              estado_calls += 1
+                              continue
+
+                          plan_rows.extend(chunk_rows)
+                          total_bytes += size
+                          estado_calls += 1
+
+                          if chunk_rows:
+                              estados_con_datos.add(estado_value)
+
                           print(
-                              "PLANRECIBO BLOQUE ERROR:",
+                              "PLANRECIBO BLOQUE:",
                               chunk_start.strftime("%Y%m%d"),
                               "a",
                               chunk_end.strftime("%Y%m%d"),
+                              "· tipodeplaneacion:", tipo_plan,
                               "· estado:", estado_value,
-                              "·", str(e)[:180]
+                              "· HTTP:", http_status,
+                              "· filas:", len(chunk_rows)
                           )
-                          estado_calls += 1
-                          continue
-
-                      plan_rows.extend(chunk_rows)
-                      total_bytes += size
-                      estado_calls += 1
-
-                      if chunk_rows:
-                          estados_con_datos.add(estado_value)
-
-                      print(
-                          "PLANRECIBO BLOQUE:",
-                          chunk_start.strftime("%Y%m%d"),
-                          "a",
-                          chunk_end.strftime("%Y%m%d"),
-                          "· estado:", estado_value,
-                          "· HTTP:", http_status,
-                          "· filas:", len(chunk_rows)
-                      )
 
                   monthly_calls += 1
                   cursor = next_month
@@ -961,39 +1022,44 @@ jobs:
               # que es el único estado que devolvió información en las pruebas.
               # Usamos el mismo período global ya calculado.
               for documento in unresolved_docs:
-                  params_direct = urllib.parse.urlencode({
-                      "documentooc": documento,
-                      "tipodeplaneacion": "12",
-                      "estado": "1",
-                      "tipodocto": "",
-                      "bodega": "47",
-                      "fecha_inicial": fecha_inicial,
-                      "fecha_final": fecha_final
-                  })
-
-                  direct_doc_calls += 1
-
-                  try:
-                      payload_direct, http_direct, size_direct = request_json(
-                          PLANRECIBO_URL + "?" + params_direct,
-                          method="GET",
-                          jwt=jwt,
-                          timeout=120
-                      )
-                      rows_direct = extract_rows(payload_direct)
-                  except Exception as e:
-                      print(
-                          "PLANRECIBO DIRECTO ERROR:",
-                          documento,
-                          "·",
-                          str(e)[:180]
-                      )
-                      continue
-
-                  direct_doc_rows += len(rows_direct)
                   found_supplier = ""
+                  rows_direct_total = []
 
-                  for plan_row in rows_direct:
+                  for tipo_plan in tipodeplaneacion_con_datos:
+                      params_direct = urllib.parse.urlencode({
+                          "documentooc": documento,
+                          "tipodeplaneacion": tipo_plan,
+                          "estado": "1",
+                          "tipodocto": "",
+                          "bodega": "47",
+                          "fecha_inicial": fecha_inicial,
+                          "fecha_final": fecha_final
+                      })
+
+                      direct_doc_calls += 1
+
+                      try:
+                          payload_direct, http_direct, size_direct = request_json(
+                              PLANRECIBO_URL + "?" + params_direct,
+                              method="GET",
+                              jwt=jwt,
+                              timeout=120
+                          )
+                          rows_direct = extract_rows(payload_direct)
+                      except Exception as e:
+                          print(
+                              "PLANRECIBO DIRECTO ERROR:",
+                              documento,
+                              "· tipodeplaneacion:", tipo_plan,
+                              "·",
+                              str(e)[:180]
+                          )
+                          continue
+
+                      rows_direct_total.extend(rows_direct)
+                      direct_doc_rows += len(rows_direct)
+
+                      for plan_row in rows_direct:
                       proveedor = str(
                           field(
                               plan_row,
@@ -1028,8 +1094,7 @@ jobs:
                   print(
                       "PLANRECIBO DIRECTO:",
                       documento,
-                      "· HTTP:", http_direct,
-                      "· filas:", len(rows_direct),
+                      "· filas totales:", len(rows_direct_total),
                       "· proveedor:", found_supplier or "SIN MATCH EXACTO"
                   )
 
@@ -1049,7 +1114,7 @@ jobs:
               print(
                   "PLANRECIBO HTTP:", http_status,
                   "· estados:", ",".join(sorted(estados_con_datos)) or "sin datos",
-                  "· tipodeplaneacion: 12",
+                  "· tipodeplaneacion:", ",".join(tipodeplaneacion_con_datos),
                   "· período:", fecha_inicial, "a", fecha_final,
                   "· bloques:", monthly_calls,
                   "· llamadas estado:", estado_calls,
@@ -1073,7 +1138,9 @@ jobs:
                   "estado_calls": estado_calls,
                   "direct_doc_calls": direct_doc_calls,
                   "direct_doc_rows": direct_doc_rows,
-                  "direct_doc_resolved": direct_doc_resolved
+                  "direct_doc_resolved": direct_doc_resolved,
+                  "tipodeplaneacion_con_datos": tipodeplaneacion_con_datos,
+                  "probe_resultados": probe_resultados
               }
 
           # -----------------------------
