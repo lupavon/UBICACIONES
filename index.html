@@ -1002,6 +1002,14 @@ body.heatSplit .layoutHeatGrid{
 .syncHealth.warn{color:#e5bd67}.syncHealth.warn .dot{background:#e5bd67}
 .syncHealth.bad{color:#ef8e98}.syncHealth.bad .dot{background:#ef8e98}
 
+/* ===== v43 · filtros y agrupación en tablas operativas ===== */
+.tableTools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}
+.tableTools select{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:9px 11px;min-width:170px}
+.tableTools .toolLabel{font-size:10px;color:#8f9aa8;font-weight:800;margin-left:2px}
+.groupRow td{background:#1b2530!important;color:#eef3f8!important;font-weight:900!important;border-top:1px solid #405064!important;border-bottom:1px solid #405064!important;padding:8px 10px!important}
+.groupRow .groupMeta{color:#9aa8b7;font-weight:700;margin-left:8px;font-size:10px}
+@media(max-width:900px){.tableTools{align-items:stretch}.tableTools select{width:100%;min-width:0}.tableTools .toolLabel{width:100%;margin-top:2px}}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1838,6 +1846,14 @@ body.heatSplit .layoutHeatGrid{
       <input id="processSearch" placeholder="Buscar caja, SKU, descripción, origen o maquinista...">
       <button class="btn" id="processRefreshBtn">↻ Actualizar</button>
     </div>
+    <div class="tableTools">
+      <span class="toolLabel">FILTRAR</span>
+      <select id="processFilterField"><option value="">Elegir campo…</option></select>
+      <select id="processFilterValue" disabled><option value="">Todos los valores</option></select>
+      <span class="toolLabel">AGRUPAR</span>
+      <select id="processGroupBy"><option value="">Sin agrupar</option></select>
+      <button class="btn" id="processClearTools" type="button">Limpiar</button>
+    </div>
 
     <div id="processStatus" class="processStatus">Cargando pallets en proceso…</div>
 
@@ -1865,7 +1881,7 @@ body.heatSplit .layoutHeatGrid{
   <div id="receiptView" style="display:none">
     <div class="layoutHeatTitle">En recibo</div>
     <div class="layoutHeatSubtitle">
-      Unidades que actualmente figuran en <b>RECIBO</b>. Se identifica quién realizó el movimiento hacia Recibo, su equipo y la posición de origen.
+      Unidades que actualmente figuran en <b>RECIBO</b>. El equipo se deriva del perfil de Copérnico: Inventarios → <b>Inventario</b>, Recibo → <b>Recepción</b> y picking → <b>Reabastecedor</b>.
     </div>
     <div class="processKpis">
       <div class="processKpi"><small>CAJAS</small><b id="receiptBoxCount">0</b><span>cajas distintas</span></div>
@@ -1876,6 +1892,14 @@ body.heatSplit .layoutHeatGrid{
       <input id="receiptSearch" placeholder="Buscar caja, SKU, descripción, origen, responsable o equipo...">
       <select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
       <button class="btn" id="receiptRefreshBtn">↻ Actualizar</button>
+    </div>
+    <div class="tableTools">
+      <span class="toolLabel">FILTRAR</span>
+      <select id="receiptFilterField"><option value="">Elegir campo…</option></select>
+      <select id="receiptFilterValue" disabled><option value="">Todos los valores</option></select>
+      <span class="toolLabel">AGRUPAR</span>
+      <select id="receiptGroupBy"><option value="">Sin agrupar</option></select>
+      <button class="btn" id="receiptClearTools" type="button">Limpiar</button>
     </div>
     <div id="receiptStatus" class="processStatus">Cargando unidades en recibo…</div>
     <div class="receiptTableWrap">
@@ -2707,6 +2731,33 @@ function setDisplayMode(mode){
 }
 
 
+const PROCESS_FIELDS={caja:'Caja',sku:'SKU / EAN',desc:'Descripción',saldo:'Saldo',fv:'FV',origen:'Desde posición',maquinista:'Maquinista',id:'ID empleado',fecha:'Ingreso a proceso'};
+const RECEIPT_FIELDS={caja:'Caja',sku:'SKU / EAN',desc:'Descripción',saldo:'Unidades',fv:'FV',origen:'Desde posición',responsable:'Responsable',id:'ID empleado',equipo:'Equipo',fecha:'Ingreso a recibo'};
+
+function setupTableToolSelects(prefix,fields){
+  const f=$(prefix+'FilterField'),g=$(prefix+'GroupBy');
+  if(f&&f.options.length<=1) f.innerHTML='<option value="">Elegir campo…</option>'+Object.entries(fields).map(([k,v])=>'<option value="'+k+'">'+esc(v)+'</option>').join('');
+  if(g&&g.options.length<=1) g.innerHTML='<option value="">Sin agrupar</option>'+Object.entries(fields).map(([k,v])=>'<option value="'+k+'">'+esc(v)+'</option>').join('');
+}
+function fillToolValues(prefix,rows,field,getter){
+  const sel=$(prefix+'FilterValue'); if(!sel)return;
+  if(!field){sel.innerHTML='<option value="">Todos los valores</option>';sel.disabled=true;return}
+  const current=sel.value;
+  const vals=[...new Set(rows.map(r=>String(getter(r,field)||'—').trim()||'—'))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'}));
+  sel.innerHTML='<option value="">Todos los valores</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');
+  sel.disabled=false;if(vals.includes(current))sel.value=current;
+}
+function groupedRowsHtml(rows,groupKey,getter,rowHtml,colspan,sumKey){
+  if(!groupKey)return rows.map(rowHtml).join('');
+  const groups=new Map();
+  rows.forEach(r=>{const v=String(getter(r,groupKey)||'—').trim()||'—';if(!groups.has(v))groups.set(v,[]);groups.get(v).push(r)});
+  return [...groups.entries()].map(([name,items])=>{
+    let meta=items.length.toLocaleString('es-AR')+' registro'+(items.length===1?'':'s');
+    if(sumKey){const total=items.reduce((a,r)=>a+(Number(String(getter(r,sumKey)||0).replace(',','.'))||0),0);meta+=' · '+total.toLocaleString('es-AR')+' unidades';}
+    return '<tr class="groupRow"><td colspan="'+colspan+'">'+esc(name)+'<span class="groupMeta">'+meta+'</span></td></tr>'+items.map(rowHtml).join('');
+  }).join('');
+}
+
 let PROCESS_ROWS=[];
 let PROCESS_LOADED=false;
 
@@ -2716,12 +2767,21 @@ function processVal(r,names){
   }
   return '';
 }
+function processField(r,key){
+  const map={caja:['Caja','caja'],sku:['EAN','ean','SKU','sku'],desc:['Descripcion','descripcion'],saldo:['Saldo','saldo'],fv:['FV','fv'],origen:['PosicionOrigen','posicion_origen','UbicacionInicial'],maquinista:['Maquinista','maquinista','Nombre_empleado'],id:['Id_maquinista','id_maquinista','Id_empleado'],fecha:['FechaIngresoProceso','fecha_ingreso_proceso','fecha']};
+  return processVal(r,map[key]||[key]);
+}
 
 function renderPalletsProcess(){
   const body=$('processBody'),empty=$('processEmpty');
   if(!body||!empty)return;
 
   const q=String($('processSearch')?.value||'').trim().toLowerCase();
+  setupTableToolSelects('process',PROCESS_FIELDS);
+  const filterField=String($('processFilterField')?.value||'');
+  fillToolValues('process',PROCESS_ROWS,filterField,(r,k)=>processField(r,k));
+  const filterValue=String($('processFilterValue')?.value||'');
+  const groupKey=String($('processGroupBy')?.value||'');
   let rows=PROCESS_ROWS.slice();
   if(q){
     rows=rows.filter(r=>[
@@ -2734,9 +2794,11 @@ function renderPalletsProcess(){
       processVal(r,['Id_maquinista','id_maquinista','Id_empleado'])
     ].join(' ').toLowerCase().includes(q));
   }
+  if(filterField&&filterValue)rows=rows.filter(r=>(String(processField(r,filterField)||'—').trim()||'—')===filterValue);
+  if(groupKey)rows.sort((a,b)=>String(processField(a,groupKey)||'').localeCompare(String(processField(b,groupKey)||''),'es',{numeric:true,sensitivity:'base'}));
 
   empty.style.display=rows.length?'none':'block';
-  body.innerHTML=rows.map(r=>{
+  const processRowHtml=r=>{
     const caja=processVal(r,['Caja','caja']);
     const sku=processVal(r,['EAN','ean','SKU','sku']);
     const desc=processVal(r,['Descripcion','descripcion']);
@@ -2757,7 +2819,8 @@ function renderPalletsProcess(){
       '<td>'+esc(id||'—')+'</td>'+
       '<td>'+esc(fecha||'—')+'</td>'+
     '</tr>';
-  }).join('');
+  };
+  body.innerHTML=groupedRowsHtml(rows,groupKey,processField,processRowHtml,9,'saldo');
 
   const pallets=new Set(PROCESS_ROWS.map(r=>String(processVal(r,['Caja','caja'])||'')).filter(Boolean));
   const identified=PROCESS_ROWS.filter(r=>
@@ -2813,6 +2876,58 @@ async function buildPalletsProcessPanel(force=false){
 }
 
 
+
+// ===== v44 · Directorio Copérnico para clasificar equipo en En recibo =====
+const COPERNICO_USERS=[{"usuario":"consultor_arrpp01","nombre":"consultor","apellidos":"arrpp01","perfil":"superadmin","id":"3650"},{"usuario":"victor.logistics","nombre":"Victor","apellidos":"Heredia","perfil":"supervisor","id":"3651"},{"usuario":"rodrigo.guzman","nombre":"Santiago","apellidos":"Guzman","perfil":"superadmin","id":"3652"},{"usuario":"lpavon","nombre":"Lucas","apellidos":"Pavon","perfil":"supervisor","id":"3653"},{"usuario":"leonel.logistics","nombre":"Leonel","apellidos":"Lezcano","perfil":"supervisor","id":"3654"},{"usuario":"consultor10_arrpp01","nombre":"Consultor","apellidos":"luis","perfil":"superadmin","id":"3655"},{"usuario":"paula.suarez_arrpp01","nombre":"Paula","apellidos":"Suarez","perfil":"superadmin","id":"3656"},{"usuario":"romina.volpe_arrpp01","nombre":"Romina","apellidos":"Valpe","perfil":"user","id":"3657"},{"usuario":"consultor2_arrpp01--","nombre":"consultor","apellidos":"nicolas","perfil":"superadmin","id":"3658"},{"usuario":"fernando.vizgarra","nombre":"Fernando","apellidos":"Vizgarra","perfil":"Maquinista con recarga","id":"3659"},{"usuario":"luciano.rpp","nombre":"Luciano","apellidos":"Barrera","perfil":"user","id":"3660"},{"usuario":"tatiana.tassara","nombre":"Tatiana","apellidos":"Tassara","perfil":"superadmin","id":"3661"},{"usuario":"romi.rappi.arg","nombre":"Romina","apellidos":"Volpe","perfil":"user","id":"3662"},{"usuario":"Nicolas.Sturla","nombre":"Nicolas","apellidos":"Sturla","perfil":"superadmin","id":"3663"},{"usuario":"jorge.suarez","nombre":"Nicolas","apellidos":"Suarez","perfil":"superadmin","id":"3664"},{"usuario":"cesar.estayARG","nombre":"Cesar","apellidos":"Estay","perfil":"supervisor","id":"3665"},{"usuario":"ext-e.luna","nombre":"Enzo","apellidos":"Luna","perfil":"superadmin","id":"3666"},{"usuario":"sebastian.almiron","nombre":"sebastian","apellidos":"Almiron","perfil":"user","id":"3667"},{"usuario":"Sebas.Almiron","nombre":"sebastian","apellidos":"Almiron","perfil":"user","id":"3668"},{"usuario":"alejandro.logistics","nombre":"Alejandro","apellidos":"Fortuny","perfil":"superadmin","id":"3669"},{"usuario":"Adrian@rpp.com","nombre":"Adrian","apellidos":"Licciardo","perfil":"picking","id":"3670"},{"usuario":"felipe.logistics","nombre":"Felipe","apellidos":"Di francesca","perfil":"superadmin","id":"3671"},{"usuario":"Hernan@rpp.com","nombre":"Hernan","apellidos":"Arnaudin","perfil":"Resurtido","id":"3672"},{"usuario":"emiliano.logistics","nombre":"Emiliano","apellidos":"Tasin","perfil":"Resurtido","id":"3673"},{"usuario":"Cristian.logistics","nombre":"Cristian","apellidos":"Gonzalez","perfil":"picking","id":"3674"},{"usuario":"juan.logistics","nombre":"Juan","apellidos":"Aragon","perfil":"picking","id":"3675"},{"usuario":"Sebastian.logistics","nombre":"Sebastian","apellidos":"Gauna","perfil":"picking","id":"3676"},{"usuario":"Luciano.logistics","nombre":"Luciano","apellidos":"Quiroga","perfil":"Recibo","id":"3677"},{"usuario":"Tomas.logistics","nombre":"Tomas","apellidos":"Chavez","perfil":"picking","id":"3678"},{"usuario":"Elian.logistics","nombre":"Elian","apellidos":"Luque","perfil":"Recibo","id":"3679"},{"usuario":"nicolas.grobe","nombre":"Nicolas","apellidos":"Grobe","perfil":"galileo","id":"3680"},{"usuario":"Ricardo.logistics","nombre":"Ricardo","apellidos":"Erman","perfil":"Recibo","id":"3681"},{"usuario":"Daniel.logistics","nombre":"Daniel","apellidos":"Abregu","perfil":"Inventarios","id":"3682"},{"usuario":"Alan.logistics","nombre":"Alan","apellidos":"Petrino","perfil":"supervisor","id":"3683"},{"usuario":"Paul.logistics","nombre":"Paul","apellidos":"Gonzalez","perfil":"Almacenamiento","id":"3684"},{"usuario":"joan.logistics","nombre":"Joan","apellidos":"Cisneros","perfil":"Inventarios","id":"3685"},{"usuario":"Uriel.fernandez","nombre":"Uriel","apellidos":"Fernandez","perfil":"superadmin","id":"3686"},{"usuario":"Jean.espindola","nombre":"Jeanmarco","apellidos":"Espindola","perfil":"superadmin","id":"3687"},{"usuario":"Alexis.logistics","nombre":"Alexis","apellidos":"Pavon","perfil":"picking","id":"3688"},{"usuario":"Leandro.logistics","nombre":"Leandro","apellidos":"Barrios","perfil":"Almacenamiento","id":"3689"},{"usuario":"nicolas.transporte","nombre":"Nicolas","apellidos":"Grobe","perfil":"galileo","id":"3690"},{"usuario":"esteban.transporte","nombre":"Esteban","apellidos":"Grobe","perfil":"galileo","id":"3691"},{"usuario":"NicolasF.logistics","nombre":"Nicolas","apellidos":"Forni","perfil":"supervisor","id":"3692"},{"usuario":"fvillagran","nombre":"Fabian","apellidos":"Villagran","perfil":"supervisor","id":"3693"},{"usuario":"Braian.logistics","nombre":"Braian","apellidos":"Coronel","perfil":"Almacenamiento","id":"3694"},{"usuario":"Angie.Vilte","nombre":"Cecilia Maria","apellidos":"De los Angeles Vilte","perfil":"Aduana","id":"3695"},{"usuario":"Angie.vilt","nombre":"Angie","apellidos":"Vilt","perfil":"Aduana","id":"3696"},{"usuario":"jhonatan.transporte","nombre":"Jhonatan","apellidos":"Grobe","perfil":"galileo","id":"3697"},{"usuario":"Diego.logistics","nombre":"Diego","apellidos":"Rau @","perfil":"picking","id":"3698"},{"usuario":"Roman.logistics","nombre":"Roman","apellidos":"Faciano","perfil":"picking","id":"3699"},{"usuario":"David.logistics","nombre":"David","apellidos":"Belingheri","perfil":"picking","id":"3700"},{"usuario":"Carlos.logistics","nombre":"Carlos","apellidos":"Frias","perfil":"Maquinista con recarga","id":"3701"},{"usuario":"Patricio.logistics","nombre":"Patricio","apellidos":"Gomez","perfil":"Maquinista","id":"3702"},{"usuario":"Agos.vega","nombre":"Agostina Eugenia","apellidos":"Vega","perfil":"Aduana","id":"3703"},{"usuario":"William.Vega","nombre":"William Eduardo","apellidos":"Vega","perfil":"Aduana","id":"3704"},{"usuario":"Julian.perdomo","nombre":"Julian","apellidos":"Perdomo","perfil":"Aduana","id":"3705"},{"usuario":"Carlos.Aranda","nombre":"Carlos","apellidos":"Aranda","perfil":"Aduana","id":"3706"},{"usuario":"Anahi.Saucedo","nombre":"Anahi Estela","apellidos":"Saucedo","perfil":"Aduana","id":"3707"},{"usuario":"Lamine.logistics","nombre":"Gabriel","apellidos":"Lopez","perfil":"picking","id":"3708"},{"usuario":"lucas.sanabria","nombre":"Lucas","apellidos":"Sanabria","perfil":"galileo","id":"3709"},{"usuario":"Ruiz.logistics","nombre":"Ruiz","apellidos":"Nicolas","perfil":"Maquinista","id":"3710"},{"usuario":"Moyano.logistics","nombre":"Diego","apellidos":"Moyano","perfil":"supervisor","id":"3711"},{"usuario":"Gabi.logistics","nombre":"Gabriel","apellidos":"Fernandez","perfil":"Inventarios","id":"3712"},{"usuario":"Seba.logistics","nombre":"Sebastian","apellidos":"Garcete","perfil":"Inventarios","id":"3713"},{"usuario":"grobe.brian","nombre":"Brian","apellidos":"Grobe","perfil":"galileo","id":"3714"},{"usuario":"Franco.logistics","nombre":"Franco","apellidos":"Gutierrez","perfil":"picking","id":"3715"},{"usuario":"juan.transporte","nombre":"Juan","apellidos":"Olivera","perfil":"galileo","id":"3716"},{"usuario":"Sebastian.transporte","nombre":"Sebastian","apellidos":"Carolemos","perfil":"galileo","id":"3717"},{"usuario":"Fernando.transporte","nombre":"Fernando","apellidos":"Molina","perfil":"galileo","id":"3718"},{"usuario":"esteban.transporte1","nombre":"Esteban","apellidos":"dueñas","perfil":"galileo","id":"3719"},{"usuario":"Miguel.transporte","nombre":"Miguel Hernan","apellidos":"Esquivel","perfil":"galileo","id":"3720"},{"usuario":"Gustavo.transporte","nombre":"Gustavo","apellidos":"Chocobar","perfil":"galileo","id":"3721"},{"usuario":"mathias.maldonado","nombre":"Mathias","apellidos":"Maldonado","perfil":"supervisor","id":"3722"},{"usuario":"Nahuel.logistics","nombre":"Nahuel","apellidos":"Gomez","perfil":"Recibo","id":"3723"},{"usuario":"Jorge.luis","nombre":"Jorge Luis","apellidos":"Sierra","perfil":"superadmin","id":"3724"},{"usuario":"Valentin.blanco","nombre":"Valentin","apellidos":"Blanco","perfil":"Recibo","id":"3725"},{"usuario":"Fernando.santos","nombre":"Fernando Matias","apellidos":"Santos","perfil":"Aduana","id":"3726"},{"usuario":"vila.fernando","nombre":"Fernando","apellidos":"Vila","perfil":"Maquinista","id":"3727"},{"usuario":"Ignacio.logistics","nombre":"Ignacio","apellidos":"Lopez","perfil":"Maquinista","id":"3728"},{"usuario":"Facundo.logistics","nombre":"Facundo","apellidos":"De La Torre","perfil":"Maquinista con recarga","id":"3729"},{"usuario":"lucas.transporte","nombre":"Lucas","apellidos":"Perazza","perfil":"galileo","id":"3730"},{"usuario":"barbara.belicari","nombre":"Barbara","apellidos":"Belicari","perfil":"Inventarios","id":"3731"},{"usuario":"daniel.jurado","nombre":"Daniel","apellidos":"Jurado","perfil":"picking","id":"3732"},{"usuario":"fernando.albornoz","nombre":"Fernando","apellidos":"Albornoz","perfil":"picking","id":"3733"},{"usuario":"lucas.costa","nombre":"Lucas","apellidos":"Costa","perfil":"picking","id":"3734"},{"usuario":"leonel.gonzalez","nombre":"Leonel","apellidos":"Gonzalez","perfil":"picking","id":"3735"},{"usuario":"Jonathan.logistics","nombre":"Jonathan","apellidos":"Gambarte","perfil":"picking","id":"3736"},{"usuario":"martin.transporte","nombre":"Martin","apellidos":"Ramirez","perfil":"galileo","id":"3737"},{"usuario":"hugo.transporte","nombre":"Hugo","apellidos":"Lopez","perfil":"galileo","id":"3738"},{"usuario":"gust.transporte","nombre":"gustavo","apellidos":"murray","perfil":"galileo","id":"3739"},{"usuario":"tomas.rios","nombre":"Tomas","apellidos":"Rios","perfil":"Recibo","id":"3740"},{"usuario":"joaquin.quiroga","nombre":"Joaquin","apellidos":"Quiroga","perfil":"picking","id":"3741"},{"usuario":"ssaldarriaga_arrpp01","nombre":"Santiago","apellidos":"Saldarriaga","perfil":"superadmin","id":"3742"},{"usuario":"data.maestra_arg","nombre":"Data","apellidos":"Maestra","perfil":"user","id":"3743"},{"usuario":"nicolas.logistics","nombre":"Nicolas","apellidos":"Totaro","perfil":"Maquinista","id":"3744"},{"usuario":"jorge.transporte","nombre":"Jorge","apellidos":"Negreti","perfil":"galileo","id":"3745"},{"usuario":"leonardo.transporte","nombre":"Leonardo","apellidos":"sowmo","perfil":"galileo","id":"3746"},{"usuario":"jose.transporte","nombre":"Jose","apellidos":"Copia","perfil":"galileo","id":"3747"},{"usuario":"Ezequiel.Gallo","nombre":"Ezequiel Esteban","apellidos":"Gallo","perfil":"Aduana","id":"3748"},{"usuario":"rodrigo.logistics","nombre":"Rodrigo","apellidos":"Ramirez","perfil":"Despacho","id":"3749"},{"usuario":"cristian.paya","nombre":"Cristian","apellidos":"Paya","perfil":"supervisor","id":"3750"},{"usuario":"lucas.transporte1","nombre":"Lucas","apellidos":"Correa","perfil":"galileo","id":"3751"},{"usuario":"TEAMCOMERCIAL","nombre":"TEAM","apellidos":"COMERCIAL","perfil":"user","id":"3752"},{"usuario":"brian.transporte","nombre":"Brian","apellidos":"Migueletto","perfil":"galileo","id":"3753"},{"usuario":"isaias.logistics","nombre":"Isaias","apellidos":"Aguirre","perfil":"supervisor","id":"3754"},{"usuario":"jesus.logistics","nombre":"Jesus","apellidos":"Nuñez","perfil":"Maquinista","id":"3755"},{"usuario":"diego.ramos","nombre":"Diego","apellidos":"Ramos","perfil":"user","id":"3756"},{"usuario":"agustin.logistics","nombre":"Agustin","apellidos":"Seib","perfil":"Maquinista con recarga","id":"3757"},{"usuario":"facundo.logistics1","nombre":"Facundo","apellidos":"Santos","perfil":"picking","id":"3758"},{"usuario":"gaston.logistics","nombre":"Gaston","apellidos":"Pastrana","perfil":"Maquinista con recarga","id":"3759"},{"usuario":"damian.logistics","nombre":"Damian","apellidos":"Farias","perfil":"Resurtido","id":"3760"},{"usuario":"alejo.logistics","nombre":"Alejo","apellidos":"Peralta","perfil":"Maquinista con recarga","id":"3761"},{"usuario":"nahuel.logistics1","nombre":"Nahuel","apellidos":"Rojas","perfil":"Recibo","id":"3762"},{"usuario":"leo.transporte","nombre":"Leonel","apellidos":"Sosa","perfil":"galileo","id":"3763"},{"usuario":"daniel.lezcano","nombre":"Daniel","apellidos":"Lezcano","perfil":"Inventarios","id":"3764"},{"usuario":"juan.dorta","nombre":"Juan","apellidos":"Dorta","perfil":"superadmin","id":"3765"},{"usuario":"maximiliao.logistic","nombre":"maximiliano","apellidos":"piza","perfil":"Maquinista","id":"3766"},{"usuario":"santiago.logistics","nombre":"santiago","apellidos":"figueroa","perfil":"Maquinista","id":"3767"},{"usuario":"victoria.deltour","nombre":"victoria","apellidos":"Deltour","perfil":"user","id":"3768"},{"usuario":"axel.tojo","nombre":"Axel","apellidos":"Tojo","perfil":"picking","id":"3769"},{"usuario":"oviedo.logistics","nombre":"victor","apellidos":"oviedo","perfil":"Maquinista con recarga","id":"3770"},{"usuario":"marcos.logistics","nombre":"marcos","apellidos":"salas","perfil":"picking","id":"3771"},{"usuario":"Jony.bordon","nombre":"Jonathan","apellidos":"Bordon","perfil":"Aduana","id":"3772"},{"usuario":"Tobias.Diaz","nombre":"Tobias","apellidos":"Diaz","perfil":"Aduana","id":"3773"},{"usuario":"Augusto.aguero","nombre":"Augusto","apellidos":"Aguero","perfil":"Aduana","id":"3774"},{"usuario":"Alex.varela","nombre":"Alex","apellidos":"Varela","perfil":"Aduana","id":"3775"},{"usuario":"Santiago.rueda","nombre":"Santiago","apellidos":"Rueda","perfil":"Aduana","id":"3776"},{"usuario":"brian.sanchez","nombre":"Brian","apellidos":"Sanchez","perfil":"Inventarios","id":"3777"},{"usuario":"jonathan.transporte1","nombre":"Jonathan","apellidos":"Galvan","perfil":"galileo","id":"3778"},{"usuario":"dionisio.logistics","nombre":"Dionisio","apellidos":"Diaz","perfil":"Maquinista","id":"3779"},{"usuario":"Lucas.logistics","nombre":"Lucas","apellidos":"Peralta","perfil":"picking","id":"3780"},{"usuario":"eugenio.logistics","nombre":"Eugenio","apellidos":"Sisi","perfil":"Maquinista con recarga","id":"3781"},{"usuario":"Facu.logistics","nombre":"Facundo","apellidos":"Vallejos","perfil":"picking","id":"3782"},{"usuario":"axel.diaz","nombre":"Axel","apellidos":"Diaz","perfil":"picking","id":"3783"},{"usuario":"Miguel.nieto","nombre":"Miguel","apellidos":"Nieto","perfil":"INVENTARIOS","id":"3784"},{"usuario":"Priscila.logistics","nombre":"Priscila","apellidos":"Enrique","perfil":"supervisor","id":"3785"},{"usuario":"ivan.transporte","nombre":"Ivan","apellidos":"Pereyra","perfil":"galileo","id":"3786"},{"usuario":"guillermo.logistics","nombre":"Guillermo","apellidos":"Barraza","perfil":"picking","id":"3787"},{"usuario":"elias.transporte","nombre":"Elias","apellidos":"Marlia","perfil":"galileo","id":"3788"},{"usuario":"diaz.logistics","nombre":"Nestor","apellidos":"Diaz","perfil":"picking","id":"3789"},{"usuario":"omar.gomez","nombre":"Omar","apellidos":"Gomez","perfil":"picking","id":"3790"},{"usuario":"ar_vtorres","nombre":"VIVIANA","apellidos":"TORRES","perfil":"superadmin","id":"3791"},{"usuario":"agustin.transporte","nombre":"Agustin","apellidos":"Manzilo","perfil":"galileo","id":"3792"},{"usuario":"matias.escalada","nombre":"matias","apellidos":"escalada","perfil":"picking","id":"3793"},{"usuario":"franco.herrera","nombre":"franco","apellidos":"herrera","perfil":"picking","id":"3794"},{"usuario":"castillo.logistics","nombre":"Nahuel","apellidos":"Castillo","perfil":"picking","id":"3795"},{"usuario":"thiago.berizovsky","nombre":"thiago","apellidos":"berizovsky","perfil":"Admin ID","id":"3796"},{"usuario":"carlos.Garcia","nombre":"Carlos","apellidos":"Garcia","perfil":"Admin ID","id":"3797"},{"usuario":"maxi.logistics","nombre":"maximiliano","apellidos":"zapata","perfil":"picking","id":"3798"},{"usuario":"Ema.logistics","nombre":"Emanuel","apellidos":"Saldaña","perfil":"Maquinista","id":"3799"},{"usuario":"standar1.logistics","nombre":"Usuario 1","apellidos":"Standar","perfil":"picking","id":"3800"},{"usuario":"standar2.logistics","nombre":"Usuario 2","apellidos":"Standar","perfil":"picking","id":"3801"},{"usuario":"standar3.logistics","nombre":"Usuario 3","apellidos":"Standar","perfil":"picking","id":"3802"},{"usuario":"gonzalo.logistics","nombre":"Gonzalo","apellidos":"Duarte","perfil":"picking","id":"3803"},{"usuario":"santiagog.logistics","nombre":"santiago","apellidos":"gerez","perfil":"picking","id":"3804"},{"usuario":"Gas.logistics","nombre":"Gaston","apellidos":"Basualdo","perfil":"picking","id":"3805"},{"usuario":"Matias.logistics","nombre":"Matias","apellidos":"Cortez","perfil":"Maquinista","id":"3806"},{"usuario":"Kevin.logistics","nombre":"Kevin","apellidos":"Jerez","perfil":"Maquinista","id":"3807"},{"usuario":"Canaria.Alexis","nombre":"Alexis","apellidos":"Canaria","perfil":"picking","id":"3808"},{"usuario":"Vicente.logistics","nombre":"Vicente","apellidos":"Fernandez","perfil":"picking","id":"3809"},{"usuario":"Fernando.logistics1","nombre":"Fernando","apellidos":"Moya","perfil":"picking","id":"3810"},{"usuario":"Fabri.logistics","nombre":"Fabricio","apellidos":"Olivera","perfil":"user","id":"3811"},{"usuario":"alexis.logistics1","nombre":"Alexis","apellidos":"Gramajo","perfil":"supervisor","id":"3812"},{"usuario":"lucasdorsch.logistics","nombre":"lucas","apellidos":"dorsch","perfil":"picking","id":"3813"},{"usuario":"victorriver.logistics","nombre":"Victor","apellidos":"Miranda","perfil":"Maquinista","id":"3814"},{"usuario":"angel.logistics","nombre":"Angel Gabriel","apellidos":"Rios","perfil":"picking","id":"3815"},{"usuario":"Nimit_ID","nombre":"Nimit","apellidos":"Dhagat","perfil":"superadmin","id":"3816"},{"usuario":"Rajas_ID","nombre":"Rajas","apellidos":"Lonkar","perfil":"superadmin","id":"3817"},{"usuario":"Braian.ruiz","nombre":"Braian","apellidos":"Ruiz","perfil":"Aduana","id":"3818"},{"usuario":"Leonardo.sandoval","nombre":"Leonardo","apellidos":"Sandoval","perfil":"Admin ID","id":"3819"},{"usuario":"consultor7_arrpp01","nombre":"Rony","apellidos":"Consultor","perfil":"superadmin","id":"3820"},{"usuario":"TABLET RAPPI","nombre":"TABLET","apellidos":"RAPPI","perfil":"superadmin","id":"3821"},{"usuario":"emanuel.logistics","nombre":"Emanuel","apellidos":"De olivera","perfil":"supervisor","id":"3822"},{"usuario":"Carolina.Tvethe","nombre":"Carolina","apellidos":"Tvethe","perfil":"INVENTARIOS","id":"3823"},{"usuario":"Nico.logistics","nombre":"Nicolas","apellidos":"Caceres","perfil":"Maquinista con recarga","id":"3824"},{"usuario":"pablo.logistics","nombre":"Pablo","apellidos":"Martinez","perfil":"picking","id":"3825"},{"usuario":"leonardo.logistics","nombre":"Leonardo","apellidos":"Sandoval","perfil":"Admin ID","id":"3826"},{"usuario":"nehuen.barrios","nombre":"Nehuen","apellidos":"Barrios","perfil":"picking","id":"3827"},{"usuario":"nicolas.palavecino","nombre":"Nicolas","apellidos":"Palavecino","perfil":"Recibo","id":"3828"},{"usuario":"lautaro.corbalan","nombre":"Lautaro","apellidos":"Corbalan","perfil":"picking","id":"3829"},{"usuario":"diego.nuñez","nombre":"Diego","apellidos":"Nuñez","perfil":"Maquinista con recarga","id":"3830"},{"usuario":"Airala.dario","nombre":"Dario","apellidos":"Airala","perfil":"picking","id":"3831"},{"usuario":"Gonzalez.Alberto","nombre":"Alberto","apellidos":"Gonzalez","perfil":"picking","id":"3832"},{"usuario":"joaquin.logistics","nombre":"Joaquin","apellidos":"Sosa","perfil":"Maquinista","id":"3833"},{"usuario":"facu.logistics1","nombre":"Facundo","apellidos":"Diaz","perfil":"Maquinista","id":"3834"},{"usuario":"patrodriguezbote","nombre":"Patricio","apellidos":"Rodriguez Bote","perfil":"supervisor","id":"3835"},{"usuario":"enrique.daniel","nombre":"Daniel","apellidos":"Enrique","perfil":"picking","id":"3836"},{"usuario":"antonio.logistics","nombre":"Antonio","apellidos":"Miño","perfil":"Maquinista","id":"3837"},{"usuario":"patri.logistics","nombre":"Patricio","apellidos":"Urra","perfil":"Maquinista","id":"3838"},{"usuario":"bassano.logistics","nombre":"Lucas","apellidos":"Bassano","perfil":"Maquinista","id":"3839"},{"usuario":"blengio.tomas","nombre":"Tomas","apellidos":"Blengio","perfil":"galileo","id":"3840"},{"usuario":"claudio.gomez","nombre":"Claudio","apellidos":"Gomez","perfil":"picking","id":"3841"},{"usuario":"sebastian.deolivera","nombre":"Sebastian","apellidos":"De Olivera","perfil":"Inventarios","id":"3842"},{"usuario":"matias.leguizamon","nombre":"Matias","apellidos":"Leguizamon","perfil":"Inventarios","id":"3843"},{"usuario":"emir.maldonado","nombre":"Emir","apellidos":"Maldonado","perfil":"picking","id":"3844"},{"usuario":"federico.gaitan","nombre":"Federico","apellidos":"Gaitan","perfil":"picking","id":"3845"},{"usuario":"martin.logistics","nombre":"Martin","apellidos":"Echazarreta","perfil":"Maquinista","id":"3846"},{"usuario":"valentin.logistics","nombre":"Valentin","apellidos":"Ayala","perfil":"Maquinista","id":"3847"},{"usuario":"alan.logistics1","nombre":"Alan","apellidos":"Chamorro","perfil":"picking","id":"3848"},{"usuario":"javier.gollner","nombre":"javier","apellidos":"gollner","perfil":"picking","id":"3849"},{"usuario":"diego.logistics1","nombre":"Diego","apellidos":"Causade","perfil":"Maquinista","id":"3850"},{"usuario":"gomez.diego","nombre":"diego","apellidos":"gomez","perfil":"Recibo","id":"3851"},{"usuario":"Cisneros.Tomas","nombre":"Tomas","apellidos":"Cisneros","perfil":"Inventarios","id":"3852"},{"usuario":"ivan.gutierrez","nombre":"Ivan","apellidos":"Gutierrez","perfil":"picking","id":"3853"},{"usuario":"lautaro.solis","nombre":"Lautaro","apellidos":"Solis","perfil":"picking","id":"3854"},{"usuario":"Guido.torres","nombre":"Guido","apellidos":"Torres","perfil":"Inventarios","id":"3855"},{"usuario":"Abel.Altamiranda","nombre":"Abel","apellidos":"Altamiranda","perfil":"Aduana","id":"3856"},{"usuario":"Matias.barbisan","nombre":"Matias","apellidos":"Barbisan","perfil":"Maquinista","id":"3857"},{"usuario":"Miranda.logistics","nombre":"Miranda","apellidos":"Merip","perfil":"Inventarios","id":"3858"},{"usuario":"felipe.barreto","nombre":"Felipe","apellidos":"Barreto","perfil":"Recibo","id":"3859"},{"usuario":"gabriel.herrera","nombre":"gabriel","apellidos":"herrera","perfil":"picking","id":"3860"},{"usuario":"soporte_L1","nombre":"Soporte","apellidos":"Desk","perfil":"superadmin","id":"3861"},{"usuario":"maite.diaz","nombre":"Maite","apellidos":"Diaz","perfil":"Inventarios","id":"3862"},{"usuario":"cintia.roldan","nombre":"Cintia","apellidos":"Roldan","perfil":"Inventarios","id":"3863"},{"usuario":"facundov.logistics","nombre":"Facundo","apellidos":"Veron","perfil":"Maquinista","id":"3864"},{"usuario":"micaela.miranda","nombre":"Micaela","apellidos":"Miranda","perfil":"INVENTARIOS","id":"3865"},{"usuario":"falcon.ezequiel","nombre":"ezequiel","apellidos":"falcon","perfil":"INVENTARIOS","id":"3866"},{"usuario":"nahiara.velazquez","nombre":"Nahiara","apellidos":"Velazquez","perfil":"INVENTARIOS","id":"3867"},{"usuario":"Pablo.logistics1","nombre":"Pablo","apellidos":"Cabrio","perfil":"Despacho","id":"3868"},{"usuario":"fabio.martinez","nombre":"Fabio","apellidos":"Martinez","perfil":"supervisor","id":"3869"},{"usuario":"Lezcano.kevin","nombre":"Kevin","apellidos":"Lezcano","perfil":"picking","id":"3870"},{"usuario":"joaquin.cuba","nombre":"Joaquin","apellidos":"Cuba","perfil":"Maquinista","id":"3871"},{"usuario":"adrianc.logistics","nombre":"Adrian","apellidos":"Carrizo","perfil":"picking","id":"3872"},{"usuario":"vgs_arrpp01","nombre":"vgs_arrpp01","apellidos":"vgs_arrpp01","perfil":"INVENTARIOS","id":"3873"},{"usuario":"Rodrigo.rivero","nombre":"Rodrigo","apellidos":"Rivero","perfil":"superadmin","id":"3874"},{"usuario":"Mauro.carrizo","nombre":"Mauro","apellidos":"Carrizo","perfil":"Aduana","id":"3875"},{"usuario":"Joaquin.godoy","nombre":"Joaquin","apellidos":"Godoy","perfil":"Recibo","id":"3876"},{"usuario":"Joaquin.gomez","nombre":"Joaquin","apellidos":"Gomez","perfil":"Aduana","id":"3877"},{"usuario":"lovato.facundo","nombre":"Facundo","apellidos":"Lovato","perfil":"picking","id":"3878"},{"usuario":"German.logistics","nombre":"German","apellidos":"Sanabria","perfil":"picking","id":"3879"},{"usuario":"ricardo.laureano","nombre":"Ricardo","apellidos":"Laureano","perfil":"supervisor","id":"3880"},{"usuario":"Perola.pablo","nombre":"Pablo","apellidos":"Perola","perfil":"picking","id":"3881"},{"usuario":"gustavo.barrios","nombre":"Gustavo","apellidos":"Barrios","perfil":"picking","id":"3882"},{"usuario":"Fabricio.torres","nombre":"Fabricio","apellidos":"Torres","perfil":"Recibo","id":"3883"},{"usuario":"Valen.logistics","nombre":"Valentin","apellidos":"Gonzalez","perfil":"Maquinista con recarga","id":"3884"},{"usuario":"Melina.lares","nombre":"Melina","apellidos":"Lares","perfil":"picking","id":"3885"},{"usuario":"jony.logistics","nombre":"Jonathan","apellidos":"Escalante","perfil":"Maquinista con recarga","id":"3886"},{"usuario":"NJuarez.logistics","nombre":"noelia","apellidos":"juarez","perfil":"supervisor","id":"3887"},{"usuario":"Martin","nombre":"Martin","apellidos":"Espindola","perfil":"Maquinista","id":"3888"},{"usuario":"Flor.Galan","nombre":"Florencia","apellidos":"Galan","perfil":"supervisor","id":"3889"},{"usuario":"cami.torres","nombre":"Camila","apellidos":"Torres","perfil":"picking","id":"3890"},{"usuario":"n.juarez","nombre":"Noelia","apellidos":"Juarez","perfil":"picking","id":"3891"},{"usuario":"Moreno.ricardo","nombre":"Ricardo","apellidos":"Moreno","perfil":"Maquinista","id":"3892"},{"usuario":"cristian.logistics1","nombre":"Cristian","apellidos":"Rivero","perfil":"Maquinista","id":"3893"},{"usuario":"manuel.logistics","nombre":"Jose","apellidos":"Bretz","perfil":"Maquinista","id":"3894"},{"usuario":"Iara.carabajal","nombre":"Iara","apellidos":"Carabajal","perfil":"Aduana","id":"3895"},{"usuario":"Mateo.osores","nombre":"Mateo","apellidos":"Osores","perfil":"Aduana","id":"3896"},{"usuario":"Fabio.Logistics","nombre":"Fabio","apellidos":"Martinez","perfil":"Despacho","id":"3897"},{"usuario":"nicolas.logistics1","nombre":"Nicolas","apellidos":"Garcia","perfil":"Despacho","id":"3898"},{"usuario":"lucasa.logistics","nombre":"Lucas","apellidos":"Aguirre","perfil":"Maquinista con recarga","id":"3899"},{"usuario":"santiruiz.logistics","nombre":"Santiago","apellidos":"Ruiz","perfil":"Inventarios","id":"3900"},{"usuario":"Romina.castillo","nombre":"Romina","apellidos":"Castillo","perfil":"picking","id":"3901"},{"usuario":"walter.logistics","nombre":"Walter","apellidos":"Maidana","perfil":"Maquinista","id":"3902"},{"usuario":"lautaro.caron","nombre":"Lautaro","apellidos":"Caron","perfil":"Recibo","id":"3903"},{"usuario":"Cristian.lopez","nombre":"Cristian","apellidos":"Lopez","perfil":"Aduana","id":"3904"},{"usuario":"jesuan.logistics","nombre":"Jesuan","apellidos":"Bustamante","perfil":"Maquinista","id":"3905"},{"usuario":"agustin.burgos","nombre":"Agustin","apellidos":"Burgos","perfil":"Inventarios","id":"3906"},{"usuario":"tomas.gomez","nombre":"tomas","apellidos":"gomez","perfil":"picking","id":"3907"},{"usuario":"Mendez.luciano","nombre":"Luciano","apellidos":"Mendez","perfil":"picking","id":"3908"},{"usuario":"alex.logistics","nombre":"Alexis","apellidos":"Herrera","perfil":"Maquinista con recarga","id":"3909"},{"usuario":"Abigail.Ruiz","nombre":"Abigail","apellidos":"Ruiz","perfil":"Aduana","id":"3910"},{"usuario":"Cristian.Caballero","nombre":"Cristian","apellidos":"Caballero","perfil":"Maquinista con recarga","id":"3911"},{"usuario":"dauria.logistics","nombre":"Martin","apellidos":"Dauria","perfil":"Maquinista","id":"3912"},{"usuario":"rami.logistics","nombre":"Rodrigo","apellidos":"Ramirez","perfil":"Maquinista","id":"3913"},{"usuario":"Antonella.dalvano","nombre":"Antonella","apellidos":"Dalvano","perfil":"Aduana","id":"3914"},{"usuario":"ivaan.logistics","nombre":"ivan","apellidos":"avellaneda","perfil":"picking","id":"3915"},{"usuario":"diego.ortiz","nombre":"diego","apellidos":"ortiz","perfil":"picking","id":"3916"},{"usuario":"jonatan.gorosito","nombre":"Jonatan","apellidos":"Gorosito","perfil":"picking","id":"3917"},{"usuario":"matias.ramirez","nombre":"matias","apellidos":"Ramirez","perfil":"Maquinista con recarga","id":"3918"},{"usuario":"ivan.logistics","nombre":"Ivan","apellidos":"Acosta","perfil":"Maquinista con recarga","id":"3919"},{"usuario":"Brisa.bothe","nombre":"Brisa","apellidos":"Bothe","perfil":"picking","id":"3920"},{"usuario":"nicolas.zamudio","nombre":"nicolas","apellidos":"zamudio","perfil":"picking","id":"3921"},{"usuario":"dario.gonzalez","nombre":"dario","apellidos":"gonzalez","perfil":"supervisor","id":"3922"},{"usuario":"dario.gonzalez26","nombre":"dario","apellidos":"gonzalez","perfil":"supervisor","id":"3923"},{"usuario":"consultor100_arrpp01","nombre":"consultor100","apellidos":"arrpp01","perfil":"superadmin","id":"3924"},{"usuario":"Vallejo.Alejandro","nombre":"Alejandro","apellidos":"Vallejo","perfil":"picking","id":"3925"},{"usuario":"santiago.gomez","nombre":"santiago","apellidos":"gomez","perfil":"picking","id":"3926"},{"usuario":"Selene.Mansilla","nombre":"Selene","apellidos":"Mansilla","perfil":"picking","id":"3927"},{"usuario":"leonel.aguirre","nombre":"Leonel","apellidos":"Aguirre","perfil":"picking","id":"3928"},{"usuario":"Alejandro.Alvarez","nombre":"Alejandro","apellidos":"Alvarez","perfil":"picking","id":"3929"},{"usuario":"pablo.asselbon","nombre":"Pablo","apellidos":"Asselbon","perfil":"picking","id":"3930"},{"usuario":"damian.arcuri","nombre":"Damian","apellidos":"Arcuri","perfil":"picking","id":"3931"},{"usuario":"camila.ruival","nombre":"Camila","apellidos":"ruival","perfil":"picking","id":"3932"},{"usuario":"Yamila.Gonzalez","nombre":"Yamila","apellidos":"Gonzalez","perfil":"picking","id":"3933"},{"usuario":"Sofia.Strube","nombre":"Sofia","apellidos":"Strube","perfil":"Inventarios","id":"3934"},{"usuario":"eduardo.logistics","nombre":"Eduardo","apellidos":"Pavon","perfil":"Maquinista con recarga","id":"3935"},{"usuario":"nicolas.logistics2","nombre":"Nicolas","apellidos":"Ljumgberg","perfil":"Maquinista con recarga","id":"3936"},{"usuario":"emiliano.bustos","nombre":"Emiliano","apellidos":"Bustos","perfil":"picking","id":"3937"},{"usuario":"tomas.gomez2","nombre":"Tomas","apellidos":"Gomez","perfil":"picking","id":"3938"},{"usuario":"Facundo.Bogado","nombre":"Facundo","apellidos":"Bogado","perfil":"picking","id":"3939"},{"usuario":"matias.mariotta","nombre":"matias","apellidos":"mariotta","perfil":"picking","id":"3940"},{"usuario":"Sid_Gupta","nombre":"Sid","apellidos":"Gupta","perfil":"Admin ID","id":"3941"},{"usuario":"Nimit Dhagat","nombre":"Nimit","apellidos":"Dhagat","perfil":"superadmin","id":"3942"},{"usuario":"David.salo","nombre":"david","apellidos":"salo","perfil":"picking","id":"3943"},{"usuario":"Cristian Sanchez","nombre":"Cristian","apellidos":"Sanchez","perfil":"Maquinista con recarga","id":"3944"},{"usuario":"Ian.Nestares","nombre":"Ian","apellidos":"Nestares","perfil":"Recibo","id":"3945"},{"usuario":"joaco.logistics","nombre":"Joaquin","apellidos":"Llanos","perfil":"picking","id":"3946"},{"usuario":"alex.logistics1","nombre":"Alexis","apellidos":"Gonzalez","perfil":"picking","id":"3947"},{"usuario":"svalencia_arrpp01","nombre":"Sebatian","apellidos":"Consultor","perfil":"superadmin","id":"3948"},{"usuario":"IDL1","nombre":"idl","apellidos":"logistics","perfil":"Admin ID","id":"3949"},{"usuario":"Agustin.montoya","nombre":"Agustin","apellidos":"montoya","perfil":"Aduana","id":"3950"},{"usuario":"Michel.Dufourian","nombre":"michel","apellidos":"Dufourian","perfil":"Aduana","id":"3951"},{"usuario":"dario.caceres","nombre":"dario","apellidos":"caceres","perfil":"Aduana","id":"3952"},{"usuario":"Ludmila.nicole","nombre":"Ludmila","apellidos":"Lopez","perfil":"Aduana","id":"3953"},{"usuario":"Lautaro.mendoza","nombre":"Lautaro","apellidos":"Mendoza","perfil":"Aduana","id":"3954"},{"usuario":"prueba.01","nombre":"prueba","apellidos":"0111","perfil":"Aduana","id":"3955"},{"usuario":"consultor5_arrpp01","nombre":"Consultor","apellidos":"Miguel","perfil":"superadmin","id":"3956"},{"usuario":"Daniela.ruiz","nombre":"Daniela","apellidos":"Ruiz","perfil":"Aduana","id":"3957"},{"usuario":"candela.perez","nombre":"Candela","apellidos":"Perez","perfil":"Aduana","id":"3958"},{"usuario":"lucas.miranda","nombre":"lucas","apellidos":"miranda","perfil":"Aduana","id":"3959"},{"usuario":"leo.logistics","nombre":"Leonardo","apellidos":"Lugo","perfil":"Maquinista con recarga","id":"3960"},{"usuario":"consultor_ar001","nombre":"consultor","apellidos":"ar001","perfil":"Admin ID","id":"3961"}];
+
+function receiptNorm(v){
+  return String(v??'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ');
+}
+function receiptTeamFromProfile(profile){
+  const p=receiptNorm(profile);
+  if(p==='inventarios'||p==='inventario') return 'Inventario';
+  if(p==='recibo'||p==='recepcion') return 'Recepción';
+  if(p==='picking'||p==='picker') return 'Reabastecedor';
+  return '';
+}
+const COPERNICO_BY_ID=new Map();
+const COPERNICO_BY_USER=new Map();
+const COPERNICO_BY_NAME=new Map();
+COPERNICO_USERS.forEach(p=>{
+  const id=receiptNorm(p.id);
+  const user=receiptNorm(p.usuario);
+  const name=receiptNorm([p.nombre,p.apellidos].filter(Boolean).join(' '));
+  if(id) COPERNICO_BY_ID.set(id,p);
+  if(user) COPERNICO_BY_USER.set(user,p);
+  if(name){
+    if(COPERNICO_BY_NAME.has(name)) COPERNICO_BY_NAME.set(name,null);
+    else COPERNICO_BY_NAME.set(name,p);
+  }
+});
+function receiptCopernicoPerson(r){
+  const id=receiptNorm(processVal(r,['Id_empleado','id_empleado','IdEmpleado','id_employee']));
+  if(id&&COPERNICO_BY_ID.has(id)) return COPERNICO_BY_ID.get(id);
+
+  const userCandidates=[
+    processVal(r,['Usuario','usuario','User','user','Username','username']),
+    processVal(r,['Responsable','responsable','Nombre_empleado','Empleado'])
+  ];
+  for(const raw of userCandidates){
+    const k=receiptNorm(raw);
+    if(!k) continue;
+    if(COPERNICO_BY_USER.has(k)) return COPERNICO_BY_USER.get(k);
+    const byName=COPERNICO_BY_NAME.get(k);
+    if(byName) return byName;
+  }
+  return null;
+}
+function receiptTeamForRow(r){
+  const p=receiptCopernicoPerson(r);
+  return p ? (receiptTeamFromProfile(p.perfil)||'Sin clasificar') : 'Sin clasificar';
+}
+
 let RECEIPT_ROWS=[];
 let RECEIPT_LOADED=false;
 let RECEIPT_SORT={key:'fecha',dir:-1};
@@ -2826,6 +2941,7 @@ function receiptField(r,key){
     id:['Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
     fecha:['FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
   };
+  if(key==='equipo') return receiptTeamForRow(r);
   return processVal(r,map[key]||[key]);
 }
 function receiptCmp(a,b,key){
@@ -2845,12 +2961,18 @@ function renderReceipt(){
   const body=$('receiptBody'),empty=$('receiptEmpty');if(!body||!empty)return;
   const q=String($('receiptSearch')?.value||'').trim().toLowerCase();
   const team=String($('receiptTeamFilter')?.value||'').trim();
+  setupTableToolSelects('receipt',RECEIPT_FIELDS);
+  const filterField=String($('receiptFilterField')?.value||'');
+  fillToolValues('receipt',RECEIPT_ROWS,filterField,receiptField);
+  const filterValue=String($('receiptFilterValue')?.value||'');
+  const groupKey=String($('receiptGroupBy')?.value||'');
   let rows=RECEIPT_ROWS.slice();
   if(q)rows=rows.filter(r=>['caja','sku','desc','origen','responsable','id','equipo','fecha'].map(k=>receiptField(r,k)).join(' ').toLowerCase().includes(q));
   if(team)rows=rows.filter(r=>String(receiptField(r,'equipo')||'Sin clasificar')===team);
-  rows.sort((a,b)=>receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir);
+  if(filterField&&filterValue)rows=rows.filter(r=>(String(receiptField(r,filterField)||'—').trim()||'—')===filterValue);
+  rows.sort((a,b)=>groupKey?(String(receiptField(a,groupKey)||'').localeCompare(String(receiptField(b,groupKey)||''),'es',{numeric:true,sensitivity:'base'})||receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir):receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir);
   empty.style.display=rows.length?'none':'block';
-  body.innerHTML=rows.map(r=>{
+  const receiptRowHtml=r=>{
     const equipo=receiptField(r,'equipo')||'Sin clasificar';
     return '<tr>'+
       '<td><b>'+esc(receiptField(r,'caja'))+'</b></td>'+
@@ -2864,7 +2986,8 @@ function renderReceipt(){
       '<td class="team">'+esc(equipo)+'</td>'+
       '<td>'+esc(receiptField(r,'fecha')||'—')+'</td>'+
     '</tr>';
-  }).join('');
+  };
+  body.innerHTML=groupedRowsHtml(rows,groupKey,receiptField,receiptRowHtml,10,'saldo');
   document.querySelectorAll('[data-receipt-sort]').forEach(th=>{
     const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.receiptSort===RECEIPT_SORT.key?(RECEIPT_SORT.dir===1?'↑':'↓'):'↕';
   });
@@ -3738,9 +3861,17 @@ $('sanitationModeBtn').onclick=()=>setDisplayMode('sanitation');
 $('palletsProcessModeBtn').onclick=()=>setDisplayMode('process');
 $('processSearch').oninput=()=>renderPalletsProcess();
 $('processRefreshBtn').onclick=()=>buildPalletsProcessPanel(true);
+$('processFilterField').onchange=()=>{fillToolValues('process',PROCESS_ROWS,$('processFilterField').value,(r,k)=>processField(r,k));renderPalletsProcess();};
+$('processFilterValue').onchange=()=>renderPalletsProcess();
+$('processGroupBy').onchange=()=>renderPalletsProcess();
+$('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
+$('receiptFilterField').onchange=()=>{fillToolValues('receipt',RECEIPT_ROWS,$('receiptFilterField').value,receiptField);renderReceipt();};
+$('receiptFilterValue').onchange=()=>renderReceipt();
+$('receiptGroupBy').onchange=()=>renderReceipt();
+$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';$('receiptTeamFilter').value='';$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
 $('receiptRefreshBtn').onclick=()=>buildReceiptPanel(true);
 document.querySelectorAll('[data-receipt-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.receiptSort;if(RECEIPT_SORT.key===k)RECEIPT_SORT.dir*=-1;else{RECEIPT_SORT.key=k;RECEIPT_SORT.dir=1}renderReceipt();});
 $('sanGroupSelect').onchange=()=>{
