@@ -762,13 +762,82 @@ jobs:
                   "fecha_final": fecha_final
               })
 
-              payload, http_status, size = request_json(
-                  PLANRECIBO_URL + "?" + params,
-                  method="GET",
-                  jwt=jwt,
-                  timeout=120
-              )
-              plan_rows = extract_rows(payload)
+              # Copérnico devuelve [] cuando el rango es demasiado amplio.
+              # Consultamos por bloques mensuales y acumulamos resultados.
+              start_dt = datetime.strptime(fecha_inicial, "%Y%m%d").date()
+              end_dt = datetime.strptime(fecha_final, "%Y%m%d").date()
+
+              plan_rows = []
+              total_bytes = 0
+              monthly_calls = 0
+
+              cursor = start_dt.replace(day=1)
+              while cursor <= end_dt:
+                  if cursor.month == 12:
+                      next_month = cursor.replace(
+                          year=cursor.year + 1,
+                          month=1,
+                          day=1
+                      )
+                  else:
+                      next_month = cursor.replace(
+                          month=cursor.month + 1,
+                          day=1
+                      )
+
+                  chunk_start = max(start_dt, cursor)
+                  chunk_end = min(end_dt, next_month - timedelta(days=1))
+
+                  chunk_params = urllib.parse.urlencode({
+                      "documentooc": "",
+                      "tipodocumento": "12",
+                      "estado": "1",
+                      "tipodocto": "",
+                      "bodega": "47",
+                      "fecha_inicial": chunk_start.strftime("%Y%m%d"),
+                      "fecha_final": chunk_end.strftime("%Y%m%d")
+                  })
+
+                  payload, http_status, size = request_json(
+                      PLANRECIBO_URL + "?" + chunk_params,
+                      method="GET",
+                      jwt=jwt,
+                      timeout=120
+                  )
+
+                  chunk_rows = extract_rows(payload)
+                  plan_rows.extend(chunk_rows)
+                  total_bytes += size
+                  monthly_calls += 1
+
+                  print(
+                      "PLANRECIBO BLOQUE:",
+                      chunk_start.strftime("%Y%m%d"),
+                      "a",
+                      chunk_end.strftime("%Y%m%d"),
+                      "· HTTP:", http_status,
+                      "· filas:", len(chunk_rows)
+                  )
+
+                  cursor = next_month
+
+              # Deduplicar documentos devueltos en más de un bloque.
+              deduped = []
+              seen = set()
+              for row in plan_rows:
+                  signature = (
+                      str(field(row, "id", "Id") or "").strip(),
+                      str(field(row, "unido", "Unido") or "").strip(),
+                      str(field(row, "doctoERP", "DoctoERP") or "").strip(),
+                      str(field(row, "numDocumento", "NumDocumento") or "").strip()
+                  )
+                  if signature in seen:
+                      continue
+                  seen.add(signature)
+                  deduped.append(row)
+
+              plan_rows = deduped
+              size = total_bytes
 
               supplier_by_key = {}
 
@@ -805,6 +874,7 @@ jobs:
                   "PLANRECIBO HTTP:", http_status,
                   "· estado: 1 · tipodocumento: 12",
                   "· período:", fecha_inicial, "a", fecha_final,
+                  "· bloques:", monthly_calls,
                   "· filas:", len(plan_rows),
                   "· claves proveedor:", len(supplier_by_key),
                   "· ord_no no vacíos:", len(stock_keys),
