@@ -809,7 +809,7 @@ jobs:
 
                   chunk_params = urllib.parse.urlencode({
                       "documentooc": documentooc_trigger,
-                      "tipodocumento": "12",
+                      "tipodeplaneacion": "12",
                       "estado": "1",
                       "tipodocto": "",
                       "bodega": "47",
@@ -891,7 +891,7 @@ jobs:
 
               print(
                   "PLANRECIBO HTTP:", http_status,
-                  "· estado: 1 · tipodocumento: 12",
+                  "· estado: 1 · tipodeplaneacion: 12",
                   "· período:", fecha_inicial, "a", fecha_final,
                   "· bloques:", monthly_calls,
                   "· filas:", len(plan_rows),
