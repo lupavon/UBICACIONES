@@ -914,6 +914,138 @@ jobs:
 
               direct_hits = sum(1 for key in stock_keys if key in supplier_by_key)
 
+              # V11: resolver faltantes consultando cada documento actual de RECIBO
+              # directamente en Consulta Recibo. Se consulta una sola vez por
+              # ord_no único y se conserva el mapa ya resuelto por la consulta general.
+              unresolved_docs = []
+              seen_unresolved = set()
+
+              for row in receipt_rows:
+                  raw_ord = str(
+                      field(row, "ord_no", "OrdNo", "ordno") or ""
+                  ).strip()
+                  variants = receipt_key_variants(raw_ord)
+
+                  if not variants:
+                      continue
+
+                  if any(key in supplier_by_key for key in variants):
+                      continue
+
+                  # Si viene repetido (450...-450...), preferimos la variante simple.
+                  preferred = ""
+                  simple_variants = sorted(
+                      [k for k in variants if "-" not in k],
+                      key=lambda x: (0 if x.startswith("45") else 1, -len(x))
+                  )
+                  if simple_variants:
+                      preferred = simple_variants[0]
+                  else:
+                      preferred = sorted(variants)[0]
+
+                  if preferred and preferred not in seen_unresolved:
+                      seen_unresolved.add(preferred)
+                      unresolved_docs.append(preferred)
+
+              print(
+                  "PLANRECIBO consultas directas pendientes:",
+                  len(unresolved_docs),
+                  unresolved_docs[:40]
+              )
+
+              direct_doc_calls = 0
+              direct_doc_rows = 0
+              direct_doc_resolved = 0
+
+              # Para cada documento hacemos una consulta focalizada con estado 1,
+              # que es el único estado que devolvió información en las pruebas.
+              # Usamos el mismo período global ya calculado.
+              for documento in unresolved_docs:
+                  params_direct = urllib.parse.urlencode({
+                      "documentooc": documento,
+                      "tipodeplaneacion": "12",
+                      "estado": "1",
+                      "tipodocto": "",
+                      "bodega": "47",
+                      "fecha_inicial": fecha_inicial,
+                      "fecha_final": fecha_final
+                  })
+
+                  direct_doc_calls += 1
+
+                  try:
+                      payload_direct, http_direct, size_direct = request_json(
+                          PLANRECIBO_URL + "?" + params_direct,
+                          method="GET",
+                          jwt=jwt,
+                          timeout=120
+                      )
+                      rows_direct = extract_rows(payload_direct)
+                  except Exception as e:
+                      print(
+                          "PLANRECIBO DIRECTO ERROR:",
+                          documento,
+                          "·",
+                          str(e)[:180]
+                      )
+                      continue
+
+                  direct_doc_rows += len(rows_direct)
+                  found_supplier = ""
+
+                  for plan_row in rows_direct:
+                      proveedor = str(
+                          field(
+                              plan_row,
+                              "nombreProveedor", "NombreProveedor",
+                              "proveedor", "Proveedor"
+                          ) or ""
+                      ).strip()
+
+                      if not proveedor:
+                          continue
+
+                      row_keys = set()
+                      for raw_key in (
+                          field(plan_row, "unido", "Unido"),
+                          field(plan_row, "doctoERP", "DoctoERP"),
+                          field(plan_row, "numDocumento", "NumDocumento"),
+                          field(plan_row, "numdocumento")
+                      ):
+                          row_keys.update(receipt_key_variants(raw_key))
+
+                      # Primero intentamos coincidencia exacta con el documento
+                      # consultado; después publicamos todas sus variantes.
+                      if documento in row_keys:
+                          found_supplier = proveedor
+
+                      for key in row_keys:
+                          supplier_by_key[key] = proveedor
+
+                  if found_supplier:
+                      direct_doc_resolved += 1
+
+                  print(
+                      "PLANRECIBO DIRECTO:",
+                      documento,
+                      "· HTTP:", http_direct,
+                      "· filas:", len(rows_direct),
+                      "· proveedor:", found_supplier or "SIN MATCH EXACTO"
+                  )
+
+              # Recalcular coincidencias después del enriquecimiento directo.
+              direct_hits = sum(
+                  1 for key in stock_keys if key in supplier_by_key
+              )
+
+              print(
+                  "PLANRECIBO DIRECTO RESUMEN:",
+                  "llamadas:", direct_doc_calls,
+                  "· filas:", direct_doc_rows,
+                  "· documentos resueltos:", direct_doc_resolved,
+                  "· coincidencias finales:", direct_hits
+              )
+
               print(
                   "PLANRECIBO HTTP:", http_status,
                   "· estados:", ",".join(sorted(estados_con_datos)) or "sin datos",
@@ -938,7 +1070,10 @@ jobs:
                   "fecha_final": fecha_final,
                   "direct_hits": direct_hits,
                   "estados_con_datos": sorted(estados_con_datos),
-                  "estado_calls": estado_calls
+                  "estado_calls": estado_calls,
+                  "direct_doc_calls": direct_doc_calls,
+                  "direct_doc_rows": direct_doc_rows,
+                  "direct_doc_resolved": direct_doc_resolved
               }
 
           # -----------------------------
