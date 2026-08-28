@@ -3786,7 +3786,7 @@ function formatStockStatus(updatedAt,{fromCache=false,checking=false,error=false
   if(diffMin>=30) freshness='🔴';
 
   let suffix='';
-  if(error) suffix=' · actualización fallida';
+  if(error) suffix=' · usando último stock válido';
   else if(checking) suffix=' · buscando actualización…';
   else if(fromCache) suffix=' · último stock guardado';
 
@@ -3868,15 +3868,29 @@ async function loadPublishedStock({silent=false}={}){
   const timeout=setTimeout(()=>controller.abort(),20000);
 
   try{
-    const url='https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now();
-    const res=await fetch(url,{
-      cache:'no-store',
-      signal:controller.signal
-    });
+    let payload=null;
+    let sourceError=null;
+    const sources=[
+      'https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now(),
+      './stock.json?v='+Date.now()
+    ];
 
-    if(!res.ok) throw new Error('stock.json '+res.status);
+    for(const url of sources){
+      try{
+        const res=await fetch(url,{cache:'no-store',signal:controller.signal});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const candidate=await res.json();
+        const candidateRows=Array.isArray(candidate)?candidate:(Array.isArray(candidate?.rows)?candidate.rows:[]);
+        if(!candidateRows.length) throw new Error('sin filas');
+        payload=candidate;
+        break;
+      }catch(err){
+        sourceError=err;
+        console.warn('Fuente de stock no disponible:',url,err);
+      }
+    }
 
-    const payload=await res.json();
+    if(!payload) throw (sourceError||new Error('No se pudo obtener stock remoto'));
     const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
     const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
 
