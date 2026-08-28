@@ -1010,6 +1010,20 @@ body.heatSplit .layoutHeatGrid{
 .groupRow .groupMeta{color:#9aa8b7;font-weight:700;margin-left:8px;font-size:10px}
 @media(max-width:900px){.tableTools{align-items:stretch}.tableTools select{width:100%;min-width:0}.tableTools .toolLabel{width:100%;margin-top:2px}}
 
+
+/* ===== Trazabilidad 360° ===== */
+.trace360Hero{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.trace360HeroText{max-width:900px}.trace360HeroText h2{margin:0 0 5px;font-size:21px}.trace360HeroText p{margin:0;color:#8d99a6;font-size:11px;line-height:1.45}
+.trace360Search{display:grid;grid-template-columns:minmax(260px,1fr) 190px auto;gap:8px;margin:12px 0}
+.trace360Search input,.trace360Search select{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:10px 11px;min-width:0}
+.trace360Kpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin:10px 0 14px}
+.trace360Kpi{background:#111821;border:1px solid #2b3541;border-radius:8px;padding:10px 11px}.trace360Kpi small{display:block;color:#7f8b98;font-size:8px;font-weight:800;letter-spacing:.06em}.trace360Kpi b{display:block;font-size:22px;margin-top:5px}.trace360Kpi span{display:block;color:#8793a0;font-size:9px;margin-top:3px}
+.trace360Grid{display:grid;grid-template-columns:minmax(280px,34%) minmax(0,66%);gap:12px;align-items:start}
+.trace360Panel{background:#0f151c;border:1px solid #28323d;border-radius:9px;overflow:hidden}.trace360PanelHead{padding:10px 12px;background:#121921;border-bottom:1px solid #27313b;display:flex;justify-content:space-between;gap:8px;align-items:center}.trace360PanelHead b{font-size:12px}.trace360PanelHead span{font-size:9px;color:#7f8b98}.trace360Results{max-height:68vh;overflow:auto}.trace360Result{padding:10px 12px;border-bottom:1px solid #202831;cursor:pointer}.trace360Result:hover,.trace360Result.active{background:#16212b}.trace360Result b{font-size:12px;color:#e7edf4}.trace360Result .sub{font-size:9px;color:#8c98a5;margin-top:3px;line-height:1.4}.trace360Badge{display:inline-flex;padding:3px 7px;border-radius:10px;font-size:8px;font-weight:900;background:#16354a;color:#8edcff;margin-left:5px}.trace360Badge.green{background:#173c2b;color:#94e6b2}.trace360Badge.amber{background:#49391c;color:#ffd987}.trace360Badge.red{background:#4b252c;color:#ffb0ba}
+.trace360Detail{padding:12px}.trace360Empty{padding:24px;text-align:center;color:#7f8b98;font-size:11px}.trace360Summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:7px;margin-bottom:12px}.trace360Info{background:#111821;border:1px solid #29343f;border-radius:7px;padding:8px 9px;min-width:0}.trace360Info small{display:block;color:#7d8996;font-size:8px;text-transform:uppercase}.trace360Info b{display:block;margin-top:4px;font-size:12px;word-break:break-word}.trace360Timeline{position:relative;margin-top:8px}.trace360Event{display:grid;grid-template-columns:155px 18px minmax(0,1fr);gap:7px;position:relative}.trace360EventTime{font-size:9px;color:#8d99a6;text-align:right;padding:11px 4px 13px 0}.trace360DotCol{position:relative}.trace360DotCol:before{content:"";position:absolute;left:8px;top:0;bottom:0;width:1px;background:#34404d}.trace360Dot{position:absolute;left:4px;top:13px;width:9px;height:9px;border-radius:50%;background:#58a6ff;box-shadow:0 0 0 3px #0f151c}.trace360EventCard{margin:5px 0 7px;background:#111821;border:1px solid #2b3541;border-radius:8px;padding:9px 10px}.trace360EventTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.trace360EventTop b{font-size:11px}.trace360EventMeta{font-size:9px;color:#8d99a6;line-height:1.5;margin-top:5px}.trace360Amounts{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}.trace360Amt{background:#0d131a;border:1px solid #27323d;border-radius:6px;padding:5px 7px;font-size:9px}.trace360Amt strong{font-size:11px}.trace360Raw{margin-top:8px;border-top:1px solid #29343f;padding-top:7px}.trace360Raw summary{cursor:pointer;color:#9fb0c1;font-size:9px;font-weight:800}.trace360RawGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px;margin-top:7px}.trace360RawRow{font-size:9px;display:grid;grid-template-columns:minmax(90px,38%) 1fr;gap:6px;border-bottom:1px dashed #222c36;padding:3px 0}.trace360RawRow span:first-child{color:#778492}.trace360RawRow span:last-child{color:#d5dde6;word-break:break-word}.trace360Profile{margin-top:7px;padding:7px 8px;background:#0d1d27;border:1px solid #24455b;border-radius:6px;font-size:9px;line-height:1.45}.trace360Current{margin:10px 0 12px;padding:10px;background:#111821;border:1px solid #29343f;border-radius:8px}.trace360Current h3{font-size:11px;margin:0 0 7px}.trace360CurrentRow{font-size:9px;padding:5px 0;border-bottom:1px solid #222b35}.trace360CurrentRow:last-child{border-bottom:0}
+@media(max-width:1100px){.trace360Grid{grid-template-columns:1fr}.trace360Results{max-height:300px}.trace360Kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.trace360Search{grid-template-columns:1fr}.trace360Kpis{grid-template-columns:repeat(2,1fr)}.trace360Summary{grid-template-columns:repeat(2,1fr)}.trace360Event{grid-template-columns:100px 16px 1fr}.trace360EventTime{font-size:8px}.trace360RawGrid{grid-template-columns:1fr}}
+
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0f14">
@@ -1643,6 +1657,7 @@ body.heatSplit .layoutHeatGrid{
     <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
     <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
     <button class="btn" id="receiptModeBtn">📥 En recibo</button>
+    <button class="btn" id="trace360ModeBtn">🧬 Trazabilidad 360°</button>
   </div>
   <div id="rackView">
   <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -1926,6 +1941,49 @@ body.heatSplit .layoutHeatGrid{
         <tbody id="receiptBody"></tbody>
       </table>
       <div id="receiptEmpty" class="processEmpty" style="display:none">No hay unidades actualmente en RECIBO.</div>
+    </div>
+  </div>
+
+
+  <div id="trace360View" style="display:none">
+    <div class="trace360Hero">
+      <div class="trace360HeroText">
+        <h2>🧬 Trazabilidad 360° · Copérnico</h2>
+        <p>Explorador integral de movimientos. Busca por caja, EAN/SKU, empleado, ID, transacción, NoControl o cualquier dato publicado por el WMS. La ficha conserva todos los campos originales del movimiento para auditoría.</p>
+      </div>
+      <button class="btn" id="trace360RefreshBtn" type="button">↻ Recargar trazabilidad</button>
+    </div>
+
+    <div class="trace360Search">
+      <input id="trace360Search" placeholder="Ej: 556633 · 2888 · Matias Leguizamon · 3843 · RECIBE DESDE · NoControl...">
+      <select id="trace360Type">
+        <option value="all">Buscar en todo</option>
+        <option value="box">Caja</option>
+        <option value="sku">EAN / SKU</option>
+        <option value="employee">Empleado / ID</option>
+        <option value="transaction">Transacción / NoControl</option>
+      </select>
+      <button class="btn" id="trace360SearchBtn" type="button">Buscar</button>
+    </div>
+    <div id="trace360Status" class="processStatus">Cargá una búsqueda para explorar la trazabilidad.</div>
+
+    <div class="trace360Kpis">
+      <div class="trace360Kpi"><small>CAJAS INDEXADAS</small><b id="trace360Boxes">—</b><span>en trazabilidad publicada</span></div>
+      <div class="trace360Kpi"><small>MOVIMIENTOS</small><b id="trace360Moves">—</b><span>eventos WMS disponibles</span></div>
+      <div class="trace360Kpi"><small>RESULTADOS</small><b id="trace360Matches">0</b><span>coincidencias de búsqueda</span></div>
+      <div class="trace360Kpi"><small>EMPLEADOS</small><b id="trace360Employees">—</b><span>IDs detectados en movimientos</span></div>
+      <div class="trace360Kpi"><small>SKUs</small><b id="trace360Skus">—</b><span>EAN detectados</span></div>
+    </div>
+
+    <div class="trace360Grid">
+      <div class="trace360Panel">
+        <div class="trace360PanelHead"><b>Coincidencias</b><span id="trace360ResultMeta">Sin búsqueda</span></div>
+        <div id="trace360Results" class="trace360Results"><div class="trace360Empty">Escribí un dato arriba para comenzar.</div></div>
+      </div>
+      <div class="trace360Panel">
+        <div class="trace360PanelHead"><b>Historia completa</b><span>Movimientos ordenados cronológicamente</span></div>
+        <div id="trace360Detail" class="trace360Detail"><div class="trace360Empty">Seleccioná una caja para reconstruir su historia.</div></div>
+      </div>
     </div>
   </div>
 
@@ -2720,6 +2778,7 @@ function setDisplayMode(mode){
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
   $('receiptView').style.display=mode==='receipt'?'block':'none';
+  $('trace360View').style.display=mode==='trace360'?'block':'none';
 
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -2728,6 +2787,7 @@ function setDisplayMode(mode){
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
+  $('trace360ModeBtn').classList.toggle('active',mode==='trace360');
 
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
@@ -2735,6 +2795,131 @@ function setDisplayMode(mode){
   if(mode==='sanitation') buildSanitationPanel();
   if(mode==='process') buildPalletsProcessPanel();
   if(mode==='receipt') buildReceiptPanel();
+  if(mode==='trace360') buildTrace360Panel();
+}
+
+
+/* ===== Trazabilidad 360° ===== */
+let TRACE360_INDEX=null;
+let TRACE360_RESULTS=[];
+let TRACE360_SELECTED='';
+
+function trace360BoxMap(dataset){return dataset?.boxes&&typeof dataset.boxes==='object'?dataset.boxes:{}}
+function trace360RawText(obj){
+  try{return Object.entries(obj||{}).map(([k,v])=>k+' '+(typeof v==='object'?JSON.stringify(v):String(v??''))).join(' ').toLowerCase()}catch(e){return ''}
+}
+function trace360PersonById(id){return COPERNICO_BY_ID.get(receiptNorm(id))||null}
+function trace360BuildIndex(dataset){
+  const boxes=trace360BoxMap(dataset),entries=[];
+  const employees=new Set(),skus=new Set(); let moveCount=0;
+  Object.entries(boxes).forEach(([caja,result])=>{
+    const moves=trArr(result?.movimientos).filter(x=>x&&typeof x==='object');
+    moveCount+=moves.length;
+    const eans=new Set(),emps=new Set(),transactions=new Set(),controls=new Set();
+    moves.forEach(m=>{
+      const e=trEan(m); if(e){eans.add(e);skus.add(e)}
+      const id=trEmployeeId(m),name=trEmployee(m); if(id){employees.add(id);emps.add((name?name+' · ':'')+id)} else if(name)emps.add(name);
+      const t=trTransaccion(m);if(t)transactions.add(t);
+      const nc=trNoControl(m);if(nc)controls.add(nc);
+    });
+    const stockMatches=allNormalizedRows().filter(x=>String(x.caja||'').trim()===String(caja));
+    const text=[caja,[...eans].join(' '),[...emps].join(' '),[...transactions].join(' '),[...controls].join(' '),trace360RawText(result),moves.map(trace360RawText).join(' ')].join(' ').toLowerCase();
+    entries.push({caja:String(caja),result,moves,eans:[...eans],employees:[...emps],transactions:[...transactions],controls:[...controls],stockMatches,text});
+  });
+  return {entries,boxCount:entries.length,moveCount,employeeCount:employees.size,skuCount:skus.size};
+}
+function trace360SetKpis(idx,matches){
+  $('trace360Boxes').textContent=(idx?.boxCount??0).toLocaleString('es-AR');
+  $('trace360Moves').textContent=(idx?.moveCount??0).toLocaleString('es-AR');
+  $('trace360Employees').textContent=(idx?.employeeCount??0).toLocaleString('es-AR');
+  $('trace360Skus').textContent=(idx?.skuCount??0).toLocaleString('es-AR');
+  $('trace360Matches').textContent=(matches??0).toLocaleString('es-AR');
+}
+async function buildTrace360Panel(force=false){
+  const st=$('trace360Status');
+  try{
+    if(st){st.className='processStatus';st.textContent='Indexando trazabilidad publicada por Copérnico…'}
+    const ds=await loadTraceDataset(force);
+    TRACE360_INDEX=trace360BuildIndex(ds);
+    trace360SetKpis(TRACE360_INDEX,TRACE360_RESULTS.length);
+    if(st){st.className='processStatus ok';st.textContent='● Trazabilidad lista · '+TRACE360_INDEX.boxCount.toLocaleString('es-AR')+' cajas · '+TRACE360_INDEX.moveCount.toLocaleString('es-AR')+' movimientos'}
+    if($('trace360Search').value.trim()) trace360Search();
+  }catch(err){
+    TRACE360_INDEX=null;trace360SetKpis(null,0);
+    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar trazabilidad-cajas.json · '+(err.message||String(err))}
+  }
+}
+function trace360MatchesType(e,q,type){
+  if(type==='box')return e.caja.toLowerCase().includes(q);
+  if(type==='sku')return e.eans.join(' ').toLowerCase().includes(q);
+  if(type==='employee')return e.employees.join(' ').toLowerCase().includes(q);
+  if(type==='transaction')return (e.transactions.join(' ')+' '+e.controls.join(' ')).toLowerCase().includes(q);
+  return e.text.includes(q);
+}
+function trace360Search(){
+  if(!TRACE360_INDEX){buildTrace360Panel().then(trace360Search);return}
+  const q=$('trace360Search').value.trim().toLowerCase(),type=$('trace360Type').value;
+  if(!q){TRACE360_RESULTS=[];trace360SetKpis(TRACE360_INDEX,0);$('trace360ResultMeta').textContent='Sin búsqueda';$('trace360Results').innerHTML='<div class="trace360Empty">Escribí una caja, EAN, empleado, ID, transacción o cualquier dato del WMS.</div>';return}
+  TRACE360_RESULTS=TRACE360_INDEX.entries.filter(e=>trace360MatchesType(e,q,type)).slice(0,500);
+  trace360SetKpis(TRACE360_INDEX,TRACE360_RESULTS.length);
+  $('trace360ResultMeta').textContent=TRACE360_RESULTS.length.toLocaleString('es-AR')+' coincidencias'+(TRACE360_RESULTS.length===500?' (máx. 500)':'');
+  $('trace360Results').innerHTML=TRACE360_RESULTS.length?TRACE360_RESULTS.map(e=>{
+    const latest=e.moves.map(m=>trDateValue(m)).filter(Number.isFinite).sort((a,b)=>b-a)[0];
+    const active=TRACE360_SELECTED===e.caja?' active':'';
+    return '<div class="trace360Result'+active+'" data-tracebox="'+esc(e.caja)+'"><b>Caja '+esc(e.caja)+'</b><span class="trace360Badge">'+e.moves.length+' mov.</span>'+(e.stockMatches.length?'<span class="trace360Badge green">stock actual</span>':'')+'<div class="sub">EAN: '+esc(e.eans.join(', ')||'—')+'<br>Empleados: '+esc(e.employees.slice(0,3).join(' · ')||'—')+(e.employees.length>3?'…':'')+(latest?'<br>Último: '+esc(trDateLabel(latest,'')):'')+'</div></div>'
+  }).join(''):'<div class="trace360Empty">No encontré coincidencias.</div>';
+  document.querySelectorAll('[data-tracebox]').forEach(el=>el.onclick=()=>trace360ShowBox(el.dataset.tracebox));
+  if(TRACE360_RESULTS.length===1)trace360ShowBox(TRACE360_RESULTS[0].caja);
+}
+function trace360RawHtml(raw){
+  const entries=Object.entries(raw||{});
+  if(!entries.length)return '';
+  return '<details class="trace360Raw"><summary>Ver todos los campos WMS de este movimiento ('+entries.length+')</summary><div class="trace360RawGrid">'+entries.map(([k,v])=>'<div class="trace360RawRow"><span>'+esc(k)+'</span><span>'+esc(typeof v==='object'?JSON.stringify(v):String(v??'—'))+'</span></div>').join('')+'</div></details>';
+}
+function trace360EmployeeHtml(m){
+  const id=trEmployeeId(m),name=trEmployee(m),p=trace360PersonById(id);
+  if(!id&&!name)return '';
+  let h='<div class="trace360Profile"><strong>👤 '+esc(name||'Empleado')+'</strong>'+(id?' · ID '+esc(id):'');
+  if(p)h+='<br>Usuario: <strong>'+esc(p.usuario||'—')+'</strong> · Perfil Copérnico: <strong>'+esc(p.perfil||'—')+'</strong> · Equipo: <strong>'+esc(receiptTeamFromProfile(p.perfil)||'Sin clasificar')+'</strong>';
+  h+='</div>';return h;
+}
+function trace360CurrentHtml(e){
+  let rows=e.stockMatches||[];
+  if(!rows.length)return '<div class="trace360Current"><h3>📦 Estado actual conocido</h3><div class="muted">La caja no aparece asociada a una posición en el stock visible actual.</div></div>';
+  return '<div class="trace360Current"><h3>📦 Estado actual conocido en Inventario Referencia</h3>'+rows.map(x=>'<div class="trace360CurrentRow"><b>'+esc(x.ubicacion||'—')+'</b> · EAN '+esc(x.ean||'—')+' · Saldo <b>'+Number(x.saldo||0).toLocaleString('es-AR')+'</b> · Estatus '+esc(x.estatus||'—')+' · Gestión '+esc(x.gestion||'—')+(x.fv?' · FV '+esc(x.fv):'')+'</div>').join('')+'</div>';
+}
+function trace360ShowBox(caja){
+  if(!TRACE360_INDEX)return;
+  const e=TRACE360_INDEX.entries.find(x=>x.caja===String(caja));if(!e)return;
+  TRACE360_SELECTED=e.caja;
+  document.querySelectorAll('[data-tracebox]').forEach(el=>el.classList.toggle('active',el.dataset.tracebox===e.caja));
+  const normalized=e.moves.map(raw=>({raw,time:trDateValue(raw),ean:trEan(raw),estado:trEstado(raw),trans:trTransaccion(raw),mov:trMovimiento(raw),saldo:trSaldo(raw),employee:trEmployee(raw),id:trEmployeeId(raw),control:trNoControl(raw)})).sort((a,b)=>(Number.isFinite(a.time)?a.time:0)-(Number.isFinite(b.time)?b.time:0));
+  let first=normalized.find(x=>Number.isFinite(x.time)),last=[...normalized].reverse().find(x=>Number.isFinite(x.time));
+  const net=normalized.reduce((a,x)=>a+(Number.isFinite(x.mov)?x.mov:0),0);
+  const currSaldo=[...normalized].reverse().find(x=>Number.isFinite(x.saldo))?.saldo;
+  let html='<div class="trace360Summary">'+
+    '<div class="trace360Info"><small>Caja</small><b>'+esc(e.caja)+'</b></div>'+
+    '<div class="trace360Info"><small>EAN / SKU</small><b>'+esc(e.eans.join(', ')||'—')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Movimientos</small><b>'+normalized.length.toLocaleString('es-AR')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Saldo traza</small><b>'+(Number.isFinite(currSaldo)?currSaldo.toLocaleString('es-AR'):'—')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Primer evento</small><b>'+esc(first?trDateLabel(first.time,trDateRaw(first.raw)):'—')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Último evento</small><b>'+esc(last?trDateLabel(last.time,trDateRaw(last.raw)):'—')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Movimiento neto</small><b>'+net.toLocaleString('es-AR')+'</b></div>'+ 
+    '<div class="trace360Info"><small>Empleados</small><b>'+new Set(normalized.map(x=>x.id||x.employee).filter(Boolean)).size+'</b></div></div>';
+  html+=trace360CurrentHtml(e);
+  html+='<div class="trace360Timeline">';
+  normalized.forEach((x,i)=>{
+    const profile=trace360PersonById(x.id);
+    const state=(trNorm(x.estado)==='ENTRADA'||(Number.isFinite(x.mov)&&x.mov>0))?'green':((Number.isFinite(x.mov)&&x.mov<0)?'red':'amber');
+    html+='<div class="trace360Event"><div class="trace360EventTime">'+esc(Number.isFinite(x.time)?trDateLabel(x.time,trDateRaw(x.raw)):String(trDateRaw(x.raw)||'Sin fecha'))+'</div><div class="trace360DotCol"><i class="trace360Dot"></i></div><div class="trace360EventCard">'+
+      '<div class="trace360EventTop"><b>'+(esc(x.trans||x.estado||'Movimiento WMS'))+'</b><span class="trace360Badge '+state+'">'+esc(x.estado||'EVENTO')+'</span></div>'+ 
+      '<div class="trace360EventMeta">EAN <b>'+esc(x.ean||'—')+'</b>'+(x.control?' · NoControl <b>'+esc(x.control)+'</b>':'')+(x.employee||x.id?' · Responsable <b>'+esc(x.employee||'—')+'</b>'+(x.id?' (#'+esc(x.id)+')':''):'')+'</div>'+ 
+      '<div class="trace360Amounts">'+(Number.isFinite(x.mov)?'<div class="trace360Amt">Movimiento <strong>'+x.mov.toLocaleString('es-AR')+'</strong></div>':'')+(Number.isFinite(x.saldo)?'<div class="trace360Amt">Saldo <strong>'+x.saldo.toLocaleString('es-AR')+'</strong></div>':'')+'</div>'+ 
+      trace360EmployeeHtml(x.raw)+trace360RawHtml(x.raw)+'</div></div>';
+  });
+  html+='</div>';
+  if(e.result&&typeof e.result==='object')html+=trace360RawHtml(Object.fromEntries(Object.entries(e.result).filter(([k])=>k!=='movimientos')));
+  $('trace360Detail').innerHTML=html;
 }
 
 
@@ -3996,6 +4181,11 @@ $('processFilterField').onchange=()=>{fillToolValues('process',PROCESS_ROWS,$('p
 $('processFilterValue').onchange=()=>renderPalletsProcess();
 $('processGroupBy').onchange=()=>renderPalletsProcess();
 $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
+$('trace360ModeBtn').onclick=()=>setDisplayMode('trace360');
+$('trace360SearchBtn').onclick=()=>trace360Search();
+$('trace360Search').onkeydown=e=>{if(e.key==='Enter')trace360Search();};
+$('trace360Type').onchange=()=>{if($('trace360Search').value.trim())trace360Search();};
+$('trace360RefreshBtn').onclick=()=>{TRACE360_INDEX=null;TRACE360_RESULTS=[];TRACE360_SELECTED='';loadTraceDataset(true).then(()=>buildTrace360Panel(true));};
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
