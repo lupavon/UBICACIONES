@@ -40,6 +40,7 @@ jobs:
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
+          PLANRECIBO_URL = "https://services.copernicowms.com/backweb25/planrecibo"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
@@ -682,6 +683,110 @@ jobs:
                   )
               }
 
+          def normalize_receipt_link(value):
+              """
+              Normaliza la clave que Copérnico usa para vincular Inventario Referencia
+              con Consulta Recibo. Ej.: "4501988088-4501988088" queda igual, sin
+              espacios; si viniera repetida con diferencias de formato se homogeneiza.
+              """
+              text = str(value or "").strip()
+              if not text:
+                  return ""
+              parts = [p.strip() for p in text.split("-") if p.strip()]
+              return "-".join(parts)
+
+          def receipt_date_window(receipt_rows):
+              """
+              Consulta únicamente el período necesario para las cajas que hoy siguen
+              físicamente en RECIBO. Si faltan fechas, usa 365 días como contingencia.
+              """
+              today = now_utc().date()
+              candidates = []
+              for row in receipt_rows:
+                  raw = field(
+                      row,
+                      "fecharegistro", "FechaRegistro",
+                      "f_ultimo_movimiento", "FechaUltimoMovimiento"
+                  )
+                  ts = parse_date(raw)
+                  if ts != float("-inf"):
+                      try:
+                          candidates.append(
+                              datetime.fromtimestamp(ts, timezone.utc).date()
+                          )
+                      except Exception:
+                          pass
+
+              if candidates:
+                  start = min(candidates) - timedelta(days=30)
+              else:
+                  start = today - timedelta(days=365)
+
+              # Tope defensivo: no pedir más de 2 años en una sola consulta.
+              floor = today - timedelta(days=730)
+              if start < floor:
+                  start = floor
+
+              return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+
+          def load_supplier_by_unido(receipt_rows, jwt):
+              """
+              Fuente: Consulta Recibo.
+              Cruce comprobado:
+                  Inventario Referencia.ord_no -> Consulta Recibo.unido
+                  Consulta Recibo.nombreProveedor -> Proveedor
+              """
+              if not receipt_rows:
+                  return {}, {"queried": 0, "matched_keys": 0}
+
+              fecha_inicial, fecha_final = receipt_date_window(receipt_rows)
+              params = urllib.parse.urlencode({
+                  "documentooc": "",
+                  "tipodoc": "PO",
+                  "bodega": "47",
+                  "fecha_inicial": fecha_inicial,
+                  "fecha_final": fecha_final
+              })
+              url = PLANRECIBO_URL + "?" + params
+
+              payload, http_status, size = request_json(
+                  url,
+                  method="GET",
+                  jwt=jwt,
+                  timeout=120
+              )
+              plan_rows = extract_rows(payload)
+
+              supplier_by_unido = {}
+              for plan_row in plan_rows:
+                  unido = normalize_receipt_link(
+                      field(plan_row, "unido", "Unido")
+                  )
+                  proveedor = str(
+                      field(
+                          plan_row,
+                          "nombreProveedor", "NombreProveedor",
+                          "proveedor", "Proveedor"
+                      ) or ""
+                  ).strip()
+
+                  if unido and proveedor:
+                      supplier_by_unido[unido] = proveedor
+
+              print(
+                  "PLANRECIBO HTTP:", http_status,
+                  "· período:", fecha_inicial, "a", fecha_final,
+                  "· filas:", len(plan_rows),
+                  "· claves con proveedor:", len(supplier_by_unido),
+                  "· bytes:", size
+              )
+              return supplier_by_unido, {
+                  "queried": len(plan_rows),
+                  "matched_keys": len(supplier_by_unido),
+                  "fecha_inicial": fecha_inicial,
+                  "fecha_final": fecha_final
+              }
+
           # -----------------------------
           # EN RECIBO
           # -----------------------------
@@ -753,7 +858,7 @@ jobs:
               ) or "").strip()
               return EMPLOYEE_TEAM_BY_ID.get(emp_id, "Sin clasificar")
 
-          def build_receipt_row(stock_row, trace_move=None, trace_error=""):
+          def build_receipt_row(stock_row, trace_move=None, trace_error="", proveedor=""):
               return {
                   "Caja": field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja"),
                   "EAN": field(stock_row, "EAN", "ean"),
@@ -767,6 +872,7 @@ jobs:
                   "Responsable": (field(trace_move, "Nombre_empleado", "NombreEmpleado", "nombreEmpleado", "Empleado") if trace_move else ""),
                   "Id_empleado": (field(trace_move, "Id_empleado", "IdEmpleado", "idEmpleado") if trace_move else ""),
                   "Equipo": employee_team(trace_move),
+                  "Proveedor": str(proveedor or "").strip() or "Sin asociar",
                   "FechaIngresoRecibo": (field(trace_move, "fecha", "Fecha", "FechaMovimiento", "fecha_movimiento") if trace_move else ""),
                   "Trazabilidad": ("OK" if trace_move else (trace_error or "Sin movimiento a RECIBO identificado"))
               }
@@ -1139,6 +1245,23 @@ jobs:
                       if str(field(row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                   })
 
+                  # Proveedor: se resuelve una vez por ciclo usando la relación nativa
+                  # de Copérnico ord_no (Inventario Referencia) -> unido (Consulta Recibo).
+                  supplier_by_unido = {}
+                  supplier_stats = {}
+                  try:
+                      supplier_by_unido, supplier_stats = load_supplier_by_unido(
+                          receipt_stock_rows,
+                          jwt
+                      )
+                  except Exception as e:
+                      # El proveedor es un enriquecimiento secundario: si falla, no se
+                      # pierde ninguna caja de RECIBO ni se bloquea la actualización.
+                      print(
+                          "AVISO: no se pudo consultar proveedor en planrecibo:",
+                          str(e)[:300]
+                      )
+
                   receipt_trace_by_box = {}
 
                   def trace_receipt_one(caja):
@@ -1175,11 +1298,30 @@ jobs:
                   for stock_row in receipt_stock_rows:
                       caja = str(field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                       trace = receipt_trace_by_box.get(caja, {})
+                      receipt_link = normalize_receipt_link(
+                          field(stock_row, "ord_no", "OrdNo", "ordno")
+                      )
+                      proveedor = supplier_by_unido.get(receipt_link, "")
+
                       receipt_rows.append(build_receipt_row(
-                          stock_row, trace_move=trace.get("event"), trace_error=trace.get("error", "")
+                          stock_row,
+                          trace_move=trace.get("event"),
+                          trace_error=trace.get("error", ""),
+                          proveedor=proveedor
                       ))
 
                   identified_receipt = sum(1 for row in receipt_rows if row["Responsable"])
+                  suppliers_identified = sum(
+                      1 for row in receipt_rows
+                      if row.get("Proveedor") and row.get("Proveedor") != "Sin asociar"
+                  )
+                  print(
+                      "Proveedor asociado:",
+                      suppliers_identified,
+                      "de",
+                      len(receipt_rows),
+                      "líneas actuales en RECIBO"
+                  )
                   save_json_file(
                       RECEIPT_FILE,
                       {
@@ -1188,6 +1330,7 @@ jobs:
                           "total_lineas": len(receipt_rows),
                           "total_cajas": len(receipt_boxes),
                           "identificados": identified_receipt,
+                          "proveedores_identificados": suppliers_identified,
                           "rows": receipt_rows
                       }
                   )
