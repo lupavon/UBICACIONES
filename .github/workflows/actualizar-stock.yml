@@ -789,6 +789,13 @@ jobs:
               plan_rows = []
               total_bytes = 0
               monthly_calls = 0
+              estado_calls = 0
+              estados_con_datos = set()
+
+              # Copérnico filtra por "estado". Para no perder documentos ya
+              # terminados/cerrados, consultamos todos los estados operativos
+              # observables del módulo y acumulamos los resultados.
+              estados_planrecibo = [str(x) for x in range(1, 10)]
 
               cursor = start_dt.replace(day=1)
               while cursor <= end_dt:
@@ -807,37 +814,55 @@ jobs:
                   chunk_start = max(start_dt, cursor)
                   chunk_end = min(end_dt, next_month - timedelta(days=1))
 
-                  chunk_params = urllib.parse.urlencode({
-                      "documentooc": documentooc_trigger,
-                      "tipodeplaneacion": "12",
-                      "estado": "1",
-                      "tipodocto": "",
-                      "bodega": "47",
-                      "fecha_inicial": chunk_start.strftime("%Y%m%d"),
-                      "fecha_final": chunk_end.strftime("%Y%m%d")
-                  })
+                  for estado_value in estados_planrecibo:
+                      chunk_params = urllib.parse.urlencode({
+                          "documentooc": documentooc_trigger,
+                          "tipodeplaneacion": "12",
+                          "estado": estado_value,
+                          "tipodocto": "",
+                          "bodega": "47",
+                          "fecha_inicial": chunk_start.strftime("%Y%m%d"),
+                          "fecha_final": chunk_end.strftime("%Y%m%d")
+                      })
 
-                  payload, http_status, size = request_json(
-                      PLANRECIBO_URL + "?" + chunk_params,
-                      method="GET",
-                      jwt=jwt,
-                      timeout=120
-                  )
+                      try:
+                          payload, http_status, size = request_json(
+                              PLANRECIBO_URL + "?" + chunk_params,
+                              method="GET",
+                              jwt=jwt,
+                              timeout=120
+                          )
+                          chunk_rows = extract_rows(payload)
+                      except Exception as e:
+                          print(
+                              "PLANRECIBO BLOQUE ERROR:",
+                              chunk_start.strftime("%Y%m%d"),
+                              "a",
+                              chunk_end.strftime("%Y%m%d"),
+                              "· estado:", estado_value,
+                              "·", str(e)[:180]
+                          )
+                          estado_calls += 1
+                          continue
 
-                  chunk_rows = extract_rows(payload)
-                  plan_rows.extend(chunk_rows)
-                  total_bytes += size
+                      plan_rows.extend(chunk_rows)
+                      total_bytes += size
+                      estado_calls += 1
+
+                      if chunk_rows:
+                          estados_con_datos.add(estado_value)
+
+                      print(
+                          "PLANRECIBO BLOQUE:",
+                          chunk_start.strftime("%Y%m%d"),
+                          "a",
+                          chunk_end.strftime("%Y%m%d"),
+                          "· estado:", estado_value,
+                          "· HTTP:", http_status,
+                          "· filas:", len(chunk_rows)
+                      )
+
                   monthly_calls += 1
-
-                  print(
-                      "PLANRECIBO BLOQUE:",
-                      chunk_start.strftime("%Y%m%d"),
-                      "a",
-                      chunk_end.strftime("%Y%m%d"),
-                      "· HTTP:", http_status,
-                      "· filas:", len(chunk_rows)
-                  )
-
                   cursor = next_month
 
               # Deduplicar documentos devueltos en más de un bloque.
@@ -891,9 +916,11 @@ jobs:
 
               print(
                   "PLANRECIBO HTTP:", http_status,
-                  "· estado: 1 · tipodeplaneacion: 12",
+                  "· estados:", ",".join(sorted(estados_con_datos)) or "sin datos",
+                  "· tipodeplaneacion: 12",
                   "· período:", fecha_inicial, "a", fecha_final,
                   "· bloques:", monthly_calls,
+                  "· llamadas estado:", estado_calls,
                   "· filas:", len(plan_rows),
                   "· claves proveedor:", len(supplier_by_key),
                   "· ord_no no vacíos:", len(stock_keys),
@@ -909,7 +936,9 @@ jobs:
                   "matched_keys": len(supplier_by_key),
                   "fecha_inicial": fecha_inicial,
                   "fecha_final": fecha_final,
-                  "direct_hits": direct_hits
+                  "direct_hits": direct_hits,
+                  "estados_con_datos": sorted(estados_con_datos),
+                  "estado_calls": estado_calls
               }
 
           # -----------------------------
