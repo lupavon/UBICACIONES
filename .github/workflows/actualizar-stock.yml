@@ -47,6 +47,7 @@ jobs:
           STATUS_FILE = Path("sync-status.json")
           STOCK_FILE = Path("stock.json")
           PALLETS_FILE = Path("pallets-proceso.json")
+          RECEIPT_FILE = Path("en-recibo.json")
           TRACE_FILE = Path("trazabilidad-cajas.json")
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
 
@@ -680,6 +681,68 @@ jobs:
               }
 
           # -----------------------------
+          # EN RECIBO
+          # -----------------------------
+          # Mapa opcional por ID. Si Copérnico devuelve Equipo/Puesto/Rol/Perfil
+          # se usa ese dato; si no, completar acá los IDs conocidos.
+          EMPLOYEE_TEAM_BY_ID = {
+              # "3707": "Recepción",
+              # "3824": "Reabastecimiento",
+              # "3843": "Inventario",
+          }
+
+          def latest_move_to_receipt(moves):
+              candidates = []
+              for move in moves:
+                  destino = field(
+                      move,
+                      "UbicacionFinal", "ubicacion_final", "ubicacionfinal"
+                  )
+                  if norm_value(destino) == "RECIBO":
+                      candidates.append(move)
+              if not candidates:
+                  return None
+              return max(
+                  candidates,
+                  key=lambda x: parse_date(
+                      field(x, "fecha", "Fecha", "FechaMovimiento", "fecha_movimiento")
+                  )
+              )
+
+          def employee_team(trace_move):
+              if not trace_move:
+                  return "Sin clasificar"
+              direct = field(
+                  trace_move,
+                  "Equipo", "equipo", "Puesto", "puesto",
+                  "Rol", "rol", "Perfil", "perfil", "Sector", "sector"
+              )
+              if str(direct).strip():
+                  return str(direct).strip()
+              emp_id = str(field(
+                  trace_move, "Id_empleado", "IdEmpleado", "idEmpleado"
+              ) or "").strip()
+              return EMPLOYEE_TEAM_BY_ID.get(emp_id, "Sin clasificar")
+
+          def build_receipt_row(stock_row, trace_move=None, trace_error=""):
+              return {
+                  "Caja": field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja"),
+                  "EAN": field(stock_row, "EAN", "ean"),
+                  "Referencia": field(stock_row, "referencia", "Referencia", "ref"),
+                  "Descripcion": field(stock_row, "Descripcion", "descripcion", "Descripción"),
+                  "Saldo": field(stock_row, "Saldo", "saldo", "Cantidad", "cantidad"),
+                  "Unidad": field(stock_row, "UnidadMedida", "unidadMedida", "Unidad"),
+                  "FV": field(stock_row, "FV", "fv", "FechaVencimiento"),
+                  "Ubicacion": field(stock_row, "Ubicacion", "ubicacion") or "RECIBO",
+                  "PosicionOrigen": (field(trace_move, "UbicacionInicial", "ubicacion_inicial", "ubicacionInicial") if trace_move else ""),
+                  "Responsable": (field(trace_move, "Nombre_empleado", "NombreEmpleado", "nombreEmpleado", "Empleado") if trace_move else ""),
+                  "Id_empleado": (field(trace_move, "Id_empleado", "IdEmpleado", "idEmpleado") if trace_move else ""),
+                  "Equipo": employee_team(trace_move),
+                  "FechaIngresoRecibo": (field(trace_move, "fecha", "Fecha", "FechaMovimiento", "fecha_movimiento") if trace_move else ""),
+                  "Trazabilidad": ("OK" if trace_move else (trace_error or "Sin movimiento a RECIBO identificado"))
+              }
+
+          # -----------------------------
           # Estado persistente / backoff
           # -----------------------------
           status = load_json_file(
@@ -1018,6 +1081,79 @@ jobs:
                       "Se conservará el último válido:",
                       str(e)
                   )
+
+              # -----------------------------
+              # EN RECIBO
+              # -----------------------------
+              print("=== 3B. EN RECIBO ===")
+
+              try:
+                  receipt_stock_rows = [
+                      row for row in rows
+                      if norm_value(field(row, "Ubicacion", "ubicacion", "Location")) == "RECIBO"
+                  ]
+
+                  receipt_boxes = sorted({
+                      str(field(row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
+                      for row in receipt_stock_rows
+                      if str(field(row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
+                  })
+
+                  receipt_trace_by_box = {}
+
+                  def trace_receipt_one(caja):
+                      try:
+                          moves = query_ubicaciones(caja, jwt)
+                          event = latest_move_to_receipt(moves)
+                          return caja, event, ""
+                      except Exception as e:
+                          return caja, None, str(e)[:300]
+
+                  if receipt_boxes:
+                      executor = ThreadPoolExecutor(max_workers=min(8, len(receipt_boxes)))
+                      futures = {executor.submit(trace_receipt_one, caja): caja for caja in receipt_boxes}
+                      try:
+                          for future in as_completed(futures, timeout=35):
+                              caja = futures[future]
+                              try:
+                                  caja, event, error = future.result(timeout=1)
+                              except Exception as e:
+                                  event = None
+                                  error = "Error aislado: " + str(e)[:250]
+                              receipt_trace_by_box[caja] = {"event": event, "error": error}
+                      except Exception as e:
+                          print("AVISO: trazabilidad RECIBO incompleta:", str(e))
+                      finally:
+                          executor.shutdown(wait=False, cancel_futures=True)
+
+                      for caja in receipt_boxes:
+                          receipt_trace_by_box.setdefault(
+                              caja, {"event": None, "error": "Trazabilidad no disponible en este ciclo"}
+                          )
+
+                  receipt_rows = []
+                  for stock_row in receipt_stock_rows:
+                      caja = str(field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
+                      trace = receipt_trace_by_box.get(caja, {})
+                      receipt_rows.append(build_receipt_row(
+                          stock_row, trace_move=trace.get("event"), trace_error=trace.get("error", "")
+                      ))
+
+                  identified_receipt = sum(1 for row in receipt_rows if row["Responsable"])
+                  save_json_file(
+                      RECEIPT_FILE,
+                      {
+                          "updated_at": now_iso,
+                          "source": "Copernico WMS · RECIBO · trazabilidad de ubicaciones",
+                          "total_lineas": len(receipt_rows),
+                          "total_cajas": len(receipt_boxes),
+                          "identificados": identified_receipt,
+                          "rows": receipt_rows
+                      }
+                  )
+                  print("en-recibo.json generado correctamente")
+              except Exception as e:
+                  print("AVISO: en-recibo no pudo actualizarse. Se conservará el último válido:", str(e))
 
               # -----------------------------
               # TRAZABILIDAD DE MEZCLA · COMPACTA v14
@@ -1556,7 +1692,7 @@ jobs:
 
           mkdir -p /tmp/ubicaciones-sync
 
-          for f in stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
@@ -1565,13 +1701,13 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          for f in stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "/tmp/ubicaciones-sync/$f" ]; then
               cp "/tmp/ubicaciones-sync/$f" "$f"
             fi
           done
 
-          git add stock.json pallets-proceso.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
