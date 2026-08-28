@@ -1,6 +1,8 @@
 name: Actualizar datos Copernico
 
 on:
+  schedule:
+    - cron: "* * * * *"
   workflow_dispatch:
 
 permissions:
@@ -691,14 +693,41 @@ jobs:
               # "3843": "Inventario",
           }
 
+          def looks_like_receipt(value):
+              text = norm_value(value)
+              if not text:
+                  return False
+              return (
+                  text == "RECIBO"
+                  or "RECIB" in text
+                  or "RECEPC" in text
+              )
+
+          def row_is_receipt(row):
+              # Copérnico puede identificar recepción como ubicación, área, zona,
+              # sector o estado. No asumimos un único campo.
+              values = [
+                  field(row, "Ubicacion", "ubicacion", "Location"),
+                  field(row, "Area", "area", "Área"),
+                  field(row, "Zona", "zona"),
+                  field(row, "Sector", "sector"),
+                  field(row, "Estado", "estado", "Estatus", "estatus"),
+                  field(row, "TipoUbicacion", "tipo_ubicacion", "tipoUbicacion"),
+                  field(row, "NombreUbicacion", "nombre_ubicacion", "nombreUbicacion"),
+              ]
+              return any(looks_like_receipt(v) for v in values)
+
           def latest_move_to_receipt(moves):
               candidates = []
               for move in moves:
-                  destino = field(
-                      move,
-                      "UbicacionFinal", "ubicacion_final", "ubicacionfinal"
-                  )
-                  if norm_value(destino) == "RECIBO":
+                  destino_values = [
+                      field(move, "UbicacionFinal", "ubicacion_final", "ubicacionfinal"),
+                      field(move, "Ubicacion", "ubicacion", "Location"),
+                      field(move, "AreaFinal", "area_final", "areaFinal"),
+                      field(move, "ZonaFinal", "zona_final", "zonaFinal"),
+                      field(move, "SectorFinal", "sector_final", "sectorFinal"),
+                  ]
+                  if any(looks_like_receipt(v) for v in destino_values):
                       candidates.append(move)
               if not candidates:
                   return None
@@ -1088,10 +1117,21 @@ jobs:
               print("=== 3B. EN RECIBO ===")
 
               try:
-                  receipt_stock_rows = [
-                      row for row in rows
-                      if norm_value(field(row, "Ubicacion", "ubicacion", "Location")) == "RECIBO"
-                  ]
+                  receipt_stock_rows = [row for row in rows if row_is_receipt(row)]
+
+                  print("Filas detectadas en RECIBO/RECEPCION:", len(receipt_stock_rows))
+                  if receipt_stock_rows:
+                      sample_receipt = receipt_stock_rows[0]
+                      print(
+                          "Muestra recibo:",
+                          {
+                              "Ubicacion": field(sample_receipt, "Ubicacion", "ubicacion", "Location"),
+                              "Area": field(sample_receipt, "Area", "area", "Área"),
+                              "Zona": field(sample_receipt, "Zona", "zona"),
+                              "Sector": field(sample_receipt, "Sector", "sector"),
+                              "Estado": field(sample_receipt, "Estado", "estado", "Estatus", "estatus"),
+                          }
+                      )
 
                   receipt_boxes = sorted({
                       str(field(row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
