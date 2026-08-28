@@ -684,24 +684,36 @@ jobs:
               }
 
           def normalize_receipt_link(value):
+              return (
+                  str(value or "")
+                  .strip()
+                  .upper()
+                  .replace(" ", "")
+              )
+
+          def receipt_key_variants(value):
               """
-              Normaliza la clave que Copérnico usa para vincular Inventario Referencia
-              con Consulta Recibo. Ej.: "4501988088-4501988088" queda igual, sin
-              espacios; si viniera repetida con diferencias de formato se homogeneiza.
+              Genera variantes compatibles entre:
+              - Inventario Referencia: ord_no
+              - Consulta Recibo: unido / doctoERP / numDocumento
+              Ej.: 4501999143-4501999143 también genera 4501999143.
               """
-              text = str(value or "").strip()
-              if not text:
-                  return ""
-              parts = [p.strip() for p in text.split("-") if p.strip()]
-              return "-".join(parts)
+              raw = normalize_receipt_link(value)
+              if not raw:
+                  return set()
+
+              keys = {raw}
+              parts = [p for p in raw.split("-") if p]
+
+              if len(parts) == 2 and parts[0] == parts[1]:
+                  keys.add(parts[0])
+
+              return keys
 
           def receipt_date_window(receipt_rows):
-              """
-              Consulta únicamente el período necesario para las cajas que hoy siguen
-              físicamente en RECIBO. Si faltan fechas, usa 365 días como contingencia.
-              """
               today = now_utc().date()
               candidates = []
+
               for row in receipt_rows:
                   raw = field(
                       row,
@@ -717,12 +729,13 @@ jobs:
                       except Exception:
                           pass
 
+              # Buffer amplio porque una caja puede seguir en RECIBO aunque la OC
+              # haya sido creada bastante antes del último movimiento.
               if candidates:
-                  start = min(candidates) - timedelta(days=30)
+                  start = min(candidates) - timedelta(days=90)
               else:
-                  start = today - timedelta(days=365)
+                  start = today - timedelta(days=730)
 
-              # Tope defensivo: no pedir más de 2 años en una sola consulta.
               floor = today - timedelta(days=730)
               if start < floor:
                   start = floor
@@ -730,12 +743,6 @@ jobs:
               return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
 
           def load_supplier_by_unido(receipt_rows, jwt):
-              """
-              Fuente: Consulta Recibo.
-              Cruce comprobado:
-                  Inventario Referencia.ord_no -> Consulta Recibo.unido
-                  Consulta Recibo.nombreProveedor -> Proveedor
-              """
               if not receipt_rows:
                   return {}, {"queried": 0, "matched_keys": 0}
 
@@ -747,21 +754,18 @@ jobs:
                   "fecha_inicial": fecha_inicial,
                   "fecha_final": fecha_final
               })
-              url = PLANRECIBO_URL + "?" + params
 
               payload, http_status, size = request_json(
-                  url,
+                  PLANRECIBO_URL + "?" + params,
                   method="GET",
                   jwt=jwt,
                   timeout=120
               )
               plan_rows = extract_rows(payload)
 
-              supplier_by_unido = {}
+              supplier_by_key = {}
+
               for plan_row in plan_rows:
-                  unido = normalize_receipt_link(
-                      field(plan_row, "unido", "Unido")
-                  )
                   proveedor = str(
                       field(
                           plan_row,
@@ -770,21 +774,45 @@ jobs:
                       ) or ""
                   ).strip()
 
-                  if unido and proveedor:
-                      supplier_by_unido[unido] = proveedor
+                  if not proveedor:
+                      continue
+
+                  # No dependemos de una sola columna del endpoint.
+                  for raw_key in (
+                      field(plan_row, "unido", "Unido"),
+                      field(plan_row, "doctoERP", "DoctoERP"),
+                      field(plan_row, "numDocumento", "NumDocumento"),
+                      field(plan_row, "numdocumento")
+                  ):
+                      for key in receipt_key_variants(raw_key):
+                          supplier_by_key[key] = proveedor
+
+              stock_keys = []
+              for row in receipt_rows:
+                  raw = field(row, "ord_no", "OrdNo", "ordno")
+                  stock_keys.extend(receipt_key_variants(raw))
+
+              direct_hits = sum(1 for key in stock_keys if key in supplier_by_key)
 
               print(
                   "PLANRECIBO HTTP:", http_status,
                   "· período:", fecha_inicial, "a", fecha_final,
                   "· filas:", len(plan_rows),
-                  "· claves con proveedor:", len(supplier_by_unido),
+                  "· claves proveedor:", len(supplier_by_key),
+                  "· ord_no no vacíos:", len(stock_keys),
+                  "· coincidencias de clave:", direct_hits,
                   "· bytes:", size
               )
-              return supplier_by_unido, {
+
+              print("MUESTRA ord_no RECIBO:", stock_keys[:10])
+              print("MUESTRA claves PLANRECIBO:", list(supplier_by_key.keys())[:10])
+
+              return supplier_by_key, {
                   "queried": len(plan_rows),
-                  "matched_keys": len(supplier_by_unido),
+                  "matched_keys": len(supplier_by_key),
                   "fecha_inicial": fecha_inicial,
-                  "fecha_final": fecha_final
+                  "fecha_final": fecha_final,
+                  "direct_hits": direct_hits
               }
 
           # -----------------------------
@@ -1298,10 +1326,13 @@ jobs:
                   for stock_row in receipt_stock_rows:
                       caja = str(field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                       trace = receipt_trace_by_box.get(caja, {})
-                      receipt_link = normalize_receipt_link(
-                          field(stock_row, "ord_no", "OrdNo", "ordno")
-                      )
-                      proveedor = supplier_by_unido.get(receipt_link, "")
+                      proveedor = ""
+                      stock_ord_no = field(stock_row, "ord_no", "OrdNo", "ordno")
+
+                      for receipt_link in receipt_key_variants(stock_ord_no):
+                          proveedor = supplier_by_unido.get(receipt_link, "")
+                          if proveedor:
+                              break
 
                       receipt_rows.append(build_receipt_row(
                           stock_row,
