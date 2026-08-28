@@ -747,20 +747,39 @@ jobs:
                   return {}, {"queried": 0, "matched_keys": 0}
 
               fecha_inicial, fecha_final = receipt_date_window(receipt_rows)
+
+              # La pantalla de Consulta Recibo devuelve [] cuando documentooc va
+              # vacío. Usamos como disparador una OC real presente hoy en RECIBO.
+              documentooc_trigger = ""
+              fallback_trigger = ""
+
+              for row in receipt_rows:
+                  raw_ord = str(
+                      field(row, "ord_no", "OrdNo", "ordno") or ""
+                  ).strip()
+
+                  for key in receipt_key_variants(raw_ord):
+                      if not fallback_trigger and key:
+                          fallback_trigger = key
+
+                      # Priorizar formato OC SAP observado: 45xxxxxxxx
+                      if key.isdigit() and len(key) >= 10 and key.startswith("45"):
+                          documentooc_trigger = key
+                          break
+
+                  if documentooc_trigger:
+                      break
+
+              if not documentooc_trigger:
+                  documentooc_trigger = fallback_trigger
+
+              print(
+                  "PLANRECIBO documentooc disparador:",
+                  documentooc_trigger or "(vacío)"
+              )
               # Consulta Recibo: mantenemos los parámetros obligatorios de la
               # pantalla y agregamos el rango de fechas que usa el endpoint para
               # devolver recepciones históricas/actuales.
-              # Parámetros verificados contra la Request URL real de
-              # Copérnico > Recibo > Consulta Recibo.
-              params = urllib.parse.urlencode({
-                  "documentooc": "",
-                  "tipodocumento": "12",
-                  "estado": "1",
-                  "tipodocto": "",
-                  "bodega": "47",
-                  "fecha_inicial": fecha_inicial,
-                  "fecha_final": fecha_final
-              })
 
               # Copérnico devuelve [] cuando el rango es demasiado amplio.
               # Consultamos por bloques mensuales y acumulamos resultados.
@@ -789,7 +808,7 @@ jobs:
                   chunk_end = min(end_dt, next_month - timedelta(days=1))
 
                   chunk_params = urllib.parse.urlencode({
-                      "documentooc": "",
+                      "documentooc": documentooc_trigger,
                       "tipodocumento": "12",
                       "estado": "1",
                       "tipodocto": "",
