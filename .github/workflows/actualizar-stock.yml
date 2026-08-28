@@ -747,14 +747,18 @@ jobs:
                   return {}, {"queried": 0, "matched_keys": 0}
 
               fecha_inicial, fecha_final = receipt_date_window(receipt_rows)
-              # Parámetros copiados de la llamada real de
-              # Copérnico > Recibo > Consulta Recibo.
+              # Consulta Recibo: mantenemos los parámetros obligatorios de la
+              # pantalla y agregamos el rango de fechas que usa el endpoint para
+              # devolver recepciones históricas/actuales.
               params = urllib.parse.urlencode({
                   "documentooc": "",
                   "tipodocumento": "12",
                   "estado": "1",
                   "tipodocto": "",
-                  "bodega": "47"
+                  "tipodoc": "PO",
+                  "bodega": "47",
+                  "fecha_inicial": fecha_inicial,
+                  "fecha_final": fecha_final
               })
 
               payload, http_status, size = request_json(
@@ -799,6 +803,7 @@ jobs:
               print(
                   "PLANRECIBO HTTP:", http_status,
                   "· estado: 1 · tipodocumento: 12",
+                  "· período:", fecha_inicial, "a", fecha_final,
                   "· filas:", len(plan_rows),
                   "· claves proveedor:", len(supplier_by_key),
                   "· ord_no no vacíos:", len(stock_keys),
