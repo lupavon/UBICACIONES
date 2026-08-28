@@ -514,8 +514,8 @@ jobs:
           def audit_ghost_box(caja, jwt):
               """
               Revisa getmovimientos de una caja relevada como etiqueta fantasma.
-              No guarda el historial completo: solo cantidad, primer/último evento
-              y COUNTING_ERROR, para mantener el archivo muy liviano.
+              Guarda el historial completo de movimientos de cada caja,
+              además del resumen de primer/último evento y COUNTING_ERROR.
               """
               try:
                   payload = caja_api(
@@ -547,11 +547,17 @@ jobs:
                       ).upper().replace(" ", "_")
                   ]
 
+                  movimientos_completos = [
+                      compact_movement_event(m)
+                      for m in ordered
+                  ]
+
                   return {
                       "ok": True,
                       "caja": str(caja).strip(),
                       "tiene_movimientos": bool(ordered),
                       "movimientos_count": len(ordered),
+                      "movimientos": movimientos_completos,
                       "primer_movimiento": (
                           compact_movement_event(ordered[0])
                           if ordered else None
@@ -572,6 +578,7 @@ jobs:
                       "caja": str(caja).strip(),
                       "tiene_movimientos": None,
                       "movimientos_count": None,
+                      "movimientos": [],
                       "counting_error_count": None,
                       "error": str(e)[:300]
                   }
@@ -1414,15 +1421,15 @@ jobs:
                           }
 
                   ghost_payload = {
-                      "schema_version": 1,
+                      "schema_version": 2,
                       "updated_at": now_iso,
                       "source": (
                           "Copernico WMS · auditoría de etiquetas/cajas fantasma"
                       ),
                       "criterion": (
                           "Se consulta getmovimientos para las 119 cajas únicas "
-                          "de la columna ETIQUETA del relevamiento. Se publica solo "
-                          "un resumen, sin historial completo."
+                          "de la columna ETIQUETA del relevamiento. Se publica el "
+                          "historial completo de movimientos de cada caja recuperada."
                       ),
                       "box_count": len(GHOST_BOXES),
                       "consulted_ok_count": sum(
