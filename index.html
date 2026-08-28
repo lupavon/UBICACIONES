@@ -1891,6 +1891,13 @@ body.heatSplit .layoutHeatGrid{
     <div class="receiptToolbar">
       <input id="receiptSearch" placeholder="Buscar caja, SKU, descripción, origen, responsable o equipo...">
       <select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
+      <select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
+        <option value="all">Todo actual</option>
+        <option value="exclude_today">Hasta ayer (excluye hoy)</option>
+        <option value="yesterday">Solo ayer</option>
+        <option value="old">Viejos (anteriores a ayer)</option>
+        <option value="today">Solo hoy</option>
+      </select>
       <button class="btn" id="receiptRefreshBtn">↻ Actualizar</button>
     </div>
     <div class="tableTools">
@@ -2957,10 +2964,40 @@ function fillReceiptTeams(){
   sel.innerHTML='<option value="">Todos los equipos</option>'+teams.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
   if(teams.includes(current))sel.value=current;
 }
+function receiptDateOnly(v){
+  const raw=String(v||'').trim();
+  if(!raw)return null;
+  let d=null;
+  // ISO / fecha nativa
+  d=new Date(raw);
+  if(!isNaN(d))return new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  // dd/mm/yyyy [hh:mm:ss]
+  const m=raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  if(m){
+    d=new Date(+m[3],+m[2]-1,+m[1]);
+    if(!isNaN(d))return d;
+  }
+  return null;
+}
+function receiptAgeMatches(r,mode){
+  if(!mode||mode==='all')return true;
+  const d=receiptDateOnly(receiptField(r,'fecha'));
+  if(!d)return false;
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
+  if(mode==='today')return d.getTime()===today.getTime();
+  if(mode==='yesterday')return d.getTime()===yesterday.getTime();
+  if(mode==='exclude_today')return d<today;
+  if(mode==='old')return d<yesterday;
+  return true;
+}
+
 function renderReceipt(){
   const body=$('receiptBody'),empty=$('receiptEmpty');if(!body||!empty)return;
   const q=String($('receiptSearch')?.value||'').trim().toLowerCase();
   const team=String($('receiptTeamFilter')?.value||'').trim();
+  const ageMode=String($('receiptAgeFilter')?.value||'all');
   setupTableToolSelects('receipt',RECEIPT_FIELDS);
   const filterField=String($('receiptFilterField')?.value||'');
   fillToolValues('receipt',RECEIPT_ROWS,filterField,receiptField);
@@ -2969,6 +3006,7 @@ function renderReceipt(){
   let rows=RECEIPT_ROWS.slice();
   if(q)rows=rows.filter(r=>['caja','sku','desc','origen','responsable','id','equipo','fecha'].map(k=>receiptField(r,k)).join(' ').toLowerCase().includes(q));
   if(team)rows=rows.filter(r=>String(receiptField(r,'equipo')||'Sin clasificar')===team);
+  rows=rows.filter(r=>receiptAgeMatches(r,ageMode));
   if(filterField&&filterValue)rows=rows.filter(r=>(String(receiptField(r,filterField)||'—').trim()||'—')===filterValue);
   rows.sort((a,b)=>groupKey?(String(receiptField(a,groupKey)||'').localeCompare(String(receiptField(b,groupKey)||''),'es',{numeric:true,sensitivity:'base'})||receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir):receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir);
   empty.style.display=rows.length?'none':'block';
@@ -2991,9 +3029,9 @@ function renderReceipt(){
   document.querySelectorAll('[data-receipt-sort]').forEach(th=>{
     const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.receiptSort===RECEIPT_SORT.key?(RECEIPT_SORT.dir===1?'↑':'↓'):'↕';
   });
-  const boxes=new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
-  const units=RECEIPT_ROWS.reduce((a,r)=>a+(Number(String(receiptField(r,'saldo')).replace(',','.'))||0),0);
-  const identified=RECEIPT_ROWS.filter(r=>receiptField(r,'responsable')).length;
+  const boxes=new Set(rows.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
+  const units=rows.reduce((a,r)=>a+(Number(String(receiptField(r,'saldo')).replace(',','.'))||0),0);
+  const identified=rows.filter(r=>receiptField(r,'responsable')).length;
   $('receiptBoxCount').textContent=boxes.size.toLocaleString('es-AR');
   $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
@@ -3868,10 +3906,11 @@ $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilter
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
+$('receiptAgeFilter').onchange=()=>renderReceipt();
 $('receiptFilterField').onchange=()=>{fillToolValues('receipt',RECEIPT_ROWS,$('receiptFilterField').value,receiptField);renderReceipt();};
 $('receiptFilterValue').onchange=()=>renderReceipt();
 $('receiptGroupBy').onchange=()=>renderReceipt();
-$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';$('receiptTeamFilter').value='';$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
+$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';$('receiptTeamFilter').value='';$('receiptAgeFilter').value='all';$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
 $('receiptRefreshBtn').onclick=()=>buildReceiptPanel(true);
 document.querySelectorAll('[data-receipt-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.receiptSort;if(RECEIPT_SORT.key===k)RECEIPT_SORT.dir*=-1;else{RECEIPT_SORT.key=k;RECEIPT_SORT.dir=1}renderReceipt();});
 $('sanGroupSelect').onchange=()=>{
