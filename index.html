@@ -1,8 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
 <title>UBICACIONES · Dashboard de Depósito</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -1010,28 +1011,13 @@ body.heatSplit .layoutHeatGrid{
 .groupRow .groupMeta{color:#9aa8b7;font-weight:700;margin-left:8px;font-size:10px}
 @media(max-width:900px){.tableTools{align-items:stretch}.tableTools select{width:100%;min-width:0}.tableTools .toolLabel{width:100%;margin-top:2px}}
 
-
-/* ===== Trazabilidad 360° ===== */
-.trace360Hero{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
-.trace360HeroText{max-width:900px}.trace360HeroText h2{margin:0 0 5px;font-size:21px}.trace360HeroText p{margin:0;color:#8d99a6;font-size:11px;line-height:1.45}
-.trace360Search{display:grid;grid-template-columns:minmax(260px,1fr) 190px auto;gap:8px;margin:12px 0}
-.trace360Search input,.trace360Search select{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:10px 11px;min-width:0}
-.trace360Kpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin:10px 0 14px}
-.trace360Kpi{background:#111821;border:1px solid #2b3541;border-radius:8px;padding:10px 11px}.trace360Kpi small{display:block;color:#7f8b98;font-size:8px;font-weight:800;letter-spacing:.06em}.trace360Kpi b{display:block;font-size:22px;margin-top:5px}.trace360Kpi span{display:block;color:#8793a0;font-size:9px;margin-top:3px}
-.trace360Grid{display:grid;grid-template-columns:minmax(280px,34%) minmax(0,66%);gap:12px;align-items:start}
-.trace360Panel{background:#0f151c;border:1px solid #28323d;border-radius:9px;overflow:hidden}.trace360PanelHead{padding:10px 12px;background:#121921;border-bottom:1px solid #27313b;display:flex;justify-content:space-between;gap:8px;align-items:center}.trace360PanelHead b{font-size:12px}.trace360PanelHead span{font-size:9px;color:#7f8b98}.trace360Results{max-height:68vh;overflow:auto}.trace360Result{padding:10px 12px;border-bottom:1px solid #202831;cursor:pointer}.trace360Result:hover,.trace360Result.active{background:#16212b}.trace360Result b{font-size:12px;color:#e7edf4}.trace360Result .sub{font-size:9px;color:#8c98a5;margin-top:3px;line-height:1.4}.trace360Badge{display:inline-flex;padding:3px 7px;border-radius:10px;font-size:8px;font-weight:900;background:#16354a;color:#8edcff;margin-left:5px}.trace360Badge.green{background:#173c2b;color:#94e6b2}.trace360Badge.amber{background:#49391c;color:#ffd987}.trace360Badge.red{background:#4b252c;color:#ffb0ba}
-.trace360Detail{padding:12px}.trace360Empty{padding:24px;text-align:center;color:#7f8b98;font-size:11px}.trace360Summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:7px;margin-bottom:12px}.trace360Info{background:#111821;border:1px solid #29343f;border-radius:7px;padding:8px 9px;min-width:0}.trace360Info small{display:block;color:#7d8996;font-size:8px;text-transform:uppercase}.trace360Info b{display:block;margin-top:4px;font-size:12px;word-break:break-word}.trace360Timeline{position:relative;margin-top:8px}.trace360Event{display:grid;grid-template-columns:155px 18px minmax(0,1fr);gap:7px;position:relative}.trace360EventTime{font-size:9px;color:#8d99a6;text-align:right;padding:11px 4px 13px 0}.trace360DotCol{position:relative}.trace360DotCol:before{content:"";position:absolute;left:8px;top:0;bottom:0;width:1px;background:#34404d}.trace360Dot{position:absolute;left:4px;top:13px;width:9px;height:9px;border-radius:50%;background:#58a6ff;box-shadow:0 0 0 3px #0f151c}.trace360EventCard{margin:5px 0 7px;background:#111821;border:1px solid #2b3541;border-radius:8px;padding:9px 10px}.trace360EventTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.trace360EventTop b{font-size:11px}.trace360EventMeta{font-size:9px;color:#8d99a6;line-height:1.5;margin-top:5px}.trace360Amounts{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}.trace360Amt{background:#0d131a;border:1px solid #27323d;border-radius:6px;padding:5px 7px;font-size:9px}.trace360Amt strong{font-size:11px}.trace360Raw{margin-top:8px;border-top:1px solid #29343f;padding-top:7px}.trace360Raw summary{cursor:pointer;color:#9fb0c1;font-size:9px;font-weight:800}.trace360RawGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px;margin-top:7px}.trace360RawRow{font-size:9px;display:grid;grid-template-columns:minmax(90px,38%) 1fr;gap:6px;border-bottom:1px dashed #222c36;padding:3px 0}.trace360RawRow span:first-child{color:#778492}.trace360RawRow span:last-child{color:#d5dde6;word-break:break-word}.trace360Profile{margin-top:7px;padding:7px 8px;background:#0d1d27;border:1px solid #24455b;border-radius:6px;font-size:9px;line-height:1.45}.trace360Current{margin:10px 0 12px;padding:10px;background:#111821;border:1px solid #29343f;border-radius:8px}.trace360Current h3{font-size:11px;margin:0 0 7px}.trace360CurrentRow{font-size:9px;padding:5px 0;border-bottom:1px solid #222b35}.trace360CurrentRow:last-child{border-bottom:0}
-@media(max-width:1100px){.trace360Grid{grid-template-columns:1fr}.trace360Results{max-height:300px}.trace360Kpis{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:700px){.trace360Search{grid-template-columns:1fr}.trace360Kpis{grid-template-columns:repeat(2,1fr)}.trace360Summary{grid-template-columns:repeat(2,1fr)}.trace360Event{grid-template-columns:100px 16px 1fr}.trace360EventTime{font-size:8px}.trace360RawGrid{grid-template-columns:1fr}}
-
 </style>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0f14">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="UBICACIONES">
-<link rel="apple-touch-icon" href="icon-192.png">
-
+<link href="manifest.webmanifest" rel="manifest"/>
+<meta content="#0b0f14" name="theme-color"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
+<meta content="UBICACIONES" name="apple-mobile-web-app-title"/>
+<link href="icon-192.png" rel="apple-touch-icon"/>
 <style>
 /* v20: detalle visible solo después de seleccionar una ubicación */
 .side #detail:empty{display:none}
@@ -1041,8 +1027,6 @@ body.heatSplit .layoutHeatGrid{
   .side #detail:empty{display:none}
 }
 </style>
-
-
 <style>
 /* v21 · sugerencias de reubicación */
 .movePlan{
@@ -1109,8 +1093,6 @@ body.heatSplit .layoutHeatGrid{
   font-weight:800;
 }
 </style>
-
-
 <style>
 /* v25 · Mapa de calor de ocupación */
 .occCell{
@@ -1154,8 +1136,6 @@ body.heatSplit .layoutHeatGrid{
   line-height:1;
 }
 </style>
-
-
 <style>
 /* v28 productivo · panel KPI */
 .opsKpiGrid{
@@ -1298,8 +1278,6 @@ body.heatSplit .layoutHeatGrid{
   .opsAlertRow .hideMobile{display:none}
 }
 </style>
-
-
 <style>
 /* v32 · saneamiento 1 SKU por posición */
 .sanControls{
@@ -1429,8 +1407,6 @@ body.heatSplit .layoutHeatGrid{
   .sanControls>div:first-child{width:100%}
 }
 </style>
-
-
 <style>
 /* v34 · saneamiento modo operario */
 .sanViewSwitch{
@@ -1577,8 +1553,6 @@ body.heatSplit .layoutHeatGrid{
   .sanViewSwitch #sanCoordinatorBtn{display:none}
 }
 </style>
-
-
 <style>
 .mbMfcToolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:12px 0}
 .mbMfcToolbar label{display:block;font-size:9px;font-weight:900;color:#8f9ba7;margin-bottom:4px;text-transform:uppercase}
@@ -1600,8 +1574,6 @@ body.heatSplit .layoutHeatGrid{
 .mbMfcNote{padding:9px 10px;border:1px solid #34404b;border-radius:8px;background:#121921;color:#95a2ae;font-size:9px;line-height:1.45;margin-bottom:10px}
 @media(max-width:700px){.mbMfcKpis{grid-template-columns:repeat(2,1fr)}.mbMfcToolbar>div{flex:1 1 140px}.mbMfcToolbar select,.mbMfcToolbar input{width:100%;min-width:0}}
 </style>
-
-
 <style>
 /* MFCC físico: cada módulo tiene solo 4 posiciones etiquetadas (01, 04, 07, 10). */
 .rack.mfcc4{
@@ -1609,8 +1581,6 @@ body.heatSplit .layoutHeatGrid{
   grid-template-rows:repeat(4,56px);
 }
 </style>
-
-
 <style>
 /* v35 · trazabilidad de mezcla SKU */
 .mixTraceBox{margin-top:10px;border:1px solid #334150;background:#101821;border-radius:9px;padding:10px}
@@ -1623,8 +1593,6 @@ body.heatSplit .layoutHeatGrid{
 .mixTraceEvent b{color:#e7eef5}.mixTraceUser{color:#79dcff;font-weight:900}.mixTraceSku{color:#ffcf80;font-weight:800}.mixTraceNote{font-size:8px;color:#7f8c99;margin-top:7px}
 .mixTraceRetry{margin-top:8px;font-size:9px;padding:6px 8px}
 </style>
-
-
 <style>
 .mixTraceDebug{margin-top:10px;border-top:1px solid #34404d;padding-top:8px}
 .mixTraceDebug summary{cursor:pointer;color:#8fdcff;font-size:9px;font-weight:800}
@@ -1633,371 +1601,302 @@ body.heatSplit .layoutHeatGrid{
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Cargando referencia de stock…</small></div>
-  <div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
-  <div class="controls">
-    <button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
-    <label class="filelabel">Vista previa XLSX local<input id="fileInput" type="file" accept=".xlsx,.xls"></label>
-    <input id="search" class="search" placeholder="Buscar SKU, EAN, descripción o ubicación...">
-  </div>
-  <div class="kpis">
-    <div class="kpi"><b id="kOcc">0</b><span>ocupadas</span></div>
-    <div class="kpi"><b id="kBad">0</b><span>mal ubicadas</span></div>
-    <div class="kpi"><b id="kMulti">0</b><span>mezcla SKU</span></div>
-    <div class="kpi"><b id="kUnknown">0</b><span>sin clasificación</span></div>
-  </div>
+<div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Cargando referencia de stock…</small></div>
+<div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
+<div class="controls">
+<button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
+<label class="filelabel">Vista previa XLSX local<input accept=".xlsx,.xls" id="fileInput" type="file"/></label>
+<input class="search" id="search" placeholder="Buscar SKU, EAN, descripción o ubicación..."/>
+</div>
+<div class="kpis">
+<div class="kpi"><b id="kOcc">0</b><span>ocupadas</span></div>
+<div class="kpi"><b id="kBad">0</b><span>mal ubicadas</span></div>
+<div class="kpi"><b id="kMulti">0</b><span>mezcla SKU</span></div>
+<div class="kpi"><b id="kUnknown">0</b><span>sin clasificación</span></div>
+</div>
 </div>
 <div class="layout">
 <main class="main">
-  <div class="modebar">
-    <button class="btn active" id="rackModeBtn">Vista racks</button>
-    <button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
-    <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
-    <button class="btn" id="kpiModeBtn">📊 KPIs</button>
-    <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
-    <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
-    <button class="btn" id="receiptModeBtn">📥 En recibo</button>
-    <button class="btn" id="trace360ModeBtn">🧬 Trazabilidad 360°</button>
-  </div>
-  <div id="rackView">
-  <div class="viewtitle" id="viewTitle">MFCA · L</div>
-  <div class="legend">
-    <span><i class="dot" style="background:#d6aa78"></i>1 SKU · correcta</span>
-    <span><i class="dot" style="background:#f0a23b"></i>Grupo incorrecto</span>
-    <span><i class="dot" style="background:#d64555"></i>Más de 1 SKU</span>
-    <span><i class="dot" style="background:#343d49"></i>Sin grupo</span>
-    <span><i class="dot" style="background:#151b23;border:1px solid #3a424e"></i>Vacía</span>
-    <span><i class="dot" style="background:#58d7ff"></i>Coincidencia de búsqueda</span>
-  </div>
-  <div class="filterbar">
-    <button class="btn active" data-filter="all">Todas</button>
-    <button class="btn" data-filter="bad">Solo mal ubicadas</button>
-    <button class="btn" data-filter="multi">Solo mezcla SKU</button>
-  </div>
-  <div id="racks"></div>
-  </div>
-  <div id="heatmapView">
-    <div class="layoutHeatTitle">Mapa de calor · vista superior</div>
-    <div class="layoutHeatSubtitle">Misma distribución física del Layout Secos MFC, con foco en posiciones que contienen más de 1 SKU.</div>
-
-    <div class="layoutHeatToolbar">
-      <div class="layoutHeatLegend">
-        <span><i style="background:#29313b"></i> Sin mezcla</span>
-        <span><i style="background:#d7a64f"></i> Baja</span>
-        <span><i style="background:#d9833e"></i> Media</span>
-        <span><i style="background:#b83c43"></i> Alta</span>
-        <span><i style="background:#62d8ff"></i> Búsqueda</span>
-      </div>
-      <div class="layoutHeatStats">
-        <div class="layoutHeatStat"><b id="heatModules">0</b><small>módulos</small></div>
-        <div class="layoutHeatStat"><b id="heatMixedModules">0</b><small>con mezcla</small></div>
-        <div class="layoutHeatStat"><b id="heatMixedSlots">0</b><small>posiciones mixtas</small></div>
-      </div>
-    </div>
-
-    <div class="layoutHeatHint">Cada bloque representa el mismo módulo del layout. El indicador superior muestra cuántas posiciones de ese módulo tienen mezcla de SKU.</div>
-    <div class="layoutHeatViewport">
-      <div class="layoutHeatSectionLabel">SECO MFC ACTUAL</div>
-      <div id="heatmap" class="layoutHeatGrid"></div>
-    </div>
-    <div id="heatDetailHost"></div>
-  </div>
-
-  <div id="occupancyView" style="display:none">
-    <div class="layoutHeatTitle">Mapa de calor · ocupación</div>
-    <div class="layoutHeatSubtitle">Vista superior del mismo Layout Secos MFC. El color muestra qué porcentaje de posiciones físicas del módulo están ocupadas.</div>
-
-    <div class="layoutHeatToolbar">
-      <div class="layoutHeatLegend">
-        <span><i style="background:#29313b"></i> 0%</span>
-        <span><i style="background:#315f4b"></i> Baja</span>
-        <span><i style="background:#66844a"></i> Media</span>
-        <span><i style="background:#a3873e"></i> Alta</span>
-        <span><i style="background:#b34b3e"></i> Saturada</span>
-      </div>
-      <div class="layoutHeatStats">
-        <div class="layoutHeatStat"><b id="occModules">0</b><small>módulos</small></div>
-        <div class="layoutHeatStat"><b id="occAvg">0%</b><small>ocupación media</small></div>
-        <div class="layoutHeatStat"><b id="occFull">0</b><small>≥ 90%</small></div>
-      </div>
-    </div>
-
-    <div class="layoutHeatHint">Cada bloque representa un módulo. El porcentaje indica posiciones ocupadas / posiciones físicas disponibles.</div>
-    <div class="layoutHeatViewport">
-      <div class="layoutHeatSectionLabel">SECO MFC ACTUAL · OCUPACIÓN</div>
-      <div id="occupancyMap" class="layoutHeatGrid"></div>
-    </div>
-  </div>
-
-  <div id="kpiView" style="display:none">
-    <div class="layoutHeatTitle">Panel de KPIs</div>
-    <div class="layoutHeatSubtitle">Indicadores de ocupación, calidad de almacenamiento y capacidad por grupo logístico.</div>
-
-    <div class="opsKpiGrid">
-      <div class="opsKpiCard"><small>OCUPACIÓN TOTAL</small><b id="kpiOccPct">0%</b><span id="kpiOccDetail">0 / 0 posiciones</span></div>
-      <div class="opsKpiCard"><small>POSICIONES VACÍAS</small><b id="kpiEmpty">0</b><span>capacidad disponible</span></div>
-      <div class="opsKpiCard"><small>MEZCLA DE SKU</small><b id="kpiMixed">0</b><span id="kpiMixedPct">0% de ocupadas</span></div>
-      <div class="opsKpiCard"><small>MAL UBICADAS</small><b id="kpiBad">0</b><span id="kpiBadPct">0% de ocupadas</span></div>
-      <div class="opsKpiCard"><small>MÓDULOS ≥ 90%</small><b id="kpiSaturated">0</b><span>riesgo de saturación</span></div>
-      <div class="opsKpiCard"><small>GRUPOS ACTIVOS</small><b id="kpiGroups">0</b><span>según layout</span></div>
-    </div>
-
-    <div class="opsSection">
-      <div class="opsSectionHead">
-        <div><b>Ocupación por grupo logístico</b><span>Capacidad física vs. posiciones ocupadas</span></div>
-        <button class="btn" id="sortGroupBtn" type="button">Ordenar por ocupación</button>
-      </div>
-      <div class="opsGroupTableWrap">
-        <table class="opsGroupTable">
-          <thead><tr>
-            <th>Grupo</th><th>Ocupadas</th><th>Capacidad</th><th>Vacías</th><th>Ocupación</th><th>Mezclas</th><th>Incorrectas</th>
-          </tr></thead>
-          <tbody id="kpiGroupBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="opsSection">
-      <div class="opsSectionHead">
-        <div><b>Ocupación por zona</b><span>Resumen operativo por sector</span></div>
-      </div>
-      <div id="kpiZoneGrid" class="opsZoneGrid"></div>
-    </div>
-
-    <div class="opsSection">
-      <div class="opsSectionHead">
-        <div><b>Alertas prioritarias</b><span>Módulos con mayor presión de ocupación o desvíos</span></div>
-      </div>
-      <div id="kpiAlerts" class="opsAlerts"></div>
-    </div>
-  </div>
-
-  <div id="sanitationView" style="display:none">
-    <div class="layoutHeatTitle">Saneamiento · 1 SKU por posición</div>
-    <div class="layoutHeatSubtitle">Seleccioná un grupo logístico para generar un plan de movimientos desde posiciones mezcladas hacia posiciones vacías compatibles.</div>
-
-    <div class="sanControls">
-      <div>
-        <label for="sanGroupSelect">Código de grupo</label>
-        <select id="sanGroupSelect"></select>
-      </div>
-      <div class="sanControlActions">
-        <button class="btn" id="sanRefreshBtn" type="button">Recalcular plan</button>
-      </div>
-    </div>
-
-    <div class="opsKpiGrid sanKpiGrid">
-      <div class="opsKpiCard"><small>POSICIONES A SANEAR</small><b id="sanMixedPositions">0</b><span>con más de 1 SKU</span></div>
-      <div class="opsKpiCard"><small>MOVIMIENTOS PROPUESTOS</small><b id="sanMoves">0</b><span>SKU a reubicar</span></div>
-      <div class="opsKpiCard"><small>UNIDADES A MOVER</small><b id="sanUnits">0</b><span>según saldo actual</span></div>
-      <div class="opsKpiCard"><small>DESTINOS DISPONIBLES</small><b id="sanDestinations">0</b><span>vacíos y compatibles</span></div>
-      <div class="opsKpiCard"><small>SIN DESTINO</small><b id="sanNoDest">0</b><span>requieren revisión</span></div>
-      <div class="opsKpiCard"><small>GRUPO SELECCIONADO</small><b id="sanGroupLabel">—</b><span id="sanGroupMeta">sin selección</span></div>
-    </div>
-
-    <div class="sanViewSwitch">
-      <button class="btn active" id="sanOperatorBtn" type="button">Modo operario</button>
-      <button class="btn" id="sanCoordinatorBtn" type="button">Vista completa</button>
-    </div>
-
-    <div id="sanOperatorView">
-      <div class="sanOperatorHeader">
-        <div><span id="sanTaskCounter">0 de 0</span><b id="sanTaskStatus">Sin tareas</b></div>
-        <div class="sanOperatorNav">
-          <button class="btn" id="sanPrevBtn" type="button">← Anterior</button>
-          <button class="btn" id="sanNextBtn" type="button">Siguiente →</button>
-        </div>
-      </div>
-      <div id="sanTaskCard"></div>
-    </div>
-
-    <div id="sanCoordinatorView" style="display:none">
-    <div class="opsSection">
-      <div class="opsSectionHead">
-        <div><b>Plan de movimientos</b><span>Solo se sugieren posiciones que no aparecen en el stock publicado. Un destino se reserva una sola vez dentro del plan para evitar duplicados.</span></div>
-      </div>
-      <div class="sanTableWrap">
-        <table class="sanTable">
-          <thead>
-            <tr>
-              <th>Origen</th>
-              <th>SKU / descripción</th>
-              <th>Unidades</th>
-              <th>Grupo SKU</th>
-              <th>Acción</th>
-              <th>Destino sugerido</th>
-              <th>Alternativas</th>
-            </tr>
-          </thead>
-          <tbody id="sanPlanBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    </div>
-
-    <div class="opsSection">
-      <div class="opsSectionHead">
-        <div><b>Posiciones mezcladas del grupo</b><span>Resumen por ubicación antes de ejecutar movimientos.</span></div>
-      </div>
-      <div id="sanSourceCards" class="sanSourceGrid"></div>
-    </div>
-  </div>
-
-
-  <div id="palletsProcessView" style="display:none">
-    <div class="layoutHeatTitle">Pallets en proceso</div>
-    <div class="layoutHeatSubtitle">
+<div class="modebar">
+<button class="btn active" id="rackModeBtn">Vista racks</button>
+<button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
+<button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
+<button class="btn" id="kpiModeBtn">📊 KPIs</button>
+<button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
+<button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
+<button class="btn" id="receiptModeBtn">📥 En recibo</button>
+</div>
+<div id="rackView">
+<div class="viewtitle" id="viewTitle">MFCA · L</div>
+<div class="legend">
+<span><i class="dot" style="background:#d6aa78"></i>1 SKU · correcta</span>
+<span><i class="dot" style="background:#f0a23b"></i>Grupo incorrecto</span>
+<span><i class="dot" style="background:#d64555"></i>Más de 1 SKU</span>
+<span><i class="dot" style="background:#343d49"></i>Sin grupo</span>
+<span><i class="dot" style="background:#151b23;border:1px solid #3a424e"></i>Vacía</span>
+<span><i class="dot" style="background:#58d7ff"></i>Coincidencia de búsqueda</span>
+</div>
+<div class="filterbar">
+<button class="btn active" data-filter="all">Todas</button>
+<button class="btn" data-filter="bad">Solo mal ubicadas</button>
+<button class="btn" data-filter="multi">Solo mezcla SKU</button>
+</div>
+<div id="racks"></div>
+</div>
+<div id="heatmapView">
+<div class="layoutHeatTitle">Mapa de calor · vista superior</div>
+<div class="layoutHeatSubtitle">Misma distribución física del Layout Secos MFC, con foco en posiciones que contienen más de 1 SKU.</div>
+<div class="layoutHeatToolbar">
+<div class="layoutHeatLegend">
+<span><i style="background:#29313b"></i> Sin mezcla</span>
+<span><i style="background:#d7a64f"></i> Baja</span>
+<span><i style="background:#d9833e"></i> Media</span>
+<span><i style="background:#b83c43"></i> Alta</span>
+<span><i style="background:#62d8ff"></i> Búsqueda</span>
+</div>
+<div class="layoutHeatStats">
+<div class="layoutHeatStat"><b id="heatModules">0</b><small>módulos</small></div>
+<div class="layoutHeatStat"><b id="heatMixedModules">0</b><small>con mezcla</small></div>
+<div class="layoutHeatStat"><b id="heatMixedSlots">0</b><small>posiciones mixtas</small></div>
+</div>
+</div>
+<div class="layoutHeatHint">Cada bloque representa el mismo módulo del layout. El indicador superior muestra cuántas posiciones de ese módulo tienen mezcla de SKU.</div>
+<div class="layoutHeatViewport">
+<div class="layoutHeatSectionLabel">SECO MFC ACTUAL</div>
+<div class="layoutHeatGrid" id="heatmap"></div>
+</div>
+<div id="heatDetailHost"></div>
+</div>
+<div id="occupancyView" style="display:none">
+<div class="layoutHeatTitle">Mapa de calor · ocupación</div>
+<div class="layoutHeatSubtitle">Vista superior del mismo Layout Secos MFC. El color muestra qué porcentaje de posiciones físicas del módulo están ocupadas.</div>
+<div class="layoutHeatToolbar">
+<div class="layoutHeatLegend">
+<span><i style="background:#29313b"></i> 0%</span>
+<span><i style="background:#315f4b"></i> Baja</span>
+<span><i style="background:#66844a"></i> Media</span>
+<span><i style="background:#a3873e"></i> Alta</span>
+<span><i style="background:#b34b3e"></i> Saturada</span>
+</div>
+<div class="layoutHeatStats">
+<div class="layoutHeatStat"><b id="occModules">0</b><small>módulos</small></div>
+<div class="layoutHeatStat"><b id="occAvg">0%</b><small>ocupación media</small></div>
+<div class="layoutHeatStat"><b id="occFull">0</b><small>≥ 90%</small></div>
+</div>
+</div>
+<div class="layoutHeatHint">Cada bloque representa un módulo. El porcentaje indica posiciones ocupadas / posiciones físicas disponibles.</div>
+<div class="layoutHeatViewport">
+<div class="layoutHeatSectionLabel">SECO MFC ACTUAL · OCUPACIÓN</div>
+<div class="layoutHeatGrid" id="occupancyMap"></div>
+</div>
+</div>
+<div id="kpiView" style="display:none">
+<div class="layoutHeatTitle">Panel de KPIs</div>
+<div class="layoutHeatSubtitle">Indicadores de ocupación, calidad de almacenamiento y capacidad por grupo logístico.</div>
+<div class="opsKpiGrid">
+<div class="opsKpiCard"><small>OCUPACIÓN TOTAL</small><b id="kpiOccPct">0%</b><span id="kpiOccDetail">0 / 0 posiciones</span></div>
+<div class="opsKpiCard"><small>POSICIONES VACÍAS</small><b id="kpiEmpty">0</b><span>capacidad disponible</span></div>
+<div class="opsKpiCard"><small>MEZCLA DE SKU</small><b id="kpiMixed">0</b><span id="kpiMixedPct">0% de ocupadas</span></div>
+<div class="opsKpiCard"><small>MAL UBICADAS</small><b id="kpiBad">0</b><span id="kpiBadPct">0% de ocupadas</span></div>
+<div class="opsKpiCard"><small>MÓDULOS ≥ 90%</small><b id="kpiSaturated">0</b><span>riesgo de saturación</span></div>
+<div class="opsKpiCard"><small>GRUPOS ACTIVOS</small><b id="kpiGroups">0</b><span>según layout</span></div>
+</div>
+<div class="opsSection">
+<div class="opsSectionHead">
+<div><b>Ocupación por grupo logístico</b><span>Capacidad física vs. posiciones ocupadas</span></div>
+<button class="btn" id="sortGroupBtn" type="button">Ordenar por ocupación</button>
+</div>
+<div class="opsGroupTableWrap">
+<table class="opsGroupTable">
+<thead><tr>
+<th>Grupo</th><th>Ocupadas</th><th>Capacidad</th><th>Vacías</th><th>Ocupación</th><th>Mezclas</th><th>Incorrectas</th>
+</tr></thead>
+<tbody id="kpiGroupBody"></tbody>
+</table>
+</div>
+</div>
+<div class="opsSection">
+<div class="opsSectionHead">
+<div><b>Ocupación por zona</b><span>Resumen operativo por sector</span></div>
+</div>
+<div class="opsZoneGrid" id="kpiZoneGrid"></div>
+</div>
+<div class="opsSection">
+<div class="opsSectionHead">
+<div><b>Alertas prioritarias</b><span>Módulos con mayor presión de ocupación o desvíos</span></div>
+</div>
+<div class="opsAlerts" id="kpiAlerts"></div>
+</div>
+</div>
+<div id="sanitationView" style="display:none">
+<div class="layoutHeatTitle">Saneamiento · 1 SKU por posición</div>
+<div class="layoutHeatSubtitle">Seleccioná un grupo logístico para generar un plan de movimientos desde posiciones mezcladas hacia posiciones vacías compatibles.</div>
+<div class="sanControls">
+<div>
+<label for="sanGroupSelect">Código de grupo</label>
+<select id="sanGroupSelect"></select>
+</div>
+<div class="sanControlActions">
+<button class="btn" id="sanRefreshBtn" type="button">Recalcular plan</button>
+</div>
+</div>
+<div class="opsKpiGrid sanKpiGrid">
+<div class="opsKpiCard"><small>POSICIONES A SANEAR</small><b id="sanMixedPositions">0</b><span>con más de 1 SKU</span></div>
+<div class="opsKpiCard"><small>MOVIMIENTOS PROPUESTOS</small><b id="sanMoves">0</b><span>SKU a reubicar</span></div>
+<div class="opsKpiCard"><small>UNIDADES A MOVER</small><b id="sanUnits">0</b><span>según saldo actual</span></div>
+<div class="opsKpiCard"><small>DESTINOS DISPONIBLES</small><b id="sanDestinations">0</b><span>vacíos y compatibles</span></div>
+<div class="opsKpiCard"><small>SIN DESTINO</small><b id="sanNoDest">0</b><span>requieren revisión</span></div>
+<div class="opsKpiCard"><small>GRUPO SELECCIONADO</small><b id="sanGroupLabel">—</b><span id="sanGroupMeta">sin selección</span></div>
+</div>
+<div class="sanViewSwitch">
+<button class="btn active" id="sanOperatorBtn" type="button">Modo operario</button>
+<button class="btn" id="sanCoordinatorBtn" type="button">Vista completa</button>
+</div>
+<div id="sanOperatorView">
+<div class="sanOperatorHeader">
+<div><span id="sanTaskCounter">0 de 0</span><b id="sanTaskStatus">Sin tareas</b></div>
+<div class="sanOperatorNav">
+<button class="btn" id="sanPrevBtn" type="button">← Anterior</button>
+<button class="btn" id="sanNextBtn" type="button">Siguiente →</button>
+</div>
+</div>
+<div id="sanTaskCard"></div>
+</div>
+<div id="sanCoordinatorView" style="display:none">
+<div class="opsSection">
+<div class="opsSectionHead">
+<div><b>Plan de movimientos</b><span>Solo se sugieren posiciones que no aparecen en el stock publicado. Un destino se reserva una sola vez dentro del plan para evitar duplicados.</span></div>
+</div>
+<div class="sanTableWrap">
+<table class="sanTable">
+<thead>
+<tr>
+<th>Origen</th>
+<th>SKU / descripción</th>
+<th>Unidades</th>
+<th>Grupo SKU</th>
+<th>Acción</th>
+<th>Destino sugerido</th>
+<th>Alternativas</th>
+</tr>
+</thead>
+<tbody id="sanPlanBody"></tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="opsSection">
+<div class="opsSectionHead">
+<div><b>Posiciones mezcladas del grupo</b><span>Resumen por ubicación antes de ejecutar movimientos.</span></div>
+</div>
+<div class="sanSourceGrid" id="sanSourceCards"></div>
+</div>
+</div>
+<div id="palletsProcessView" style="display:none">
+<div class="layoutHeatTitle">Pallets en proceso</div>
+<div class="layoutHeatSubtitle">
       Pallets que actualmente figuran en <b>EN_PROCESO</b>. Para cada caja se muestra desde qué posición fue enviada y el maquinista que realizó ese movimiento.
     </div>
-
-    <div class="processKpis">
-      <div class="processKpi"><small>PALLETS</small><b id="processPalletCount">0</b><span>cajas distintas</span></div>
-      <div class="processKpi"><small>LÍNEAS</small><b id="processLineCount">0</b><span>inventario en proceso</span></div>
-      <div class="processKpi"><small>IDENTIFICADOS</small><b id="processIdentifiedCount">0</b><span>con maquinista + origen</span></div>
+<div class="processKpis">
+<div class="processKpi"><small>PALLETS</small><b id="processPalletCount">0</b><span>cajas distintas</span></div>
+<div class="processKpi"><small>LÍNEAS</small><b id="processLineCount">0</b><span>inventario en proceso</span></div>
+<div class="processKpi"><small>IDENTIFICADOS</small><b id="processIdentifiedCount">0</b><span>con maquinista + origen</span></div>
+</div>
+<div class="processToolbar">
+<input id="processSearch" placeholder="Buscar caja, SKU, descripción, origen o maquinista..."/>
+<button class="btn" id="processRefreshBtn">↻ Actualizar</button>
+</div>
+<div class="tableTools">
+<span class="toolLabel">FILTRAR</span>
+<select id="processFilterField"><option value="">Elegir campo…</option></select>
+<select disabled="" id="processFilterValue"><option value="">Todos los valores</option></select>
+<span class="toolLabel">AGRUPAR</span>
+<select id="processGroupBy"><option value="">Sin agrupar</option></select>
+<button class="btn" id="processClearTools" type="button">Limpiar</button>
+</div>
+<div class="processStatus" id="processStatus">Cargando pallets en proceso…</div>
+<div class="processTableWrap">
+<table class="processTable">
+<thead>
+<tr>
+<th>Caja</th>
+<th>SKU / EAN</th>
+<th>Descripción</th>
+<th>Saldo</th>
+<th>FV</th>
+<th>Desde posición</th>
+<th>Maquinista</th>
+<th>ID empleado</th>
+<th>Ingreso a proceso</th>
+</tr>
+</thead>
+<tbody id="processBody"></tbody>
+</table>
+<div class="processEmpty" id="processEmpty" style="display:none">No hay pallets actualmente en EN_PROCESO.</div>
+</div>
+</div>
+<div id="receiptView" style="display:none">
+<div class="layoutHeatTitle">En recibo</div>
+<div class="layoutHeatSubtitle">
+      Unidades que actualmente figuran en <b>RECIBO</b>. Fuente primaria: Inventario Referencia de Copérnico. Proveedor: cruce <b>Referencia ord_no ↔ Consulta Recibo unido</b>. El equipo se deriva del perfil de Copérnico.
     </div>
-
-    <div class="processToolbar">
-      <input id="processSearch" placeholder="Buscar caja, SKU, descripción, origen o maquinista...">
-      <button class="btn" id="processRefreshBtn">↻ Actualizar</button>
-    </div>
-    <div class="tableTools">
-      <span class="toolLabel">FILTRAR</span>
-      <select id="processFilterField"><option value="">Elegir campo…</option></select>
-      <select id="processFilterValue" disabled><option value="">Todos los valores</option></select>
-      <span class="toolLabel">AGRUPAR</span>
-      <select id="processGroupBy"><option value="">Sin agrupar</option></select>
-      <button class="btn" id="processClearTools" type="button">Limpiar</button>
-    </div>
-
-    <div id="processStatus" class="processStatus">Cargando pallets en proceso…</div>
-
-    <div class="processTableWrap">
-      <table class="processTable">
-        <thead>
-          <tr>
-            <th>Caja</th>
-            <th>SKU / EAN</th>
-            <th>Descripción</th>
-            <th>Saldo</th>
-            <th>FV</th>
-            <th>Desde posición</th>
-            <th>Maquinista</th>
-            <th>ID empleado</th>
-            <th>Ingreso a proceso</th>
-          </tr>
-        </thead>
-        <tbody id="processBody"></tbody>
-      </table>
-      <div id="processEmpty" class="processEmpty" style="display:none">No hay pallets actualmente en EN_PROCESO.</div>
-    </div>
-  </div>
-
-  <div id="receiptView" style="display:none">
-    <div class="layoutHeatTitle">En recibo</div>
-    <div class="layoutHeatSubtitle">
-      Unidades que actualmente figuran en <b>RECIBO</b>. El equipo se deriva del perfil de Copérnico: Inventarios → <b>Inventario</b>, Recibo → <b>Recepción</b> y picking → <b>Reabastecedor</b>.
-    </div>
-    <div class="processKpis">
-      <div class="processKpi"><small>CAJAS</small><b id="receiptBoxCount">0</b><span>cajas distintas</span></div>
-      <div class="processKpi"><small>UNIDADES</small><b id="receiptUnitCount">0</b><span>saldo actual en recibo</span></div>
-      <div class="processKpi"><small>IDENTIFICADAS</small><b id="receiptIdentifiedCount">0</b><span>con responsable</span></div>
-    </div>
-    <div class="receiptToolbar">
-      <input id="receiptSearch" placeholder="Buscar caja, SKU, descripción, origen, responsable o equipo...">
-      <select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
-      <select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
-        <option value="all">Todo actual</option>
-        <option value="exclude_today">Hasta ayer (excluye hoy)</option>
-        <option value="yesterday">Solo ayer</option>
-        <option value="old">Viejos (anteriores a ayer)</option>
-        <option value="today">Solo hoy</option>
-      </select>
-      <button class="btn" id="receiptRefreshBtn">↻ Actualizar</button>
-    </div>
-    <div class="tableTools">
-      <span class="toolLabel">FILTRAR</span>
-      <select id="receiptFilterField"><option value="">Elegir campo…</option></select>
-      <select id="receiptFilterValue" disabled><option value="">Todos los valores</option></select>
-      <span class="toolLabel">AGRUPAR</span>
-      <select id="receiptGroupBy"><option value="">Sin agrupar</option></select>
-      <button class="btn" id="receiptClearTools" type="button">Limpiar</button>
-    </div>
-    <div id="receiptStatus" class="processStatus">Cargando unidades en recibo…</div>
-    <div class="receiptTableWrap">
-      <table class="receiptTable">
-        <thead><tr>
-          <th data-receipt-sort="caja">Caja <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="sku">SKU / EAN <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="desc">Descripción <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="saldo">Unidades <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="fv">FV <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="origen">Desde posición <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="responsable">Responsable <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="id">ID empleado <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="equipo">Equipo <span class="sortMark">↕</span></th>
-          <th data-receipt-sort="fecha">Ingreso a recibo <span class="sortMark">↕</span></th>
-        </tr></thead>
-        <tbody id="receiptBody"></tbody>
-      </table>
-      <div id="receiptEmpty" class="processEmpty" style="display:none">No hay unidades actualmente en RECIBO.</div>
-    </div>
-  </div>
-
-
-  <div id="trace360View" style="display:none">
-    <div class="trace360Hero">
-      <div class="trace360HeroText">
-        <h2>🧬 Trazabilidad 360° · Copérnico</h2>
-        <p>Explorador integral de movimientos. Busca por caja, EAN/SKU, empleado, ID, transacción, NoControl o cualquier dato publicado por el WMS. La ficha conserva todos los campos originales del movimiento para auditoría.</p>
-      </div>
-      <button class="btn" id="trace360RefreshBtn" type="button">↻ Recargar trazabilidad</button>
-    </div>
-
-    <div class="trace360Search">
-      <input id="trace360Search" placeholder="Ej: 556633 · 2888 · Matias Leguizamon · 3843 · RECIBE DESDE · NoControl...">
-      <select id="trace360Type">
-        <option value="all">Buscar en todo</option>
-        <option value="box">Caja</option>
-        <option value="sku">EAN / SKU</option>
-        <option value="employee">Empleado / ID</option>
-        <option value="transaction">Transacción / NoControl</option>
-      </select>
-      <button class="btn" id="trace360SearchBtn" type="button">Buscar</button>
-    </div>
-    <div id="trace360Status" class="processStatus">Cargá una búsqueda para explorar la trazabilidad.</div>
-
-    <div class="trace360Kpis">
-      <div class="trace360Kpi"><small>CAJAS INDEXADAS</small><b id="trace360Boxes">—</b><span>en trazabilidad publicada</span></div>
-      <div class="trace360Kpi"><small>MOVIMIENTOS</small><b id="trace360Moves">—</b><span>eventos WMS disponibles</span></div>
-      <div class="trace360Kpi"><small>RESULTADOS</small><b id="trace360Matches">0</b><span>coincidencias de búsqueda</span></div>
-      <div class="trace360Kpi"><small>EMPLEADOS</small><b id="trace360Employees">—</b><span>IDs detectados en movimientos</span></div>
-      <div class="trace360Kpi"><small>SKUs</small><b id="trace360Skus">—</b><span>EAN detectados</span></div>
-    </div>
-
-    <div class="trace360Grid">
-      <div class="trace360Panel">
-        <div class="trace360PanelHead"><b>Coincidencias</b><span id="trace360ResultMeta">Sin búsqueda</span></div>
-        <div id="trace360Results" class="trace360Results"><div class="trace360Empty">Escribí un dato arriba para comenzar.</div></div>
-      </div>
-      <div class="trace360Panel">
-        <div class="trace360PanelHead"><b>Historia completa</b><span>Movimientos ordenados cronológicamente</span></div>
-        <div id="trace360Detail" class="trace360Detail"><div class="trace360Empty">Seleccioná una caja para reconstruir su historia.</div></div>
-      </div>
-    </div>
-  </div>
-
+<div class="processKpis">
+<div class="processKpi"><small>CAJAS</small><b id="receiptBoxCount">0</b><span>cajas distintas</span></div>
+<div class="processKpi"><small>UNIDADES</small><b id="receiptUnitCount">0</b><span>saldo actual en recibo</span></div>
+<div class="processKpi"><small>IDENTIFICADAS</small><b id="receiptIdentifiedCount">0</b><span>con responsable</span></div>
+</div>
+<div class="receiptToolbar">
+<input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, proveedor, descripción, responsable o equipo..."/>
+<select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
+<select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
+<option value="all">Todo actual</option>
+<option value="exclude_today">Hasta ayer (excluye hoy)</option>
+<option value="yesterday">Solo ayer</option>
+<option value="old">Viejos (anteriores a ayer)</option>
+<option value="today">Solo hoy</option>
+</select>
+<button class="btn" id="receiptRefreshBtn">↻ Actualizar</button>
+</div>
+<div class="tableTools">
+<span class="toolLabel">FILTRAR</span>
+<select id="receiptFilterField"><option value="">Elegir campo…</option></select>
+<select disabled="" id="receiptFilterValue"><option value="">Todos los valores</option></select>
+<span class="toolLabel">AGRUPAR</span>
+<select id="receiptGroupBy"><option value="">Sin agrupar</option></select>
+<button class="btn" id="receiptClearTools" type="button">Limpiar</button>
+</div>
+<div class="processStatus" id="receiptStatus">Cargando unidades en recibo…</div>
+<div class="receiptTableWrap">
+<table class="receiptTable">
+<thead><tr>
+<th data-receipt-sort="caja">Caja <span class="sortMark">↕</span></th>
+<th data-receipt-sort="sku">SKU / EAN <span class="sortMark">↕</span></th>
+<th data-receipt-sort="desc">Descripción <span class="sortMark">↕</span></th>
+<th data-receipt-sort="saldo">Unidades <span class="sortMark">↕</span></th>
+<th data-receipt-sort="fv">FV <span class="sortMark">↕</span></th>
+<th data-receipt-sort="factura">Factura <span class="sortMark">↕</span></th>
+<th data-receipt-sort="oc">OC <span class="sortMark">↕</span></th>
+<th data-receipt-sort="proveedor">Proveedor <span class="sortMark">↕</span></th>
+<th data-receipt-sort="origen">Desde posición <span class="sortMark">↕</span></th>
+<th data-receipt-sort="responsable">Responsable <span class="sortMark">↕</span></th>
+<th data-receipt-sort="id">ID empleado <span class="sortMark">↕</span></th>
+<th data-receipt-sort="equipo">Equipo <span class="sortMark">↕</span></th>
+<th data-receipt-sort="fecha">Ingreso a recibo <span class="sortMark">↕</span></th>
+</tr></thead>
+<tbody id="receiptBody"></tbody>
+</table>
+<div class="processEmpty" id="receiptEmpty" style="display:none">No hay unidades actualmente en RECIBO.</div>
+</div>
+</div>
 </main>
 </div>
-
 <div id="detailHomeAnchor"></div>
 <section class="detailSection">
-  <div class="detailSectionInner">
-    <h2>Detalle de posición</h2>
-    <div id="detail"></div>
-  </div>
+<div class="detailSectionInner">
+<h2>Detalle de posición</h2>
+<div id="detail"></div>
+</div>
 </section>
-
 <script>
 
 let DATA=[];
@@ -2778,7 +2677,6 @@ function setDisplayMode(mode){
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
   $('receiptView').style.display=mode==='receipt'?'block':'none';
-  $('trace360View').style.display=mode==='trace360'?'block':'none';
 
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -2787,7 +2685,6 @@ function setDisplayMode(mode){
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
-  $('trace360ModeBtn').classList.toggle('active',mode==='trace360');
 
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
@@ -2795,136 +2692,11 @@ function setDisplayMode(mode){
   if(mode==='sanitation') buildSanitationPanel();
   if(mode==='process') buildPalletsProcessPanel();
   if(mode==='receipt') buildReceiptPanel();
-  if(mode==='trace360') buildTrace360Panel();
-}
-
-
-/* ===== Trazabilidad 360° ===== */
-let TRACE360_INDEX=null;
-let TRACE360_RESULTS=[];
-let TRACE360_SELECTED='';
-
-function trace360BoxMap(dataset){return dataset?.boxes&&typeof dataset.boxes==='object'?dataset.boxes:{}}
-function trace360RawText(obj){
-  try{return Object.entries(obj||{}).map(([k,v])=>k+' '+(typeof v==='object'?JSON.stringify(v):String(v??''))).join(' ').toLowerCase()}catch(e){return ''}
-}
-function trace360PersonById(id){return COPERNICO_BY_ID.get(receiptNorm(id))||null}
-function trace360BuildIndex(dataset){
-  const boxes=trace360BoxMap(dataset),entries=[];
-  const employees=new Set(),skus=new Set(); let moveCount=0;
-  Object.entries(boxes).forEach(([caja,result])=>{
-    const moves=trArr(result?.movimientos).filter(x=>x&&typeof x==='object');
-    moveCount+=moves.length;
-    const eans=new Set(),emps=new Set(),transactions=new Set(),controls=new Set();
-    moves.forEach(m=>{
-      const e=trEan(m); if(e){eans.add(e);skus.add(e)}
-      const id=trEmployeeId(m),name=trEmployee(m); if(id){employees.add(id);emps.add((name?name+' · ':'')+id)} else if(name)emps.add(name);
-      const t=trTransaccion(m);if(t)transactions.add(t);
-      const nc=trNoControl(m);if(nc)controls.add(nc);
-    });
-    const stockMatches=allNormalizedRows().filter(x=>String(x.caja||'').trim()===String(caja));
-    const text=[caja,[...eans].join(' '),[...emps].join(' '),[...transactions].join(' '),[...controls].join(' '),trace360RawText(result),moves.map(trace360RawText).join(' ')].join(' ').toLowerCase();
-    entries.push({caja:String(caja),result,moves,eans:[...eans],employees:[...emps],transactions:[...transactions],controls:[...controls],stockMatches,text});
-  });
-  return {entries,boxCount:entries.length,moveCount,employeeCount:employees.size,skuCount:skus.size};
-}
-function trace360SetKpis(idx,matches){
-  $('trace360Boxes').textContent=(idx?.boxCount??0).toLocaleString('es-AR');
-  $('trace360Moves').textContent=(idx?.moveCount??0).toLocaleString('es-AR');
-  $('trace360Employees').textContent=(idx?.employeeCount??0).toLocaleString('es-AR');
-  $('trace360Skus').textContent=(idx?.skuCount??0).toLocaleString('es-AR');
-  $('trace360Matches').textContent=(matches??0).toLocaleString('es-AR');
-}
-async function buildTrace360Panel(force=false){
-  const st=$('trace360Status');
-  try{
-    if(st){st.className='processStatus';st.textContent='Indexando trazabilidad publicada por Copérnico…'}
-    const ds=await loadTraceDataset(force);
-    TRACE360_INDEX=trace360BuildIndex(ds);
-    trace360SetKpis(TRACE360_INDEX,TRACE360_RESULTS.length);
-    if(st){st.className='processStatus ok';st.textContent='● Trazabilidad lista · '+TRACE360_INDEX.boxCount.toLocaleString('es-AR')+' cajas · '+TRACE360_INDEX.moveCount.toLocaleString('es-AR')+' movimientos'}
-    if($('trace360Search').value.trim()) trace360Search();
-  }catch(err){
-    TRACE360_INDEX=null;trace360SetKpis(null,0);
-    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar trazabilidad-cajas.json · '+(err.message||String(err))}
-  }
-}
-function trace360MatchesType(e,q,type){
-  if(type==='box')return e.caja.toLowerCase().includes(q);
-  if(type==='sku')return e.eans.join(' ').toLowerCase().includes(q);
-  if(type==='employee')return e.employees.join(' ').toLowerCase().includes(q);
-  if(type==='transaction')return (e.transactions.join(' ')+' '+e.controls.join(' ')).toLowerCase().includes(q);
-  return e.text.includes(q);
-}
-function trace360Search(){
-  if(!TRACE360_INDEX){buildTrace360Panel().then(trace360Search);return}
-  const q=$('trace360Search').value.trim().toLowerCase(),type=$('trace360Type').value;
-  if(!q){TRACE360_RESULTS=[];trace360SetKpis(TRACE360_INDEX,0);$('trace360ResultMeta').textContent='Sin búsqueda';$('trace360Results').innerHTML='<div class="trace360Empty">Escribí una caja, EAN, empleado, ID, transacción o cualquier dato del WMS.</div>';return}
-  TRACE360_RESULTS=TRACE360_INDEX.entries.filter(e=>trace360MatchesType(e,q,type)).slice(0,500);
-  trace360SetKpis(TRACE360_INDEX,TRACE360_RESULTS.length);
-  $('trace360ResultMeta').textContent=TRACE360_RESULTS.length.toLocaleString('es-AR')+' coincidencias'+(TRACE360_RESULTS.length===500?' (máx. 500)':'');
-  $('trace360Results').innerHTML=TRACE360_RESULTS.length?TRACE360_RESULTS.map(e=>{
-    const latest=e.moves.map(m=>trDateValue(m)).filter(Number.isFinite).sort((a,b)=>b-a)[0];
-    const active=TRACE360_SELECTED===e.caja?' active':'';
-    return '<div class="trace360Result'+active+'" data-tracebox="'+esc(e.caja)+'"><b>Caja '+esc(e.caja)+'</b><span class="trace360Badge">'+e.moves.length+' mov.</span>'+(e.stockMatches.length?'<span class="trace360Badge green">stock actual</span>':'')+'<div class="sub">EAN: '+esc(e.eans.join(', ')||'—')+'<br>Empleados: '+esc(e.employees.slice(0,3).join(' · ')||'—')+(e.employees.length>3?'…':'')+(latest?'<br>Último: '+esc(trDateLabel(latest,'')):'')+'</div></div>'
-  }).join(''):'<div class="trace360Empty">No encontré coincidencias.</div>';
-  document.querySelectorAll('[data-tracebox]').forEach(el=>el.onclick=()=>trace360ShowBox(el.dataset.tracebox));
-  if(TRACE360_RESULTS.length===1)trace360ShowBox(TRACE360_RESULTS[0].caja);
-}
-function trace360RawHtml(raw){
-  const entries=Object.entries(raw||{});
-  if(!entries.length)return '';
-  return '<details class="trace360Raw"><summary>Ver todos los campos WMS de este movimiento ('+entries.length+')</summary><div class="trace360RawGrid">'+entries.map(([k,v])=>'<div class="trace360RawRow"><span>'+esc(k)+'</span><span>'+esc(typeof v==='object'?JSON.stringify(v):String(v??'—'))+'</span></div>').join('')+'</div></details>';
-}
-function trace360EmployeeHtml(m){
-  const id=trEmployeeId(m),name=trEmployee(m),p=trace360PersonById(id);
-  if(!id&&!name)return '';
-  let h='<div class="trace360Profile"><strong>👤 '+esc(name||'Empleado')+'</strong>'+(id?' · ID '+esc(id):'');
-  if(p)h+='<br>Usuario: <strong>'+esc(p.usuario||'—')+'</strong> · Perfil Copérnico: <strong>'+esc(p.perfil||'—')+'</strong> · Equipo: <strong>'+esc(receiptTeamFromProfile(p.perfil)||'Sin clasificar')+'</strong>';
-  h+='</div>';return h;
-}
-function trace360CurrentHtml(e){
-  let rows=e.stockMatches||[];
-  if(!rows.length)return '<div class="trace360Current"><h3>📦 Estado actual conocido</h3><div class="muted">La caja no aparece asociada a una posición en el stock visible actual.</div></div>';
-  return '<div class="trace360Current"><h3>📦 Estado actual conocido en Inventario Referencia</h3>'+rows.map(x=>'<div class="trace360CurrentRow"><b>'+esc(x.ubicacion||'—')+'</b> · EAN '+esc(x.ean||'—')+' · Saldo <b>'+Number(x.saldo||0).toLocaleString('es-AR')+'</b> · Estatus '+esc(x.estatus||'—')+' · Gestión '+esc(x.gestion||'—')+(x.fv?' · FV '+esc(x.fv):'')+'</div>').join('')+'</div>';
-}
-function trace360ShowBox(caja){
-  if(!TRACE360_INDEX)return;
-  const e=TRACE360_INDEX.entries.find(x=>x.caja===String(caja));if(!e)return;
-  TRACE360_SELECTED=e.caja;
-  document.querySelectorAll('[data-tracebox]').forEach(el=>el.classList.toggle('active',el.dataset.tracebox===e.caja));
-  const normalized=e.moves.map(raw=>({raw,time:trDateValue(raw),ean:trEan(raw),estado:trEstado(raw),trans:trTransaccion(raw),mov:trMovimiento(raw),saldo:trSaldo(raw),employee:trEmployee(raw),id:trEmployeeId(raw),control:trNoControl(raw)})).sort((a,b)=>(Number.isFinite(a.time)?a.time:0)-(Number.isFinite(b.time)?b.time:0));
-  let first=normalized.find(x=>Number.isFinite(x.time)),last=[...normalized].reverse().find(x=>Number.isFinite(x.time));
-  const net=normalized.reduce((a,x)=>a+(Number.isFinite(x.mov)?x.mov:0),0);
-  const currSaldo=[...normalized].reverse().find(x=>Number.isFinite(x.saldo))?.saldo;
-  let html='<div class="trace360Summary">'+
-    '<div class="trace360Info"><small>Caja</small><b>'+esc(e.caja)+'</b></div>'+
-    '<div class="trace360Info"><small>EAN / SKU</small><b>'+esc(e.eans.join(', ')||'—')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Movimientos</small><b>'+normalized.length.toLocaleString('es-AR')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Saldo traza</small><b>'+(Number.isFinite(currSaldo)?currSaldo.toLocaleString('es-AR'):'—')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Primer evento</small><b>'+esc(first?trDateLabel(first.time,trDateRaw(first.raw)):'—')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Último evento</small><b>'+esc(last?trDateLabel(last.time,trDateRaw(last.raw)):'—')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Movimiento neto</small><b>'+net.toLocaleString('es-AR')+'</b></div>'+ 
-    '<div class="trace360Info"><small>Empleados</small><b>'+new Set(normalized.map(x=>x.id||x.employee).filter(Boolean)).size+'</b></div></div>';
-  html+=trace360CurrentHtml(e);
-  html+='<div class="trace360Timeline">';
-  normalized.forEach((x,i)=>{
-    const profile=trace360PersonById(x.id);
-    const state=(trNorm(x.estado)==='ENTRADA'||(Number.isFinite(x.mov)&&x.mov>0))?'green':((Number.isFinite(x.mov)&&x.mov<0)?'red':'amber');
-    html+='<div class="trace360Event"><div class="trace360EventTime">'+esc(Number.isFinite(x.time)?trDateLabel(x.time,trDateRaw(x.raw)):String(trDateRaw(x.raw)||'Sin fecha'))+'</div><div class="trace360DotCol"><i class="trace360Dot"></i></div><div class="trace360EventCard">'+
-      '<div class="trace360EventTop"><b>'+(esc(x.trans||x.estado||'Movimiento WMS'))+'</b><span class="trace360Badge '+state+'">'+esc(x.estado||'EVENTO')+'</span></div>'+ 
-      '<div class="trace360EventMeta">EAN <b>'+esc(x.ean||'—')+'</b>'+(x.control?' · NoControl <b>'+esc(x.control)+'</b>':'')+(x.employee||x.id?' · Responsable <b>'+esc(x.employee||'—')+'</b>'+(x.id?' (#'+esc(x.id)+')':''):'')+'</div>'+ 
-      '<div class="trace360Amounts">'+(Number.isFinite(x.mov)?'<div class="trace360Amt">Movimiento <strong>'+x.mov.toLocaleString('es-AR')+'</strong></div>':'')+(Number.isFinite(x.saldo)?'<div class="trace360Amt">Saldo <strong>'+x.saldo.toLocaleString('es-AR')+'</strong></div>':'')+'</div>'+ 
-      trace360EmployeeHtml(x.raw)+trace360RawHtml(x.raw)+'</div></div>';
-  });
-  html+='</div>';
-  if(e.result&&typeof e.result==='object')html+=trace360RawHtml(Object.fromEntries(Object.entries(e.result).filter(([k])=>k!=='movimientos')));
-  $('trace360Detail').innerHTML=html;
 }
 
 
 const PROCESS_FIELDS={caja:'Caja',sku:'SKU / EAN',desc:'Descripción',saldo:'Saldo',fv:'FV',origen:'Desde posición',maquinista:'Maquinista',id:'ID empleado',fecha:'Ingreso a proceso'};
-const RECEIPT_FIELDS={caja:'Caja',sku:'SKU / EAN',desc:'Descripción',saldo:'Unidades',fv:'FV',origen:'Desde posición',responsable:'Responsable',id:'ID empleado',equipo:'Equipo',fecha:'Ingreso a recibo'};
+const RECEIPT_FIELDS={caja:'Caja',sku:'SKU / EAN',desc:'Descripción',saldo:'Unidades',fv:'FV',factura:'Factura',oc:'OC',proveedor:'Proveedor',origen:'Desde posición',responsable:'Responsable',id:'ID empleado',equipo:'Equipo',fecha:'Ingreso a recibo'};
 
 function setupTableToolSelects(prefix,fields){
   const f=$(prefix+'FilterField'),g=$(prefix+'GroupBy');
@@ -3128,7 +2900,8 @@ function receiptField(r,key){
   const map={
     caja:['Caja','caja'], sku:['EAN','ean','SKU','sku'], desc:['Descripcion','descripcion'],
     saldo:['Saldo','saldo','Cantidad','cantidad'], fv:['FV','fv'],
-    origen:['PosicionOrigen','posicion_origen','UbicacionInicial'],
+    factura:['_receiptFactura','Factura','factura'], oc:['_receiptOC','doctoERP','DoctoERP','oc'], proveedor:['_receiptProveedor','nombreProveedor','Proveedor','proveedor'],
+    origen:['PosicionOrigen','posicion_origen','UbicacionInicial','Ubicacion','ubicacion'],
     responsable:['_receiptResponsable','Responsable','responsable','Nombre_empleado','Empleado'],
     id:['_receiptEmployeeId','Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
     fecha:['_receiptIngreso','FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
@@ -3263,7 +3036,7 @@ function renderReceipt(){
   const filterValue=String($('receiptFilterValue')?.value||'');
   const groupKey=String($('receiptGroupBy')?.value||'');
   let rows=RECEIPT_ROWS.slice();
-  if(q)rows=rows.filter(r=>['caja','sku','desc','origen','responsable','id','equipo','fecha'].map(k=>receiptField(r,k)).join(' ').toLowerCase().includes(q));
+  if(q)rows=rows.filter(r=>['caja','sku','desc','factura','oc','proveedor','origen','responsable','id','equipo','fecha'].map(k=>receiptField(r,k)).join(' ').toLowerCase().includes(q));
   if(team)rows=rows.filter(r=>String(receiptField(r,'equipo')||'Sin clasificar')===team);
   rows=rows.filter(r=>receiptAgeMatches(r,ageMode));
   if(filterField&&filterValue)rows=rows.filter(r=>(String(receiptField(r,filterField)||'—').trim()||'—')===filterValue);
@@ -3277,6 +3050,9 @@ function renderReceipt(){
       '<td>'+esc(receiptField(r,'desc'))+'</td>'+
       '<td>'+esc(receiptField(r,'saldo'))+'</td>'+
       '<td>'+esc(receiptField(r,'fv'))+'</td>'+
+      '<td>'+esc(receiptField(r,'factura')||'—')+'</td>'+
+      '<td>'+esc(receiptField(r,'oc')||'—')+'</td>'+
+      '<td>'+esc(receiptField(r,'proveedor')||'Sin asociar')+'</td>'+
       '<td class="origin">'+esc(receiptField(r,'origen')||'—')+'</td>'+
       '<td class="who">'+esc(receiptField(r,'responsable')||'—')+'</td>'+
       '<td>'+esc(receiptField(r,'id')||'—')+'</td>'+
@@ -3284,7 +3060,7 @@ function renderReceipt(){
       '<td>'+esc(r._receiptIngresoLabel||receiptField(r,'fecha')||'Sin identificar')+'</td>'+
     '</tr>';
   };
-  body.innerHTML=groupedRowsHtml(rows,groupKey,receiptField,receiptRowHtml,10,'saldo');
+  body.innerHTML=groupedRowsHtml(rows,groupKey,receiptField,receiptRowHtml,13,'saldo');
   document.querySelectorAll('[data-receipt-sort]').forEach(th=>{
     const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.receiptSort===RECEIPT_SORT.key?(RECEIPT_SORT.dir===1?'↑':'↓'):'↕';
   });
@@ -3295,14 +3071,118 @@ function renderReceipt(){
   $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
 }
-async function buildReceiptPanel(force=false){
-  if(RECEIPT_LOADED&&!force){renderReceipt();return}
-  const st=$('receiptStatus');if(st){st.className='processStatus';st.textContent='Cargando Inventario Referencia → RECIBO y cruzando trazabilidad…'}
+
+// ===== v46 · En recibo desde fuentes originales de Copérnico =====
+const COPERNICO_REFERENCE_URL='https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47';
+const COPERNICO_RECEIPT_URL='https://services.copernicowms.com/backweb25/planrecibo';
+let COPERNICO_RECEIPT_PLAN_CACHE=null;
+
+function receiptCompact(v){return String(v??'').trim()}
+function receiptJoinKey(v){return receiptCompact(v).toUpperCase().replace(/\s+/g,'')}
+function receiptIsCurrentRecibo(r){
+  const loc=receiptJoinKey(processVal(r,['Ubicacion','ubicacion','Posicion','posicion','Zona','zona']));
+  return loc.includes('RECIBO');
+}
+function receiptRefKey(r){
+  const caja=receiptCompact(processVal(r,['Caja','caja']));
+  const sku=receiptCompact(processVal(r,['EAN','ean','SKU','sku','referencia','Referencia']));
+  return caja+'|'+sku;
+}
+function receiptYmd(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return ''+y+m+day;
+}
+function receiptPlanRange(rows){
+  const end=new Date();
+  let start=null;
+  for(const r of rows||[]){
+    const raw=processVal(r,['fecharegistro','FechaRegistro','fechaRegistro','f_ultimo_movimiento']);
+    const d=raw?new Date(raw):null;
+    if(d&&!isNaN(d) && (!start||d<start))start=d;
+  }
+  if(!start){start=new Date(end);start.setFullYear(start.getFullYear()-1)}
+  else {start=new Date(start);start.setDate(start.getDate()-14)}
+  // Tope razonable: hasta 3 años atrás para no pedir históricos enormes por error.
+  const floor=new Date(end);floor.setFullYear(floor.getFullYear()-3);
+  if(start<floor)start=floor;
+  return {from:receiptYmd(start),to:receiptYmd(end)};
+}
+async function loadCopernicoReferenceRows(force=false){
   try{
-    const res=await fetch('./en-recibo.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    const res=await fetch(COPERNICO_REFERENCE_URL+(COPERNICO_REFERENCE_URL.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json();
-    const baseRows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    if(!rows.length)throw new Error('Referencia sin filas');
+    return rows.filter(receiptIsCurrentRecibo);
+  }catch(err){
+    console.warn('No se pudo leer Inventario Referencia directo; uso en-recibo.json como respaldo',err);
+    const res=await fetch('./en-recibo.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    if(!res.ok)throw new Error('Fallback en-recibo.json HTTP '+res.status);
+    const payload=await res.json();
+    return Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+  }
+}
+async function loadCopernicoReceiptPlan(rows,force=false){
+  if(COPERNICO_RECEIPT_PLAN_CACHE&&!force)return COPERNICO_RECEIPT_PLAN_CACHE;
+  const range=receiptPlanRange(rows);
+  const qs=new URLSearchParams({documentooc:'',tipodoc:'PO',bodega:'47',fecha_inicial:range.from,fecha_final:range.to});
+  const res=await fetch(COPERNICO_RECEIPT_URL+'?'+qs.toString()+'&_='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw new Error('Consulta Recibo HTTP '+res.status);
+  const payload=await res.json();
+  const data=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+  COPERNICO_RECEIPT_PLAN_CACHE=data;
+  return data;
+}
+function receiptPlanIndexes(planRows){
+  const byUnido=new Map(),byOc=new Map();
+  for(const p of planRows||[]){
+    const unido=receiptJoinKey(processVal(p,['unido','Unido']));
+    const oc=receiptJoinKey(processVal(p,['doctoERP','DoctoERP','doctoerp','numDocumento','numdocumento']));
+    if(unido&&!byUnido.has(unido))byUnido.set(unido,p);
+    if(oc&&!byOc.has(oc))byOc.set(oc,p);
+  }
+  return {byUnido,byOc};
+}
+function receiptPlanMatch(refRow,indexes){
+  const raw=receiptJoinKey(processVal(refRow,['ord_no','Ord_no','ORD_NO']));
+  if(raw&&indexes.byUnido.has(raw))return indexes.byUnido.get(raw);
+  // Respaldo para casos 450...-450... o valor simple.
+  if(raw){
+    const parts=raw.split('-').filter(Boolean);
+    const oc=(parts.length===2&&parts[0]===parts[1])?parts[0]:(parts.length===1?parts[0]:'');
+    if(oc&&indexes.byOc.has(oc))return indexes.byOc.get(oc);
+  }
+  return null;
+}
+function enrichReceiptRowsWithReferenceAndProvider(rows,planRows){
+  const indexes=receiptPlanIndexes(planRows);
+  return (rows||[]).map(src=>{
+    const r={...src};
+    const p=receiptPlanMatch(r,indexes);
+    r._receiptFactura=receiptCompact(processVal(r,['Factura','factura']));
+    r._receiptOrdNo=receiptCompact(processVal(r,['ord_no','Ord_no','ORD_NO']));
+    r._receiptOC=p?receiptCompact(processVal(p,['doctoERP','DoctoERP','numDocumento','numdocumento'])):'';
+    r._receiptProveedor=p?receiptCompact(processVal(p,['nombreProveedor','NombreProveedor','proveedor'])):'';
+    r._receiptProviderFound=!!p;
+    return r;
+  });
+}
+
+async function buildReceiptPanel(force=false){
+  if(RECEIPT_LOADED&&!force){renderReceipt();return}
+  const st=$('receiptStatus');
+  if(st){st.className='processStatus';st.textContent='Cargando Inventario Referencia → RECIBO → Consulta Recibo → trazabilidad…'}
+  try{
+    const baseRows=await loadCopernicoReferenceRows(force);
+
+    let planRows=[];
+    try{
+      planRows=await loadCopernicoReceiptPlan(baseRows,force);
+    }catch(planErr){
+      console.warn('No se pudo cargar Consulta Recibo para asociar proveedor',planErr);
+    }
+    let enriched=enrichReceiptRowsWithReferenceAndProvider(baseRows,planRows);
 
     let trace=null;
     try{
@@ -3311,22 +3191,25 @@ async function buildReceiptPanel(force=false){
       console.warn('No se pudo cargar trazabilidad-cajas.json para En recibo',traceErr);
     }
 
-    RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(baseRows,trace) : baseRows.map(r=>({...r,_receiptTraceFound:false}));
+    RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(enriched,trace) : enriched.map(r=>({...r,_receiptTraceFound:false}));
     RECEIPT_LOADED=true;
     fillReceiptTeams();
     if(st){
-      const d=payload?.updated_at?new Date(payload.updated_at):null;
       const identified=RECEIPT_ROWS.filter(r=>r._receiptTraceFound).length;
-      const missing=RECEIPT_ROWS.length-identified;
-      st.className=missing?'processStatus':'processStatus ok';
-      st.textContent='● Información actualizada'+(d&&!isNaN(d)?' · '+d.toLocaleString('es-AR'):'')+
-        ' · ingreso inicial identificado: '+identified.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
-        (missing?' · '+missing.toLocaleString('es-AR')+' sin trazabilidad':'');
+      const linked=RECEIPT_ROWS.filter(r=>r._receiptProviderFound).length;
+      const missingProvider=RECEIPT_ROWS.length-linked;
+      st.className=(missingProvider||identified<RECEIPT_ROWS.length)?'processStatus':'processStatus ok';
+      st.textContent='● Fuente: Copérnico Inventario Referencia · '+RECEIPT_ROWS.length.toLocaleString('es-AR')+' registros en RECIBO'+
+        ' · proveedor asociado: '+linked.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
+        ' · ingreso identificado: '+identified.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
+        (missingProvider?' · '+missingProvider.toLocaleString('es-AR')+' sin proveedor':'');
     }
     renderReceipt();
-  }catch(err){RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();if(st){st.className='processStatus bad';st.textContent='Todavía no está publicado en-recibo.json · '+(err.message||String(err))}}
+  }catch(err){
+    RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();
+    if(st){st.className='processStatus bad';st.textContent='No se pudo construir En recibo desde Copérnico · '+(err.message||String(err))}
+  }
 }
-
 
 const LAYOUT_CELLS=[{"row":4,"col":4,"label":"MFCA11","raw":"MFCA11","r":1,"c":1},{"row":4,"col":6,"label":"MFCA12","raw":"MFCA12","r":1,"c":3},{"row":4,"col":7,"label":"MFCB11","raw":"MFCB11","r":1,"c":4},{"row":4,"col":9,"label":"MFCB12","raw":"MFCB012","r":1,"c":6},{"row":4,"col":12,"label":"MFCC11","raw":"MFCC011","r":1,"c":9},{"row":4,"col":13,"label":"A40","raw":"A40","r":1,"c":10},{"row":5,"col":4,"label":"MFCA13","raw":"MFCA13","r":2,"c":1},{"row":5,"col":6,"label":"MFCA14","raw":"MFCA14","r":2,"c":3},{"row":5,"col":7,"label":"MFCB13","raw":"MFCB13","r":2,"c":4},{"row":5,"col":9,"label":"MFCB14","raw":"MFCB014","r":2,"c":6},{"row":5,"col":12,"label":"MFCC13","raw":"MFCC013","r":2,"c":9},{"row":6,"col":4,"label":"MFCA15","raw":"MFCA15","r":3,"c":1},{"row":6,"col":6,"label":"MFCA16","raw":"MFCA16","r":3,"c":3},{"row":6,"col":7,"label":"MFCB15","raw":"MFCB15","r":3,"c":4},{"row":6,"col":9,"label":"MFCB16","raw":"MFCB016","r":3,"c":6},{"row":6,"col":12,"label":"MFCC15","raw":"MFCC015","r":3,"c":9},{"row":6,"col":13,"label":"A42","raw":"A42","r":3,"c":10},{"row":7,"col":4,"label":"MFCA17","raw":"MFCA17","r":4,"c":1},{"row":7,"col":6,"label":"MFCA18","raw":"MFCA18","r":4,"c":3},{"row":7,"col":7,"label":"MFCB17","raw":"MFCB17","r":4,"c":4},{"row":7,"col":9,"label":"MFCB18","raw":"MFCB018","r":4,"c":6},{"row":7,"col":12,"label":"MFCC17","raw":"MFCC017","r":4,"c":9},{"row":8,"col":4,"label":"MFCA19","raw":"MFCA19","r":5,"c":1},{"row":8,"col":6,"label":"MFCA20","raw":"MFCA20","r":5,"c":3},{"row":8,"col":7,"label":"MFCB19","raw":"MFCB19","r":5,"c":4},{"row":8,"col":9,"label":"MFCB20","raw":"MFCB020","r":5,"c":6},{"row":8,"col":12,"label":"MFCC19","raw":"MFCC019","r":5,"c":9},{"row":8,"col":13,"label":"A44","raw":"A44","r":5,"c":10},{"row":9,"col":4,"label":"MFCA21","raw":"MFCA21","r":6,"c":1},{"row":9,"col":6,"label":"MFCA22","raw":"MFCA22","r":6,"c":3},{"row":9,"col":7,"label":"MFCB21","raw":"MFCB21","r":6,"c":4},{"row":9,"col":9,"label":"MFCB22","raw":"MFCB022","r":6,"c":6},{"row":9,"col":12,"label":"MFCC21","raw":"MFCC021","r":6,"c":9},{"row":10,"col":4,"label":"MFCA23","raw":"MFCA23","r":7,"c":1},{"row":10,"col":6,"label":"MFCA24","raw":"MFCA24","r":7,"c":3},{"row":10,"col":7,"label":"MFCB23","raw":"MFCB23","r":7,"c":4},{"row":10,"col":9,"label":"MFCB24","raw":"MFCB024","r":7,"c":6},{"row":10,"col":12,"label":"MFCC23","raw":"MFCC023","r":7,"c":9},{"row":10,"col":13,"label":"A46","raw":"A46","r":7,"c":10},{"row":11,"col":4,"label":"MFCA25","raw":"MFCA25","r":8,"c":1},{"row":11,"col":6,"label":"MFCA26","raw":"MFCA26","r":8,"c":3},{"row":11,"col":7,"label":"MFCB25","raw":"MFCB25","r":8,"c":4},{"row":11,"col":9,"label":"MFCB26","raw":"MFCB026","r":8,"c":6},{"row":11,"col":12,"label":"MFCC25","raw":"MFCC025","r":8,"c":9},{"row":12,"col":4,"label":"MFCA27","raw":"MFCA27","r":9,"c":1},{"row":12,"col":6,"label":"MFCA28","raw":"MFCA28","r":9,"c":3},{"row":12,"col":7,"label":"MFCB27","raw":"MFCB27","r":9,"c":4},{"row":12,"col":9,"label":"MFCB28","raw":"MFCB028","r":9,"c":6},{"row":12,"col":12,"label":"MFCC27","raw":"MFCC027","r":9,"c":9},{"row":12,"col":13,"label":"A48","raw":"A48","r":9,"c":10},{"row":13,"col":4,"label":"MFCA29","raw":"MFCA29","r":10,"c":1},{"row":13,"col":6,"label":"MFCA30","raw":"MFCA30","r":10,"c":3},{"row":13,"col":7,"label":"MFCB29","raw":"MFCB29","r":10,"c":4},{"row":13,"col":9,"label":"MFCB30","raw":"MFCB030","r":10,"c":6},{"row":13,"col":12,"label":"MFCC29","raw":"MFCC029","r":10,"c":9},{"row":14,"col":4,"label":"MFCA31","raw":"MFCA31","r":11,"c":1},{"row":14,"col":6,"label":"MFCA32","raw":"MFCA32","r":11,"c":3},{"row":14,"col":7,"label":"MFCB31","raw":"MFCB31","r":11,"c":4},{"row":14,"col":9,"label":"MFCB32","raw":"MFCB032","r":11,"c":6},{"row":14,"col":12,"label":"MFCC31","raw":"MFCC031","r":11,"c":9},{"row":14,"col":13,"label":"A50","raw":"A50","r":11,"c":10},{"row":15,"col":4,"label":"MFCA33","raw":"MFCA33","r":12,"c":1},{"row":15,"col":6,"label":"MFCA34","raw":"MFCA34","r":12,"c":3},{"row":15,"col":7,"label":"MFCB33","raw":"MFCB33","r":12,"c":4},{"row":15,"col":9,"label":"MFCB34","raw":"MFCB034","r":12,"c":6},{"row":15,"col":12,"label":"MFCC33","raw":"MFCC033","r":12,"c":9},{"row":16,"col":4,"label":"MFCA35","raw":"MFCA35","r":13,"c":1},{"row":16,"col":6,"label":"MFCA36","raw":"MFCA36","r":13,"c":3},{"row":16,"col":7,"label":"MFCB35","raw":"MFCB35","r":13,"c":4},{"row":16,"col":9,"label":"MFCB36","raw":"MFCB036","r":13,"c":6},{"row":16,"col":12,"label":"MFCC35","raw":"MFCC035","r":13,"c":9},{"row":16,"col":13,"label":"A52","raw":"A52","r":13,"c":10},{"row":17,"col":4,"label":"MFCA37","raw":"MFCA37","r":14,"c":1},{"row":17,"col":6,"label":"MFCA38","raw":"MFCA38","r":14,"c":3},{"row":17,"col":7,"label":"MFCB37","raw":"MFCB37","r":14,"c":4},{"row":17,"col":9,"label":"MFCB38","raw":"MFCB038","r":14,"c":6},{"row":17,"col":12,"label":"MFCC37","raw":"MFCC037","r":14,"c":9},{"row":18,"col":12,"label":"MFCC39","raw":"MFCC039","r":15,"c":9},{"row":18,"col":13,"label":"A54","raw":"A54","r":15,"c":10},{"row":19,"col":12,"label":"MFCC41","raw":"MFCC041","r":16,"c":9},{"row":20,"col":4,"label":"MFCA39","raw":"MFCA39","r":17,"c":1},{"row":20,"col":6,"label":"MFCA40","raw":"MFCA40","r":17,"c":3},{"row":20,"col":7,"label":"MFCB39","raw":"MFCB39","r":17,"c":4},{"row":20,"col":9,"label":"MFCB40","raw":"MFCB040","r":17,"c":6},{"row":20,"col":12,"label":"MFCC43","raw":"MFCC043","r":17,"c":9},{"row":20,"col":13,"label":"A56","raw":"A56","r":17,"c":10},{"row":21,"col":4,"label":"MFCA41","raw":"MFCA41","r":18,"c":1},{"row":21,"col":6,"label":"MFCA42","raw":"MFCA42","r":18,"c":3},{"row":21,"col":7,"label":"MFCB41","raw":"MFCB41","r":18,"c":4},{"row":21,"col":9,"label":"MFCB42","raw":"MFCB042","r":18,"c":6},{"row":21,"col":12,"label":"MFCC45","raw":"MFCC045","r":18,"c":9},{"row":22,"col":4,"label":"MFCA43","raw":"MFCA43","r":19,"c":1},{"row":22,"col":6,"label":"MFCA44","raw":"MFCA44","r":19,"c":3},{"row":22,"col":7,"label":"MFCB43","raw":"MFCB43","r":19,"c":4},{"row":22,"col":9,"label":"MFCB44","raw":"MFCB044","r":19,"c":6},{"row":22,"col":12,"label":"MFCC47","raw":"MFCC047","r":19,"c":9},{"row":22,"col":13,"label":"A58","raw":"A58","r":19,"c":10},{"row":23,"col":4,"label":"MFCA45","raw":"MFCA45","r":20,"c":1},{"row":23,"col":6,"label":"MFCA46","raw":"MFCA46","r":20,"c":3},{"row":23,"col":7,"label":"MFCB45","raw":"MFCB45","r":20,"c":4},{"row":23,"col":9,"label":"MFCB46","raw":"MFCB046","r":20,"c":6},{"row":23,"col":12,"label":"MFCC49","raw":"MFCC049","r":20,"c":9},{"row":24,"col":4,"label":"MFCA47","raw":"MFCA47","r":21,"c":1},{"row":24,"col":6,"label":"MFCA48","raw":"MFCA48","r":21,"c":3},{"row":24,"col":7,"label":"MFCB47","raw":"MFCB47","r":21,"c":4},{"row":24,"col":9,"label":"MFCB48","raw":"MFCB048","r":21,"c":6},{"row":24,"col":12,"label":"MFCC51","raw":"MFCC051","r":21,"c":9},{"row":24,"col":13,"label":"A60","raw":"A60","r":21,"c":10},{"row":25,"col":4,"label":"MFCA49","raw":"MFCA49","r":22,"c":1},{"row":25,"col":6,"label":"MFCA50","raw":"MFCA50","r":22,"c":3},{"row":25,"col":7,"label":"MFCB49","raw":"MFCB49","r":22,"c":4},{"row":25,"col":9,"label":"MFCB50","raw":"MFCB050","r":22,"c":6},{"row":25,"col":12,"label":"MFCC53","raw":"MFCC053","r":22,"c":9},{"row":26,"col":4,"label":"MFCA51","raw":"MFCA51","r":23,"c":1},{"row":26,"col":6,"label":"MFCA52","raw":"MFCA52","r":23,"c":3},{"row":26,"col":7,"label":"MFCB51","raw":"MFCB51","r":23,"c":4},{"row":26,"col":9,"label":"MFCB52","raw":"MFCB052","r":23,"c":6},{"row":26,"col":12,"label":"MFCC55","raw":"MFCC055","r":23,"c":9},{"row":26,"col":13,"label":"A62","raw":"A62","r":23,"c":10},{"row":27,"col":4,"label":"MFCA53","raw":"MFCA53","r":24,"c":1},{"row":27,"col":6,"label":"MFCA54","raw":"MFCA54","r":24,"c":3},{"row":27,"col":7,"label":"MFCB53","raw":"MFCB53","r":24,"c":4},{"row":27,"col":9,"label":"MFCB54","raw":"MFCB054","r":24,"c":6},{"row":27,"col":12,"label":"MFCC57","raw":"MFCC057","r":24,"c":9},{"row":28,"col":4,"label":"MFCA55","raw":"MFCA55","r":25,"c":1},{"row":28,"col":6,"label":"MFCA56","raw":"MFCA56","r":25,"c":3},{"row":28,"col":7,"label":"MFCB55","raw":"MFCB55","r":25,"c":4},{"row":28,"col":9,"label":"MFCB56","raw":"MFCB056","r":25,"c":6},{"row":28,"col":12,"label":"MFCC59","raw":"MFCC059","r":25,"c":9},{"row":28,"col":13,"label":"A64","raw":"A64","r":25,"c":10},{"row":29,"col":4,"label":"MFCA57","raw":"MFCA57","r":26,"c":1},{"row":29,"col":6,"label":"MFCA58","raw":"MFCA58","r":26,"c":3},{"row":29,"col":7,"label":"MFCB57","raw":"MFCB57","r":26,"c":4},{"row":29,"col":9,"label":"MFCB58","raw":"MFCB058","r":26,"c":6},{"row":29,"col":12,"label":"MFCC61","raw":"MFCC061","r":26,"c":9},{"row":30,"col":4,"label":"MFCA59","raw":"MFCA59","r":27,"c":1},{"row":30,"col":6,"label":"MFCA60","raw":"MFCA60","r":27,"c":3},{"row":30,"col":7,"label":"MFCB59","raw":"MFCB59","r":27,"c":4},{"row":30,"col":9,"label":"MFCB60","raw":"MFCB060","r":27,"c":6},{"row":31,"col":4,"label":"MFCA61","raw":"MFCA61","r":28,"c":1},{"row":31,"col":6,"label":"MFCA62","raw":"MFCA62","r":28,"c":3},{"row":31,"col":7,"label":"MFCB61","raw":"MFCB61","r":28,"c":4},{"row":31,"col":9,"label":"MFCB62","raw":"MFCB062","r":28,"c":6},{"row":32,"col":4,"label":"MFCA63","raw":"MFCA63","r":29,"c":1},{"row":32,"col":6,"label":"MFCA64","raw":"MFCA64","r":29,"c":3},{"row":32,"col":7,"label":"MFCB63","raw":"MFCB63","r":29,"c":4},{"row":32,"col":9,"label":"MFCB64","raw":"MFCB064","r":29,"c":6},{"row":33,"col":4,"label":"MFCA65","raw":"MFCA65","r":30,"c":1},{"row":33,"col":6,"label":"MFCA66","raw":"MFCA66","r":30,"c":3},{"row":33,"col":7,"label":"MFCB65","raw":"MFCB65","r":30,"c":4},{"row":33,"col":9,"label":"MFCB66","raw":"MFCB066","r":30,"c":6},{"row":34,"col":4,"label":"MFCA67","raw":"MFCA67","r":31,"c":1},{"row":34,"col":6,"label":"MFCA68","raw":"MFCA68","r":31,"c":3},{"row":34,"col":7,"label":"MFCB67","raw":"MFCB67","r":31,"c":4},{"row":34,"col":9,"label":"MFCB68","raw":"MFCB068","r":31,"c":6},{"row":35,"col":4,"label":"MFCA69","raw":"MFCA69","r":32,"c":1},{"row":36,"col":4,"label":"MFCA71","raw":"MFCA71","r":33,"c":1},{"row":37,"col":4,"label":"MFCA73","raw":"MFCA73","r":34,"c":1},{"row":38,"col":4,"label":"MFCA75","raw":"MFCA75","r":35,"c":1},{"row":39,"col":4,"label":"MFCA77","raw":"MFCA77","r":36,"c":1},{"row":39,"col":6,"label":"MFCA78","raw":"MFCA78","r":36,"c":3},{"row":39,"col":7,"label":"MFCB69","raw":"MFCB69","r":36,"c":4},{"row":39,"col":9,"label":"MFCB70","raw":"MFCB070","r":36,"c":6},{"row":40,"col":4,"label":"MFCA79","raw":"MFCA79","r":37,"c":1},{"row":40,"col":6,"label":"MFCA80","raw":"MFCA80","r":37,"c":3},{"row":40,"col":7,"label":"MFCB71","raw":"MFCB71","r":37,"c":4},{"row":40,"col":9,"label":"MFCB72","raw":"MFCB072","r":37,"c":6},{"row":41,"col":4,"label":"MFCA81","raw":"MFCA81","r":38,"c":1},{"row":41,"col":6,"label":"MFCA82","raw":"MFCA82","r":38,"c":3},{"row":41,"col":7,"label":"MFCB73","raw":"MFCB73","r":38,"c":4},{"row":41,"col":9,"label":"MFCB74","raw":"MFCB074","r":38,"c":6},{"row":41,"col":12,"label":"MFCC63","raw":"MFCC063","r":38,"c":9},{"row":41,"col":13,"label":"B08","raw":"B08","r":38,"c":10},{"row":42,"col":4,"label":"MFCA83","raw":"MFCA83","r":39,"c":1},{"row":42,"col":6,"label":"MFCA84","raw":"MFCA84","r":39,"c":3},{"row":42,"col":7,"label":"MFCB75","raw":"MFCB75","r":39,"c":4},{"row":42,"col":9,"label":"MFCB76","raw":"MFCB076","r":39,"c":6},{"row":42,"col":12,"label":"MFCC65","raw":"MFCC065","r":39,"c":9},{"row":43,"col":4,"label":"MFCA85","raw":"MFCA85","r":40,"c":1},{"row":43,"col":6,"label":"MFCA86","raw":"MFCA86","r":40,"c":3},{"row":43,"col":7,"label":"MFCB77","raw":"MFCB77","r":40,"c":4},{"row":43,"col":9,"label":"MFCB78","raw":"MFCB078","r":40,"c":6},{"row":43,"col":12,"label":"MFCC67","raw":"MFCC067","r":40,"c":9},{"row":43,"col":13,"label":"B10","raw":"B10","r":40,"c":10},{"row":44,"col":4,"label":"MFCA87","raw":"MFCA87","r":41,"c":1},{"row":44,"col":6,"label":"MFCA88","raw":"MFCA88","r":41,"c":3},{"row":44,"col":7,"label":"MFCB79","raw":"MFCB79","r":41,"c":4},{"row":44,"col":9,"label":"MFCB80","raw":"MFCB080","r":41,"c":6},{"row":44,"col":12,"label":"MFCC69","raw":"MFCC069","r":41,"c":9},{"row":45,"col":12,"label":"MFCC71","raw":"MFCC071","r":42,"c":9},{"row":45,"col":13,"label":"B12","raw":"B12","r":42,"c":10},{"row":46,"col":12,"label":"MFCC73","raw":"MFCC073","r":43,"c":9},{"row":47,"col":4,"label":"MFCA89","raw":"MFCA089","r":44,"c":1},{"row":47,"col":6,"label":"MFCA90","raw":"MFCA90","r":44,"c":3},{"row":47,"col":7,"label":"MFCB81","raw":"MFCB81","r":44,"c":4},{"row":47,"col":9,"label":"MFCB82","raw":"MFCB082","r":44,"c":6},{"row":47,"col":12,"label":"MFCC75","raw":"MFCC075","r":44,"c":9},{"row":47,"col":13,"label":"B14","raw":"B14","r":44,"c":10},{"row":48,"col":4,"label":"MFCA91","raw":"MFCA091","r":45,"c":1},{"row":48,"col":6,"label":"MFCA92","raw":"MFCA92","r":45,"c":3},{"row":48,"col":7,"label":"MFCB83","raw":"MFCB83","r":45,"c":4},{"row":48,"col":9,"label":"MFCB84","raw":"MFCB084","r":45,"c":6},{"row":48,"col":12,"label":"MFCC77","raw":"MFCC077","r":45,"c":9},{"row":49,"col":4,"label":"MFCA93","raw":"MFCA093","r":46,"c":1},{"row":49,"col":6,"label":"MFCA94","raw":"MFCA94","r":46,"c":3},{"row":49,"col":7,"label":"MFCB85","raw":"MFCB85","r":46,"c":4},{"row":49,"col":9,"label":"MFCB86","raw":"MFCB086","r":46,"c":6},{"row":49,"col":12,"label":"MFCC79","raw":"MFCC079","r":46,"c":9},{"row":49,"col":13,"label":"B16","raw":"B16","r":46,"c":10},{"row":50,"col":4,"label":"MFCA95","raw":"MFCA095","r":47,"c":1},{"row":50,"col":6,"label":"MFCA96","raw":"MFCA96","r":47,"c":3},{"row":50,"col":7,"label":"MFCB87","raw":"MFCB87","r":47,"c":4},{"row":50,"col":9,"label":"MFCB88","raw":"MFCB088","r":47,"c":6},{"row":50,"col":12,"label":"MFCC81","raw":"MFCC081","r":47,"c":9},{"row":51,"col":4,"label":"MFCA97","raw":"MFCA097","r":48,"c":1},{"row":51,"col":6,"label":"MFCA98","raw":"MFCA98","r":48,"c":3},{"row":51,"col":7,"label":"MFCB89","raw":"MFCB89","r":48,"c":4},{"row":51,"col":9,"label":"MFCB90","raw":"MFCB090","r":48,"c":6},{"row":51,"col":12,"label":"MFCC83","raw":"MFCC083","r":48,"c":9},{"row":51,"col":13,"label":"B18","raw":"B18","r":48,"c":10},{"row":52,"col":4,"label":"MFCA99","raw":"MFCA099","r":49,"c":1},{"row":52,"col":6,"label":"MFCA100","raw":"MFCA100","r":49,"c":3},{"row":52,"col":7,"label":"MFCB91","raw":"MFCB91","r":49,"c":4},{"row":52,"col":9,"label":"MFCB92","raw":"MFCB092","r":49,"c":6},{"row":52,"col":12,"label":"MFCC85","raw":"MFCC085","r":49,"c":9},{"row":53,"col":4,"label":"MFCA101","raw":"MFCA101","r":50,"c":1},{"row":53,"col":6,"label":"MFCA102","raw":"MFCA102","r":50,"c":3},{"row":53,"col":7,"label":"MFCB93","raw":"MFCB93","r":50,"c":4},{"row":53,"col":9,"label":"MFCB94","raw":"MFCB094","r":50,"c":6},{"row":53,"col":12,"label":"MFCC87","raw":"MFCC087","r":50,"c":9},{"row":53,"col":13,"label":"B20","raw":"B20","r":50,"c":10},{"row":54,"col":4,"label":"MFCA103","raw":"MFCA103","r":51,"c":1},{"row":54,"col":6,"label":"MFCA104","raw":"MFCA104","r":51,"c":3},{"row":54,"col":7,"label":"MFCB95","raw":"MFCB95","r":51,"c":4},{"row":54,"col":9,"label":"MFCB96","raw":"MFCB096","r":51,"c":6},{"row":54,"col":12,"label":"MFCC89","raw":"MFCC089","r":51,"c":9},{"row":55,"col":4,"label":"MFCA105","raw":"MFCA105","r":52,"c":1},{"row":55,"col":6,"label":"MFCA106","raw":"MFCA106","r":52,"c":3},{"row":55,"col":7,"label":"MFCB97","raw":"MFCB97","r":52,"c":4},{"row":55,"col":9,"label":"MFCB98","raw":"MFCB098","r":52,"c":6},{"row":55,"col":12,"label":"MFCC91","raw":"MFCC091","r":52,"c":9},{"row":55,"col":13,"label":"B22","raw":"B22","r":52,"c":10},{"row":56,"col":4,"label":"MFCA107","raw":"MFCA107","r":53,"c":1},{"row":56,"col":6,"label":"MFCA108","raw":"MFCA108","r":53,"c":3},{"row":56,"col":7,"label":"MFCB99","raw":"MFCB99","r":53,"c":4},{"row":56,"col":9,"label":"MFCB100","raw":"MFCB100","r":53,"c":6},{"row":56,"col":12,"label":"MFCC93","raw":"MFCC093","r":53,"c":9},{"row":57,"col":4,"label":"MFCA109","raw":"MFCA109","r":54,"c":1},{"row":57,"col":6,"label":"MFCA110","raw":"MFCA110","r":54,"c":3},{"row":57,"col":7,"label":"MFCB101","raw":"MFCB101","r":54,"c":4},{"row":57,"col":9,"label":"MFCB102","raw":"MFCB102","r":54,"c":6},{"row":57,"col":12,"label":"MFCC95","raw":"MFCC095","r":54,"c":9},{"row":57,"col":13,"label":"B24","raw":"B24","r":54,"c":10},{"row":58,"col":4,"label":"MFCA111","raw":"MFCA111","r":55,"c":1},{"row":58,"col":6,"label":"MFCA112","raw":"MFCA112","r":55,"c":3},{"row":58,"col":7,"label":"MFCB103","raw":"MFCB103","r":55,"c":4},{"row":58,"col":9,"label":"MFCB104","raw":"MFCB104","r":55,"c":6},{"row":58,"col":12,"label":"MFCC97","raw":"MFCC097","r":55,"c":9},{"row":59,"col":4,"label":"MFCA113","raw":"MFCA113","r":56,"c":1},{"row":59,"col":6,"label":"MFCA114","raw":"MFCA114","r":56,"c":3},{"row":59,"col":7,"label":"MFCB105","raw":"MFCB105","r":56,"c":4},{"row":59,"col":9,"label":"MFCB106","raw":"MFCB106","r":56,"c":6},{"row":59,"col":12,"label":"MFCC99","raw":"MFCC099","r":56,"c":9},{"row":59,"col":13,"label":"B26","raw":"B26","r":56,"c":10},{"row":60,"col":4,"label":"MFCA115","raw":"MFCA115","r":57,"c":1},{"row":60,"col":6,"label":"MFCA116","raw":"MFCA116","r":57,"c":3},{"row":60,"col":7,"label":"MFCB107","raw":"MFCB107","r":57,"c":4},{"row":60,"col":9,"label":"MFCB108","raw":"MFCB108","r":57,"c":6},{"row":60,"col":12,"label":"MFCC101","raw":"MFCC101","r":57,"c":9},{"row":61,"col":4,"label":"MFCA117","raw":"MFCA117","r":58,"c":1},{"row":61,"col":6,"label":"MFCA118","raw":"MFCA118","r":58,"c":3},{"row":61,"col":7,"label":"MFCB109","raw":"MFCB109","r":58,"c":4},{"row":61,"col":9,"label":"MFCB110","raw":"MFCB110","r":58,"c":6},{"row":61,"col":12,"label":"MFCC103","raw":"MFCC103","r":58,"c":9},{"row":61,"col":13,"label":"B28","raw":"B28","r":58,"c":10},{"row":62,"col":4,"label":"MFCA119","raw":"MFCA119","r":59,"c":1},{"row":62,"col":6,"label":"MFCA120","raw":"MFCA120","r":59,"c":3},{"row":62,"col":7,"label":"MFCB111","raw":"MFCB111","r":59,"c":4},{"row":62,"col":9,"label":"MFCB112","raw":"MFCB112","r":59,"c":6},{"row":62,"col":12,"label":"MFCC105","raw":"MFCC105","r":59,"c":9},{"row":63,"col":4,"label":"MFCA121","raw":"MFCA121","r":60,"c":1},{"row":63,"col":6,"label":"MFCA122","raw":"MFCA122","r":60,"c":3},{"row":63,"col":7,"label":"MFCB113","raw":"MFCB113","r":60,"c":4},{"row":63,"col":9,"label":"MFCB114","raw":"MFCB114","r":60,"c":6},{"row":63,"col":12,"label":"MFCC107","raw":"MFCC107","r":60,"c":9},{"row":63,"col":13,"label":"B30","raw":"B30","r":60,"c":10},{"row":64,"col":4,"label":"MFCA123","raw":"MFCA123","r":61,"c":1},{"row":64,"col":6,"label":"MFCA124","raw":"MFCA124","r":61,"c":3},{"row":64,"col":7,"label":"MFCB115","raw":"MFCB115","r":61,"c":4},{"row":64,"col":9,"label":"MFCB116","raw":"MFCB116","r":61,"c":6},{"row":64,"col":12,"label":"MFCC109","raw":"MFCC109","r":61,"c":9},{"row":65,"col":4,"label":"MFCA125","raw":"MFCA125","r":62,"c":1},{"row":65,"col":6,"label":"MFCA126","raw":"MFCA126","r":62,"c":3},{"row":65,"col":7,"label":"MFCB117","raw":"MFCB117","r":62,"c":4},{"row":65,"col":9,"label":"MFCB118","raw":"MFCB118","r":62,"c":6},{"row":65,"col":12,"label":"MFCC111","raw":"MFCC111","r":62,"c":9},{"row":65,"col":13,"label":"B32","raw":"B32","r":62,"c":10},{"row":66,"col":4,"label":"MFCA127","raw":"MFCA127","r":63,"c":1},{"row":66,"col":6,"label":"MFCA128","raw":"MFCA128","r":63,"c":3},{"row":66,"col":7,"label":"MFCB119","raw":"MFCB119","r":63,"c":4},{"row":66,"col":9,"label":"MFCB120","raw":"MFCB120","r":63,"c":6},{"row":66,"col":12,"label":"MFCC113","raw":"MFCC113","r":63,"c":9},{"row":67,"col":4,"label":"MFCA129","raw":"MFCA129","r":64,"c":1},{"row":67,"col":6,"label":"MFCA130","raw":"MFCA130","r":64,"c":3},{"row":67,"col":7,"label":"MFCB121","raw":"MFCB121","r":64,"c":4},{"row":67,"col":9,"label":"MFCB122","raw":"MFCB122","r":64,"c":6},{"row":67,"col":12,"label":"MFCC115","raw":"MFCC115","r":64,"c":9},{"row":67,"col":13,"label":"B34","raw":"B34","r":64,"c":10},{"row":68,"col":4,"label":"MFCA131","raw":"MFCA131","r":65,"c":1},{"row":68,"col":6,"label":"MFCA132","raw":"MFCA132","r":65,"c":3},{"row":68,"col":7,"label":"MFCB123","raw":"MFCB123","r":65,"c":4},{"row":68,"col":9,"label":"MFCB124","raw":"MFCB124","r":65,"c":6},{"row":68,"col":12,"label":"MFCC117","raw":"MFCC117","r":65,"c":9},{"row":69,"col":4,"label":"MFCA133","raw":"MFCA133","r":66,"c":1},{"row":69,"col":6,"label":"MFCA134","raw":"MFCA134","r":66,"c":3},{"row":69,"col":7,"label":"MFCB125","raw":"MFCB125","r":66,"c":4},{"row":69,"col":9,"label":"MFCB126","raw":"MFCB126","r":66,"c":6},{"row":69,"col":12,"label":"MFCC119","raw":"MFCC119","r":66,"c":9},{"row":69,"col":13,"label":"B36","raw":"B36","r":66,"c":10},{"row":70,"col":4,"label":"MFCA135","raw":"MFCA135","r":67,"c":1},{"row":70,"col":6,"label":"MFCA136","raw":"MFCA136","r":67,"c":3},{"row":70,"col":7,"label":"MFCB127","raw":"MFCB127","r":67,"c":4},{"row":70,"col":9,"label":"MFCB128","raw":"MFCB128","r":67,"c":6},{"row":70,"col":12,"label":"MFCC121","raw":"MFCC121","r":67,"c":9},{"row":71,"col":4,"label":"MFCA137","raw":"MFCA137","r":68,"c":1},{"row":71,"col":6,"label":"MFCA138","raw":"MFCA138","r":68,"c":3},{"row":71,"col":7,"label":"MFCB129","raw":"MFCB129","r":68,"c":4},{"row":71,"col":9,"label":"MFCB130","raw":"MFCB130","r":68,"c":6},{"row":71,"col":12,"label":"MFCC123","raw":"MFCC123","r":68,"c":9},{"row":71,"col":13,"label":"B38","raw":"B38","r":68,"c":10},{"row":72,"col":4,"label":"MFCA139","raw":"MFCA139","r":69,"c":1},{"row":72,"col":6,"label":"MFCA140","raw":"MFCA140","r":69,"c":3},{"row":72,"col":7,"label":"MFCB131","raw":"MFCB131","r":69,"c":4},{"row":72,"col":9,"label":"MFCB132","raw":"MFCB132","r":69,"c":6},{"row":72,"col":12,"label":"MFCC125","raw":"MFCC125","r":69,"c":9}];
 
@@ -4181,11 +4064,6 @@ $('processFilterField').onchange=()=>{fillToolValues('process',PROCESS_ROWS,$('p
 $('processFilterValue').onchange=()=>renderPalletsProcess();
 $('processGroupBy').onchange=()=>renderPalletsProcess();
 $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
-$('trace360ModeBtn').onclick=()=>setDisplayMode('trace360');
-$('trace360SearchBtn').onclick=()=>trace360Search();
-$('trace360Search').onkeydown=e=>{if(e.key==='Enter')trace360Search();};
-$('trace360Type').onchange=()=>{if($('trace360Search').value.trim())trace360Search();};
-$('trace360RefreshBtn').onclick=()=>{TRACE360_INDEX=null;TRACE360_RESULTS=[];TRACE360_SELECTED='';loadTraceDataset(true).then(()=>buildTrace360Panel(true));};
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
@@ -4482,5 +4360,4 @@ loadSyncHealth();
 setInterval(loadSyncHealth,30000);
 
 </script>
-
 </body></html>
