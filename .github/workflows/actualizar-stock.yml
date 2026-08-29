@@ -693,10 +693,8 @@ jobs:
 
           def receipt_key_variants(value):
               """
-              Genera variantes compatibles entre:
-              - Inventario Referencia: ord_no
-              - Consulta Recibo: unido / doctoERP / numDocumento
-              Ej.: 4501999143-4501999143 también genera 4501999143.
+              Normaliza identificadores de recepción y agrega una variante simple
+              cuando Copérnico repite el mismo número (ej. 450...-450...).
               """
               raw = normalize_receipt_link(value)
               if not raw:
@@ -708,6 +706,47 @@ jobs:
               if len(parts) == 2 and parts[0] == parts[1]:
                   keys.add(parts[0])
 
+              return keys
+
+          def usable_receipt_key(value):
+              raw = normalize_receipt_link(value)
+              if not raw:
+                  return False
+
+              # Valores genéricos que no identifican de forma unívoca un recibo.
+              if raw in {
+                  "MULTIPRODUCTO", "MULTI", "N/A", "NA", "NINGUNO",
+                  "SINOC", "SINORDEN", "SINDATO", "-"
+              }:
+                  return False
+
+              return len(raw) >= 4
+
+          def stock_receipt_keys(row):
+              """
+              Identificadores disponibles en Inventario Referencia que pueden
+              vincular una caja actual en RECIBO con Consulta Recibo.
+
+              La prioridad operativa sigue siendo ord_no/documentooc; Factura y
+              PedProv se usan como fallback porque en Consulta Recibo el campo
+              ord_no puede contener el documento del proveedor.
+              """
+              values = (
+                  field(row, "ord_no", "OrdNo", "ordno"),
+                  field(row, "documentooc", "DocumentoOC", "documento_oc", "DocumentoOc"),
+                  field(row, "Factura", "factura"),
+                  field(row, "PedProv", "pedprov", "pedProv"),
+              )
+
+              keys = []
+              seen = set()
+              for value in values:
+                  if not usable_receipt_key(value):
+                      continue
+                  for key in receipt_key_variants(value):
+                      if key not in seen:
+                          seen.add(key)
+                          keys.append(key)
               return keys
 
           def receipt_date_window(receipt_rows):
@@ -944,7 +983,10 @@ jobs:
               plan_rows = deduped
               size = total_bytes
 
-              supplier_by_key = {}
+              # Construimos primero candidatos por clave. Solo publicamos una
+              # asociación cuando esa clave apunta a un único proveedor; así
+              # evitamos falsos positivos por identificadores repetidos.
+              supplier_candidates = {}
 
               for plan_row in plan_rows:
                   proveedor = str(
@@ -958,22 +1000,41 @@ jobs:
                   if not proveedor:
                       continue
 
-                  # No dependemos de una sola columna del endpoint.
+                  # Claves principales de Consulta Recibo + ord_no, que en varios
+                  # recibos contiene el documento/factura del proveedor.
                   for raw_key in (
                       field(plan_row, "unido", "Unido"),
                       field(plan_row, "doctoERP", "DoctoERP"),
                       field(plan_row, "numDocumento", "NumDocumento"),
-                      field(plan_row, "numdocumento")
+                      field(plan_row, "numdocumento"),
+                      field(plan_row, "documentooc", "DocumentoOC", "DocumentoOc"),
+                      field(plan_row, "ord_no", "OrdNo", "ordno")
                   ):
+                      if not usable_receipt_key(raw_key):
+                          continue
                       for key in receipt_key_variants(raw_key):
-                          supplier_by_key[key] = proveedor
+                          supplier_candidates.setdefault(key, set()).add(proveedor)
+
+              supplier_by_key = {
+                  key: next(iter(proveedores))
+                  for key, proveedores in supplier_candidates.items()
+                  if len(proveedores) == 1
+              }
+              ambiguous_supplier_keys = {
+                  key: sorted(proveedores)
+                  for key, proveedores in supplier_candidates.items()
+                  if len(proveedores) > 1
+              }
 
               stock_keys = []
               for row in receipt_rows:
-                  raw = field(row, "ord_no", "OrdNo", "ordno")
-                  stock_keys.extend(receipt_key_variants(raw))
+                  stock_keys.extend(stock_receipt_keys(row))
 
               direct_hits = sum(1 for key in stock_keys if key in supplier_by_key)
+              print(
+                  "PLANRECIBO claves ambiguas descartadas:",
+                  len(ambiguous_supplier_keys)
+              )
 
               # V11: resolver faltantes consultando cada documento actual de RECIBO
               # directamente en Consulta Recibo. Se consulta una sola vez por
@@ -982,10 +1043,7 @@ jobs:
               seen_unresolved = set()
 
               for row in receipt_rows:
-                  raw_ord = str(
-                      field(row, "ord_no", "OrdNo", "ordno") or ""
-                  ).strip()
-                  variants = receipt_key_variants(raw_ord)
+                  variants = set(stock_receipt_keys(row))
 
                   if not variants:
                       continue
@@ -1076,9 +1134,12 @@ jobs:
                               field(plan_row, "unido", "Unido"),
                               field(plan_row, "doctoERP", "DoctoERP"),
                               field(plan_row, "numDocumento", "NumDocumento"),
-                              field(plan_row, "numdocumento")
+                              field(plan_row, "numdocumento"),
+                              field(plan_row, "documentooc", "DocumentoOC", "DocumentoOc"),
+                              field(plan_row, "ord_no", "OrdNo", "ordno")
                           ):
-                              row_keys.update(receipt_key_variants(raw_key))
+                              if usable_receipt_key(raw_key):
+                                  row_keys.update(receipt_key_variants(raw_key))
 
                           # Primero intentamos coincidencia exacta con el documento
                           # consultado; después publicamos todas sus variantes.
@@ -1655,9 +1716,10 @@ jobs:
                       caja = str(field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                       trace = receipt_trace_by_box.get(caja, {})
                       proveedor = ""
-                      stock_ord_no = field(stock_row, "ord_no", "OrdNo", "ordno")
 
-                      for receipt_link in receipt_key_variants(stock_ord_no):
+                      # Intentamos todas las relaciones disponibles de la fila
+                      # actual: ord_no, documentooc, Factura y PedProv.
+                      for receipt_link in stock_receipt_keys(stock_row):
                           proveedor = supplier_by_unido.get(receipt_link, "")
                           if proveedor:
                               break
