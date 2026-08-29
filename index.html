@@ -1896,10 +1896,10 @@ body.heatSplit .layoutHeatGrid{
 
 <div class="receiptToolbar">
 <input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, proveedor, descripción, responsable o equipo..."/>
-<select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
+<select id="receiptTeamFilter" autocomplete="off"><option value="">Todos los equipos</option></select>
 <select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
 <option value="all">Todo actual</option>
-<option value="exclude_today">Hasta ayer (excluye hoy)</option>
+<option value="exclude_today" selected>Hasta ayer (excluye hoy)</option>
 <option value="yesterday">Solo ayer</option>
 <option value="old">Viejos (anteriores a ayer)</option>
 <option value="today">Solo hoy</option>
@@ -3038,12 +3038,26 @@ function receiptCmp(a,b,key){
   if(key==='fecha'){const ad=new Date(av).getTime(),bd=new Date(bv).getTime();return (isNaN(ad)?0:ad)-(isNaN(bd)?0:bd)}
   return String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});
 }
+let RECEIPT_DEFAULTS_APPLIED=false;
 function fillReceiptTeams(){
   const sel=$('receiptTeamFilter');if(!sel)return;
   const current=sel.value;
   const teams=[...new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'equipo')||'Sin clasificar').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   sel.innerHTML='<option value="">Todos los equipos</option>'+teams.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
-  if(teams.includes(current))sel.value=current;
+  // Después de la inicialización, conservar lo que el usuario haya elegido.
+  if(RECEIPT_DEFAULTS_APPLIED && (current===''||teams.includes(current))){
+    sel.value=current;
+  }
+}
+function applyReceiptDefaults(){
+  const teamSel=$('receiptTeamFilter');
+  const ageSel=$('receiptAgeFilter');
+  if(ageSel)ageSel.value='exclude_today';
+  if(teamSel){
+    const hasReception=[...teamSel.options].some(o=>o.value==='Recepción');
+    teamSel.value=hasReception?'Recepción':'';
+  }
+  RECEIPT_DEFAULTS_APPLIED=true;
 }
 function receiptDateOnly(v){
   const raw=String(v||'').trim();
@@ -3158,7 +3172,9 @@ function renderReceipt(){
   $('receiptBoxCount').textContent=boxes.size.toLocaleString('es-AR');
   $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
-  updateReceiptQuickSummary(RECEIPT_ROWS);
+  // Los gráficos responden únicamente al filtro de antigüedad.
+  // El filtro de equipo, búsqueda y filtros de tabla NO los modifican.
+  updateReceiptQuickSummary(RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,ageMode)));
 }
 
 // ===== v46 · En recibo desde fuentes originales de Copérnico =====
@@ -3283,6 +3299,7 @@ async function buildReceiptPanel(force=false){
     RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(enriched,trace) : enriched.map(r=>({...r,_receiptTraceFound:false}));
     RECEIPT_LOADED=true;
     fillReceiptTeams();
+    if(!RECEIPT_DEFAULTS_APPLIED)applyReceiptDefaults();
     if(st){
       const identified=RECEIPT_ROWS.filter(r=>r._receiptTraceFound).length;
       const linked=RECEIPT_ROWS.filter(r=>r._receiptProviderFound).length;
@@ -4153,6 +4170,8 @@ $('processFilterField').onchange=()=>{fillToolValues('process',PROCESS_ROWS,$('p
 $('processFilterValue').onchange=()=>renderPalletsProcess();
 $('processGroupBy').onchange=()=>renderPalletsProcess();
 $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
+// Forzar el default visual desde el arranque; luego applyReceiptDefaults fija también Recepción cuando cargan los equipos.
+if($('receiptAgeFilter'))$('receiptAgeFilter').value='exclude_today';
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
@@ -4160,7 +4179,7 @@ $('receiptAgeFilter').onchange=()=>renderReceipt();
 $('receiptFilterField').onchange=()=>{fillToolValues('receipt',RECEIPT_ROWS,$('receiptFilterField').value,receiptField);renderReceipt();};
 $('receiptFilterValue').onchange=()=>renderReceipt();
 $('receiptGroupBy').onchange=()=>renderReceipt();
-$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';$('receiptTeamFilter').value='';$('receiptAgeFilter').value='all';$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
+$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';applyReceiptDefaults();$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
 $('receiptRefreshBtn').onclick=()=>buildReceiptPanel(true);
 document.querySelectorAll('[data-receipt-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.receiptSort;if(RECEIPT_SORT.key===k)RECEIPT_SORT.dir*=-1;else{RECEIPT_SORT.key=k;RECEIPT_SORT.dir=1}renderReceipt();});
 $('sanGroupSelect').onchange=()=>{
