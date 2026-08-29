@@ -1598,6 +1598,24 @@ body.heatSplit .layoutHeatGrid{
 .mixTraceDebug summary{cursor:pointer;color:#8fdcff;font-size:9px;font-weight:800}
 .mixTraceRaw{margin-top:7px;background:#0b1117;border:1px solid #2d3945;border-radius:6px;padding:7px;max-height:240px;overflow:auto;font:9px/1.35 ui-monospace,Consolas,monospace;color:#c8d2dd;white-space:pre-wrap;word-break:break-word}
 </style>
+<style>
+/* ===== Resumen rápido RECIBO · Inventario vs Recepción ===== */
+.receiptQuick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.receiptQuickCard{border:1px solid #303a47;border-radius:10px;background:#0f151d;padding:14px;min-height:220px}
+.receiptQuickTitle{font-size:12px;font-weight:900;color:#eef3f8;margin-bottom:2px}
+.receiptQuickSub{font-size:10px;color:#8f9aa8;margin-bottom:12px}
+.receiptQuickBody{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+.receiptPie{--p:0;width:142px;height:142px;border-radius:50%;background:conic-gradient(#55d38a calc(var(--p)*1%),#3b82f6 0);position:relative;box-shadow:inset 0 0 0 1px #314050}
+.receiptPie:after{content:"";position:absolute;inset:27px;border-radius:50%;background:#0f151d;border:1px solid #263341}
+.receiptPieCenter{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+.receiptPieCenter b{font-size:21px;color:#fff}.receiptPieCenter span{font-size:9px;color:#9ca8b5;margin-top:2px}
+.receiptLegend{min-width:210px;display:flex;flex-direction:column;gap:9px}
+.receiptLegendRow{display:grid;grid-template-columns:10px 1fr auto;gap:7px;align-items:center;font-size:10px;color:#cbd5df}
+.receiptLegendRow i{width:10px;height:10px;border-radius:2px;display:block}.receiptLegendRow .op{background:#55d38a}.receiptLegendRow .rest{background:#3b82f6}
+.receiptLegendRow b{color:#fff;font-size:11px}.receiptLegendRow small{display:block;color:#7f8b98;font-size:8px;margin-top:1px}
+.receiptQuickNote{margin-top:10px;padding-top:8px;border-top:1px solid #273340;color:#7f8b98;font-size:8px;line-height:1.4}
+@media(max-width:900px){.receiptQuick{grid-template-columns:1fr}.receiptQuickBody{justify-content:flex-start}}
+</style>
 </head>
 <body>
 <div class="top">
@@ -1845,6 +1863,37 @@ body.heatSplit .layoutHeatGrid{
 <div class="processKpi"><small>UNIDADES</small><b id="receiptUnitCount">0</b><span>saldo actual en recibo</span></div>
 <div class="processKpi"><small>IDENTIFICADAS</small><b id="receiptIdentifiedCount">0</b><span>con responsable</span></div>
 </div>
+<div class="receiptQuick" id="receiptQuickSummary">
+  <div class="receiptQuickCard">
+    <div class="receiptQuickTitle">Cajas distintas · Inventario vs Recepción</div>
+    <div class="receiptQuickSub">Participación sobre las cajas que actualmente figuran en RECIBO</div>
+    <div class="receiptQuickBody">
+      <div class="receiptPie" id="receiptBoxPie" style="--p:0">
+        <div class="receiptPieCenter"><b id="receiptBoxPct">0%</b><span>Recepción</span></div>
+      </div>
+      <div class="receiptLegend">
+        <div class="receiptLegendRow"><i class="op"></i><div>Operación · Recepción<small>Cajas asociadas al equipo Recepción</small></div><b id="receiptBoxReception">0</b></div>
+        <div class="receiptLegendRow"><i class="rest"></i><div>Resto del inventario<small>Otras áreas o sin identificar</small></div><b id="receiptBoxOther">0</b></div>
+        <div class="receiptLegendRow"><span></span><div>Total inventario en RECIBO</div><b id="receiptBoxTotalQuick">0</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="receiptQuickCard">
+    <div class="receiptQuickTitle">Unidades · Inventario vs Recepción</div>
+    <div class="receiptQuickSub">Participación sobre la suma de unidades que actualmente figuran en RECIBO</div>
+    <div class="receiptQuickBody">
+      <div class="receiptPie" id="receiptUnitPie" style="--p:0">
+        <div class="receiptPieCenter"><b id="receiptUnitPct">0%</b><span>Recepción</span></div>
+      </div>
+      <div class="receiptLegend">
+        <div class="receiptLegendRow"><i class="op"></i><div>Operación · Recepción<small>Unidades asociadas al equipo Recepción</small></div><b id="receiptUnitReception">0</b></div>
+        <div class="receiptLegendRow"><i class="rest"></i><div>Resto del inventario<small>Otras áreas o sin identificar</small></div><b id="receiptUnitOther">0</b></div>
+        <div class="receiptLegendRow"><span></span><div>Total inventario en RECIBO</div><b id="receiptUnitTotalQuick">0</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="receiptToolbar">
 <input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, proveedor, descripción, responsable o equipo..."/>
 <select id="receiptTeamFilter"><option value="">Todos los equipos</option></select>
@@ -3025,6 +3074,45 @@ function receiptAgeMatches(r,mode){
   return true;
 }
 
+
+function updateReceiptQuickSummary(rows){
+  const source=Array.isArray(rows)?rows:[];
+  const byBox=new Map();
+  let totalUnits=0,receptionUnits=0;
+  for(const r of source){
+    const caja=String(receiptField(r,'caja')||'').trim();
+    const team=String(receiptField(r,'equipo')||'Sin clasificar').trim();
+    const isReception=team==='Recepción';
+    const units=Number(String(receiptField(r,'saldo')||0).replace(',','.'))||0;
+    totalUnits+=units;
+    if(isReception)receptionUnits+=units;
+    if(caja){
+      const prev=byBox.get(caja)||false;
+      byBox.set(caja,prev||isReception);
+    }
+  }
+  const totalBoxes=byBox.size;
+  const receptionBoxes=[...byBox.values()].filter(Boolean).length;
+  const otherBoxes=Math.max(0,totalBoxes-receptionBoxes);
+  const otherUnits=Math.max(0,totalUnits-receptionUnits);
+  const boxPct=totalBoxes?receptionBoxes/totalBoxes*100:0;
+  const unitPct=totalUnits?receptionUnits/totalUnits*100:0;
+  const fmt=n=>Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:2});
+  const pct=n=>n.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val};
+  const boxPie=$('receiptBoxPie'),unitPie=$('receiptUnitPie');
+  if(boxPie)boxPie.style.setProperty('--p',String(Math.max(0,Math.min(100,boxPct))));
+  if(unitPie)unitPie.style.setProperty('--p',String(Math.max(0,Math.min(100,unitPct))));
+  set('receiptBoxPct',pct(boxPct));
+  set('receiptBoxReception',fmt(receptionBoxes));
+  set('receiptBoxOther',fmt(otherBoxes));
+  set('receiptBoxTotalQuick',fmt(totalBoxes));
+  set('receiptUnitPct',pct(unitPct));
+  set('receiptUnitReception',fmt(receptionUnits));
+  set('receiptUnitOther',fmt(otherUnits));
+  set('receiptUnitTotalQuick',fmt(totalUnits));
+}
+
 function renderReceipt(){
   const body=$('receiptBody'),empty=$('receiptEmpty');if(!body||!empty)return;
   const q=String($('receiptSearch')?.value||'').trim().toLowerCase();
@@ -3070,6 +3158,7 @@ function renderReceipt(){
   $('receiptBoxCount').textContent=boxes.size.toLocaleString('es-AR');
   $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
+  updateReceiptQuickSummary(RECEIPT_ROWS);
 }
 
 // ===== v46 · En recibo desde fuentes originales de Copérnico =====
