@@ -1060,33 +1060,33 @@ jobs:
                       direct_doc_rows += len(rows_direct)
 
                       for plan_row in rows_direct:
-                      proveedor = str(
-                          field(
-                              plan_row,
-                              "nombreProveedor", "NombreProveedor",
-                              "proveedor", "Proveedor"
-                          ) or ""
-                      ).strip()
+                          proveedor = str(
+                              field(
+                                  plan_row,
+                                  "nombreProveedor", "NombreProveedor",
+                                  "proveedor", "Proveedor"
+                              ) or ""
+                          ).strip()
 
-                      if not proveedor:
-                          continue
+                          if not proveedor:
+                              continue
 
-                      row_keys = set()
-                      for raw_key in (
-                          field(plan_row, "unido", "Unido"),
-                          field(plan_row, "doctoERP", "DoctoERP"),
-                          field(plan_row, "numDocumento", "NumDocumento"),
-                          field(plan_row, "numdocumento")
-                      ):
-                          row_keys.update(receipt_key_variants(raw_key))
+                          row_keys = set()
+                          for raw_key in (
+                              field(plan_row, "unido", "Unido"),
+                              field(plan_row, "doctoERP", "DoctoERP"),
+                              field(plan_row, "numDocumento", "NumDocumento"),
+                              field(plan_row, "numdocumento")
+                          ):
+                              row_keys.update(receipt_key_variants(raw_key))
 
-                      # Primero intentamos coincidencia exacta con el documento
-                      # consultado; después publicamos todas sus variantes.
-                      if documento in row_keys:
-                          found_supplier = proveedor
+                          # Primero intentamos coincidencia exacta con el documento
+                          # consultado; después publicamos todas sus variantes.
+                          if documento in row_keys:
+                              found_supplier = proveedor
 
-                      for key in row_keys:
-                          supplier_by_key[key] = proveedor
+                          for key in row_keys:
+                              supplier_by_key[key] = proveedor
 
                   if found_supplier:
                       direct_doc_resolved += 1
