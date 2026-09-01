@@ -1908,7 +1908,7 @@ body.heatSplit .layoutHeatGrid{
 </style>
 <div class="receiptSupplierSummary" id="receiptSupplierSummary">
   <div class="receiptSupplierHead">
-    <div><h3>Resumen por proveedor</h3><small>Cajas distintas, unidades y SKU según el filtro de antigüedad seleccionado</small></div>
+    <div><h3>Resumen por proveedor</h3><small>Cajas distintas, unidades y SKU según los filtros de antigüedad y equipo seleccionados</small></div>
     <small id="receiptSupplierScope"></small>
   </div>
   <div class="receiptSupplierWrap">
@@ -3167,7 +3167,7 @@ function receiptProviderKey(value){
     .replace(/\s+/g,' ');
 }
 
-function updateReceiptSupplierSummary(rows,ageMode){
+function updateReceiptSupplierSummary(rows,ageMode,team){
   const body=$('receiptSupplierBody'),foot=$('receiptSupplierFoot'),empty=$('receiptSupplierEmpty');
   if(!body||!foot||!empty)return;
   const source=Array.isArray(rows)?rows:[];
@@ -3201,7 +3201,7 @@ function updateReceiptSupplierSummary(rows,ageMode){
   const scope=$('receiptSupplierScope');
   if(scope){
     const labels={all:'Todo actual',exclude_today:'Hasta ayer (excluye hoy)',yesterday:'Solo ayer',old:'Viejos (anteriores a ayer)',today:'Solo hoy'};
-    scope.textContent=labels[ageMode]||'';
+    scope.textContent=(labels[ageMode]||'')+(team?' · Equipo: '+team:' · Todos los equipos');
   }
 }
 
@@ -3251,11 +3251,16 @@ function renderReceipt(){
   $('receiptBoxCount').textContent=boxes.size.toLocaleString('es-AR');
   $('receiptUnitCount').textContent=units.toLocaleString('es-AR');
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
-  // Los gráficos responden únicamente al filtro de antigüedad.
-  // El filtro de equipo, búsqueda y filtros de tabla NO los modifican.
+  // Los gráficos rápidos siguen respondiendo únicamente al filtro de antigüedad.
   const receiptAgeRows=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,ageMode));
   updateReceiptQuickSummary(receiptAgeRows);
-  updateReceiptSupplierSummary(receiptAgeRows,ageMode);
+
+  // El resumen por proveedor responde al filtro de antigüedad + Equipo.
+  // Como el default de Equipo es Recepción, el resumen abre filtrado por Recepción.
+  const receiptSupplierRows=receiptAgeRows.filter(r=>
+    !team || String(receiptField(r,'equipo')||'Sin clasificar')===team
+  );
+  updateReceiptSupplierSummary(receiptSupplierRows,ageMode,team);
 }
 
 // ===== v46 · En recibo desde fuentes originales de Copérnico =====
