@@ -1856,7 +1856,7 @@ body.heatSplit .layoutHeatGrid{
 <div id="receiptView" style="display:none">
 <div class="layoutHeatTitle">En recibo</div>
 <div class="layoutHeatSubtitle">
-      Unidades que actualmente figuran en <b>RECIBO</b>. Fuente primaria: Inventario Referencia de Copérnico. Proveedor: cruce <b>Referencia ord_no ↔ Consulta Recibo unido</b>. El equipo se deriva del perfil de Copérnico.
+      Unidades que <b>actualmente figuran en RECIBO dentro de Inventario Referencia de Copérnico</b>. Esa es la única fuente que define qué líneas aparecen en esta tabla. Proveedor: <b>OC de Inventario Referencia → doctoERP de Plan Recibo</b>. Si Plan Recibo indica MULTIPRODUCTO, se usa el proveedor del maestro VL por EAN. El equipo se deriva del perfil de Copérnico.
     </div>
 <div class="processKpis">
 <div class="processKpi"><small>CAJAS</small><b id="receiptBoxCount">0</b><span>cajas distintas</span></div>
@@ -2977,12 +2977,20 @@ function receiptField(r,key){
   const map={
     caja:['Caja','caja'], sku:['EAN','ean','SKU','sku'], desc:['Descripcion','descripcion'],
     saldo:['Saldo','saldo','Cantidad','cantidad'], fv:['FV','fv'],
-    factura:['_receiptFactura','Factura','factura'], oc:['_receiptOC','doctoERP','DoctoERP','oc'], macrozona:['_receiptMacrozona','Macrozona','macrozona'], proveedor:['_receiptMasterProveedor','_receiptProveedor','nombreProveedor','Proveedor','proveedor'],
-    origen:['PosicionOrigen','posicion_origen','UbicacionInicial','Ubicacion','ubicacion'],
+    factura:['_receiptFactura','Factura','factura'], oc:['_receiptOC','doctoERP','DoctoERP','oc'], macrozona:['_receiptMacrozona','Macrozona','macrozona'],
+    origen:['Ubicacion','ubicacion','Posicion','posicion','PosicionOrigen','posicion_origen','UbicacionInicial'],
     responsable:['_receiptResponsable','Responsable','responsable','Nombre_empleado','Empleado'],
     id:['_receiptEmployeeId','Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
     fecha:['_receiptIngreso','FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
   };
+  if(key==='proveedor'){
+    // Proveedor ya resuelto según OC de Inventario Referencia → Plan Recibo,
+    // con excepción MULTIPRODUCTO → maestro VL por EAN.
+    const v=r&&r._receiptProveedorFinal!==undefined&&r._receiptProveedorFinal!==null
+      ?String(r._receiptProveedorFinal).trim():'';
+    if(v)return v;
+    return '';
+  }
   if(key==='equipo'){
     // Si la trazabilidad ya identificó al empleado de ingreso, clasificar ESE empleado.
     if(r && r._receiptEmployeeId){
@@ -3299,20 +3307,14 @@ function receiptPlanRange(rows){
   return {from:receiptYmd(start),to:receiptYmd(end)};
 }
 async function loadCopernicoReferenceRows(force=false){
-  try{
-    const res=await fetch(COPERNICO_REFERENCE_URL+(COPERNICO_REFERENCE_URL.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json();
-    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-    if(!rows.length)throw new Error('Referencia sin filas');
-    return rows.filter(receiptIsCurrentRecibo);
-  }catch(err){
-    console.warn('No se pudo leer Inventario Referencia directo; uso en-recibo.json como respaldo',err);
-    const res=await fetch('./en-recibo.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
-    if(!res.ok)throw new Error('Fallback en-recibo.json HTTP '+res.status);
-    const payload=await res.json();
-    return Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-  }
+  // FUENTE DE VERDAD DE EN RECIBO: Inventario Referencia de Copérnico.
+  // Si esta consulta falla, NO se completa la tabla con otras fuentes.
+  const res=await fetch(COPERNICO_REFERENCE_URL+(COPERNICO_REFERENCE_URL.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw new Error('Inventario Referencia HTTP '+res.status);
+  const payload=await res.json();
+  const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+  if(!rows.length)throw new Error('Inventario Referencia sin filas');
+  return rows.filter(receiptIsCurrentRecibo);
 }
 async function loadCopernicoReceiptPlan(rows,force=false){
   if(COPERNICO_RECEIPT_PLAN_CACHE&&!force)return COPERNICO_RECEIPT_PLAN_CACHE;
@@ -3335,27 +3337,38 @@ function receiptPlanIndexes(planRows){
   }
   return {byUnido,byOc};
 }
+function receiptInventoryOC(refRow){
+  // La OC se toma EXCLUSIVAMENTE de Doc_Oc en Inventario Referencia.
+  // Si Doc_Oc es MULTIPRODUCTO, el proveedor se resuelve por EAN en el maestro VL.
+  const raw=processVal(refRow,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
+  const value=String(raw??'').trim();
+  if(!value)return '';
+  if(receiptNorm(value)==='multiproducto')return 'MULTIPRODUCTO';
+  const m=value.match(/45\d{8}/);
+  return m?m[0]:'';
+}
 function receiptPlanMatch(refRow,indexes){
-  const raw=receiptJoinKey(processVal(refRow,['ord_no','Ord_no','ORD_NO']));
-  if(raw&&indexes.byUnido.has(raw))return indexes.byUnido.get(raw);
-  // Respaldo para casos 450...-450... o valor simple.
-  if(raw){
-    const parts=raw.split('-').filter(Boolean);
-    const oc=(parts.length===2&&parts[0]===parts[1])?parts[0]:(parts.length===1?parts[0]:'');
-    if(oc&&indexes.byOc.has(oc))return indexes.byOc.get(oc);
-  }
+  // 2) Con esa OC buscamos doctoERP en Plan Recibo.
+  const oc=receiptInventoryOC(refRow);
+  if(oc&&oc!=='MULTIPRODUCTO'&&indexes.byOc.has(oc))return indexes.byOc.get(oc);
   return null;
 }
 function enrichReceiptRowsWithReferenceAndProvider(rows,planRows){
   const indexes=receiptPlanIndexes(planRows);
   return (rows||[]).map(src=>{
     const r={...src};
-    const p=receiptPlanMatch(r,indexes);
+    const inventoryOC=receiptInventoryOC(r);
+    const p=inventoryOC ? receiptPlanMatch(r,indexes) : null;
+    const planProvider=p?receiptCompact(processVal(p,['nombreProveedor','NombreProveedor','proveedor'])):'';
     r._receiptFactura=receiptCompact(processVal(r,['Factura','factura']));
     r._receiptOrdNo=receiptCompact(processVal(r,['ord_no','Ord_no','ORD_NO']));
-    r._receiptOC=p?receiptCompact(processVal(p,['doctoERP','DoctoERP','numDocumento','numdocumento'])):'';
-    r._receiptProveedor=p?receiptCompact(processVal(p,['nombreProveedor','NombreProveedor','proveedor'])):'';
-    r._receiptProviderFound=!!p;
+    r._receiptInventoryOC=inventoryOC;
+    r._receiptOC=(inventoryOC==='MULTIPRODUCTO'?'':inventoryOC) || (p?receiptCompact(processVal(p,['doctoERP','DoctoERP','numDocumento','numdocumento'])):'');
+    r._receiptPlanProveedor=planProvider;
+    r._receiptPlanIsMultiproducto=(inventoryOC==='MULTIPRODUCTO')||receiptNorm(planProvider)==='multiproducto';
+    // El proveedor final se decide después de cargar el maestro VL por EAN.
+    r._receiptProveedor=(!r._receiptPlanIsMultiproducto ? planProvider : '');
+    r._receiptProviderFound=!!(!r._receiptPlanIsMultiproducto && planProvider);
     return r;
   });
 }
@@ -3384,6 +3397,24 @@ function enrichReceiptRowsWithMaster(rows,master){
     r._receiptMacrozona=hit ? String(hit.Macrozona||hit.macrozona||'').trim() : '';
     r._receiptMasterProveedor=hit ? String(hit.Proveedor||hit.proveedor||'').trim() : '';
     r._receiptMasterFound=!!hit;
+
+    // Regla de proveedor:
+    // - Si Inventario Referencia trae una OC 45xxxxxxxx y Plan Recibo devuelve un proveedor normal: usar Plan Recibo.
+    // - Si Plan Recibo devuelve MULTIPRODUCTO: usar el proveedor del maestro VL por EAN.
+    // - Si no hay OC/Plan válido: usar el maestro VL como respaldo.
+    const plan=String(r._receiptPlanProveedor||'').trim();
+    const masterProvider=String(r._receiptMasterProveedor||'').trim();
+    if(plan && receiptNorm(plan)!=='multiproducto'){
+      r._receiptProveedorFinal=plan;
+      r._receiptProveedorFuente='Plan Recibo por OC';
+    }else if(receiptNorm(plan)==='multiproducto'){
+      r._receiptProveedorFinal=masterProvider;
+      r._receiptProveedorFuente=masterProvider?'Maestro VL por EAN (MULTIPRODUCTO)':'Sin asociar';
+    }else{
+      r._receiptProveedorFinal=masterProvider;
+      r._receiptProveedorFuente=masterProvider?'Maestro VL por EAN (fallback)':'Sin asociar';
+    }
+    r._receiptProviderFound=!!r._receiptProveedorFinal;
     return r;
   });
 }
@@ -3425,11 +3456,11 @@ async function buildReceiptPanel(force=false){
     if(!RECEIPT_DEFAULTS_APPLIED)applyReceiptDefaults();
     if(st){
       const identified=RECEIPT_ROWS.filter(r=>r._receiptTraceFound).length;
-      const linked=RECEIPT_ROWS.filter(r=>r._receiptProviderFound).length;
+      const linked=RECEIPT_ROWS.filter(r=>String(receiptField(r,'proveedor')||'').trim()).length;
       const missingProvider=RECEIPT_ROWS.length-linked;
       st.className=(missingProvider||identified<RECEIPT_ROWS.length)?'processStatus':'processStatus ok';
       st.textContent='● Fuente: Copérnico Inventario Referencia · '+RECEIPT_ROWS.length.toLocaleString('es-AR')+' registros en RECIBO'+
-        ' · proveedor asociado: '+linked.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
+        ' · proveedor resuelto: '+linked.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
         ' · ingreso identificado: '+identified.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
         (missingProvider?' · '+missingProvider.toLocaleString('es-AR')+' sin proveedor':'');
     }
