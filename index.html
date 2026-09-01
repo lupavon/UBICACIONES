@@ -4483,7 +4483,11 @@ async function loadPublishedStock({silent=false}={}){
       if(!rows.length) throw new Error(src.name+' sin filas');
       const rawTs=candidate?.updated_at||candidate?.updatedAt||candidate?.generated_at||'';
       const ts=rawTs ? new Date(rawTs).getTime() : 0;
-      return {payload:candidate,ts:isNaN(ts)?0:ts,source:src.name};
+      const docOcCoverage=rows.reduce((n,row)=>{
+        const v=processVal(row,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
+        return n + (String(v??'').trim()?1:0);
+      },0);
+      return {payload:candidate,ts:isNaN(ts)?0:ts,source:src.name,docOcCoverage};
     }));
 
     const valid=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
@@ -4492,8 +4496,14 @@ async function loadPublishedStock({silent=false}={}){
       throw new Error(errors.join(' · ')||'No se pudo obtener stock remoto');
     }
 
-    // Tomar SIEMPRE la fuente más fresca entre Worker y GitHub Pages.
-    valid.sort((a,b)=>b.ts-a.ts);
+    // Para En Recibo necesitamos conservar Doc_Oc de Inventario Referencia.
+    // Priorizamos una fuente que realmente lo incluya; entre fuentes completas, la más fresca.
+    valid.sort((a,b)=>{
+      const aHas=a.docOcCoverage>0?1:0, bHas=b.docOcCoverage>0?1:0;
+      if(aHas!==bHas) return bHas-aHas;
+      if(a.docOcCoverage!==b.docOcCoverage) return b.docOcCoverage-a.docOcCoverage;
+      return b.ts-a.ts;
+    });
     const chosen=valid[0];
     const payload=chosen.payload;
     const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
