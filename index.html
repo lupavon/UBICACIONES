@@ -3161,16 +3161,23 @@ function updateReceiptSupplierSummary(rows,ageMode){
   const source=Array.isArray(rows)?rows:[];
   const byProvider=new Map();
   for(const r of source){
-    const provider=String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar';
-    if(!byProvider.has(provider))byProvider.set(provider,{boxes:new Set(),skus:new Set(),units:0});
-    const g=byProvider.get(provider);
+    const rawProvider=String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar';
+    // Agrupa solamente variantes de escritura del mismo proveedor:
+    // mayúsculas/minúsculas, acentos y espacios de más. No mezcla razones sociales distintas.
+    const providerKey=receiptNorm(rawProvider)||'sin asociar';
+    if(!byProvider.has(providerKey))byProvider.set(providerKey,{boxes:new Set(),skus:new Set(),units:0,names:new Map()});
+    const g=byProvider.get(providerKey);
+    g.names.set(rawProvider,(g.names.get(rawProvider)||0)+1);
     const box=String(receiptField(r,'caja')||'').trim();
     const sku=String(receiptField(r,'sku')||'').trim();
     if(box)g.boxes.add(box);
     if(sku)g.skus.add(sku);
     g.units+=Number(String(receiptField(r,'saldo')||0).replace(',','.'))||0;
   }
-  const arr=[...byProvider.entries()].map(([provider,g])=>({provider,boxes:g.boxes.size,units:g.units,skus:g.skus.size}))
+  const arr=[...byProvider.values()].map(g=>{
+    const provider=[...g.names.entries()].sort((a,b)=>b[1]-a[1]||b[0].localeCompare(a[0],'es',{sensitivity:'base'}))[0]?.[0]||'Sin asociar';
+    return {provider,boxes:g.boxes.size,units:g.units,skus:g.skus.size};
+  })
     .sort((a,b)=>b.units-a.units||b.boxes-a.boxes||a.provider.localeCompare(b.provider,'es',{sensitivity:'base'}));
   const fmt=n=>Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:2});
   body.innerHTML=arr.map(x=>'<tr><td>'+esc(x.provider)+'</td><td>'+fmt(x.boxes)+'</td><td>'+fmt(x.units)+'</td><td>'+fmt(x.skus)+'</td></tr>').join('');
