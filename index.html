@@ -2977,12 +2977,17 @@ function receiptField(r,key){
   const map={
     caja:['Caja','caja'], sku:['EAN','ean','SKU','sku'], desc:['Descripcion','descripcion'],
     saldo:['Saldo','saldo','Cantidad','cantidad'], fv:['FV','fv'],
-    factura:['_receiptFactura','Factura','factura'], oc:['_receiptOC','doctoERP','DoctoERP','oc'], macrozona:['_receiptMacrozona','Macrozona','macrozona'],
+    factura:['_receiptFactura','Factura','factura'], oc:['_receiptOC','Doc_Oc','DOC_OC','doc_oc','doctoERP','DoctoERP','oc'], macrozona:['_receiptMacrozona','Macrozona','macrozona'],
     origen:['Ubicacion','ubicacion','Posicion','posicion','PosicionOrigen','posicion_origen','UbicacionInicial'],
     responsable:['_receiptResponsable','Responsable','responsable','Nombre_empleado','Empleado'],
     id:['_receiptEmployeeId','Id_empleado','id_empleado','IdEmpleado'], equipo:['Equipo','equipo','Puesto','puesto'],
     fecha:['_receiptIngreso','FechaIngresoRecibo','fecha_ingreso_recibo','fecha']
   };
+  if(key==='oc'){
+    const clean=receiptInventoryOC(r);
+    if(clean)return clean;
+    return processVal(r,map[key]||[key]);
+  }
   if(key==='proveedor'){
     // Proveedor ya resuelto según OC de Inventario Referencia → Plan Recibo,
     // con excepción MULTIPRODUCTO → maestro VL por EAN.
@@ -3388,17 +3393,21 @@ function receiptPlanIndexes(planRows){
   }
   return {byUnido,byOc};
 }
+function receiptRawDocOc(refRow){
+  // Leer Doc_Oc DIRECTAMENTE del objeto de Inventario Referencia.
+  // No depender de processVal, porque puede devolver una variante vacía antes que la clave con dato.
+  if(!refRow || typeof refRow!=='object') return '';
+  for(const [k,v] of Object.entries(refRow)){
+    const nk=String(k).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+    if(nk==='dococ' && v!==undefined && v!==null && String(v).trim()!=='') return String(v).trim();
+  }
+  return '';
+}
 function receiptInventoryOC(refRow){
   // Fuente EXCLUSIVA: Doc_Oc de Inventario Referencia.
   // Ej.: 4501998850-4501998850 => 4501998850.
   // MULTIPRODUCTO se conserva para resolver proveedor por EAN en el maestro VL.
-  let raw=processVal(refRow,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
-  // Tolerar variaciones de nombre de clave del JSON sin buscar la OC en otros campos.
-  if((raw===undefined||raw===null||String(raw).trim()==='') && refRow && typeof refRow==='object'){
-    const key=Object.keys(refRow).find(k=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'')==='dococ');
-    if(key) raw=refRow[key];
-  }
-  const value=String(raw??'').trim();
+  const value=receiptRawDocOc(refRow);
   if(!value)return '';
   if(receiptNorm(value)==='multiproducto')return 'MULTIPRODUCTO';
   const first=value.split('-')[0].trim();
