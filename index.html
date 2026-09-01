@@ -3163,16 +3163,36 @@ function updateReceiptQuickSummary(rows){
   set('receiptUnitTotalQuick',fmt(totalUnits));
 }
 
-function receiptProviderKey(value){
+function receiptProviderBase(value){
   return String(value??'')
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[\u200B-\u200D\uFEFF]/g,'')
     .replace(/[\u0000-\u001F\u007F]/g,'')
     .toLowerCase()
     .replace(/&/g,' y ')
+    .replace(/\b(s\.?a\.?s?\.?|s\.?r\.?l\.?|sociedad anonima|sociedad de responsabilidad limitada)\b/g,' ')
     .replace(/[^a-z0-9]+/g,' ')
     .trim()
     .replace(/\s+/g,' ');
+}
+function receiptProviderKey(value){
+  const parts=String(value??'').split('/').map(receiptProviderBase).filter(Boolean);
+  if(!parts.length)return '';
+  // Si un valor compuesto repite el mismo proveedor con/sin razón social,
+  // consolidarlo bajo una sola clave (ej. Drogueria Del Sud / DROGUERIA DEL SUD S.A.).
+  const unique=[...new Set(parts)];
+  return unique.length===1?unique[0]:unique.join(' / ');
+}
+function receiptProviderDisplay(value){
+  const raw=String(value??'').trim();
+  const parts=raw.split('/').map(x=>x.trim()).filter(Boolean);
+  if(parts.length>1){
+    const bases=parts.map(receiptProviderBase);
+    if(bases.length && bases.every(x=>x===bases[0])){
+      return parts.sort((a,b)=>a.length-b.length)[0];
+    }
+  }
+  return raw;
 }
 
 function updateReceiptSupplierSummary(rows,ageMode,team){
@@ -3181,7 +3201,7 @@ function updateReceiptSupplierSummary(rows,ageMode,team){
   const source=Array.isArray(rows)?rows:[];
   const byProvider=new Map();
   for(const r of source){
-    const rawProvider=String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar';
+    const rawProvider=receiptProviderDisplay(String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar');
     // Agrupa solamente variantes de escritura del mismo proveedor:
     // mayúsculas/minúsculas, acentos y espacios de más. No mezcla razones sociales distintas.
     const providerKey=receiptProviderKey(rawProvider)||'sin asociar';
@@ -3307,19 +3327,45 @@ function receiptPlanRange(rows){
   return {from:receiptYmd(start),to:receiptYmd(end)};
 }
 async function loadCopernicoReferenceRows(force=false){
-  // FUENTE DE VERDAD DE EN RECIBO: el stock publicado del proyecto,
-  // que proviene de Inventario Referencia vía Worker/GitHub.
-  // No consultamos Copérnico directo desde el navegador para evitar HTTP 500.
+  // La lista de líneas actuales sigue saliendo del stock publicado.
   if(force || !Array.isArray(DATA) || !DATA.length){
     try{ await loadPublishedStock({silent:true}); }catch(_e){}
   }
-  // Si ya había una carga en curso, esperar brevemente a que DATA quede disponible.
   for(let i=0;i<20 && (!Array.isArray(DATA)||!DATA.length);i++){
     await new Promise(r=>setTimeout(r,150));
   }
-  const rows=Array.isArray(DATA)?DATA:[];
-  if(!rows.length)throw new Error('Stock publicado de Inventario Referencia sin filas');
-  return rows.filter(receiptIsCurrentRecibo);
+  const currentRows=Array.isArray(DATA)?DATA:[];
+  if(!currentRows.length)throw new Error('Stock publicado de Inventario Referencia sin filas');
+
+  // Para En Recibo, completar Doc_Oc desde stock.json de GitHub (respuesta cruda de
+  // Inventario Referencia). El Worker puede publicar una versión reducida sin Doc_Oc.
+  let fullRows=[];
+  try{
+    const res=await fetch('./stock.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}});
+    if(res.ok){
+      const payload=await res.json();
+      fullRows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    }
+  }catch(err){
+    console.warn('No se pudo leer stock.json completo para Doc_Oc',err);
+  }
+
+  const keyOf=r=>String(processVal(r,['Caja','caja'])||'').trim()+'|'+String(processVal(r,['EAN','ean','SKU','sku'])||'').trim();
+  const fullByKey=new Map();
+  for(const r of fullRows){
+    if(receiptIsCurrentRecibo(r)) fullByKey.set(keyOf(r),r);
+  }
+
+  return currentRows.filter(receiptIsCurrentRecibo).map(r=>{
+    const full=fullByKey.get(keyOf(r));
+    if(!full)return r;
+    const merged={...r};
+    for(const [k,v] of Object.entries(full)){
+      const nk=String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+      if(nk==='dococ') merged.Doc_Oc=v;
+    }
+    return merged;
+  });
 }
 async function loadCopernicoReceiptPlan(rows,force=false){
   if(COPERNICO_RECEIPT_PLAN_CACHE&&!force)return COPERNICO_RECEIPT_PLAN_CACHE;
