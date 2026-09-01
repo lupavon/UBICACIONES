@@ -3343,12 +3343,20 @@ function receiptPlanIndexes(planRows){
   return {byUnido,byOc};
 }
 function receiptInventoryOC(refRow){
-  // La OC se toma EXCLUSIVAMENTE de Doc_Oc en Inventario Referencia.
-  // Si Doc_Oc es MULTIPRODUCTO, el proveedor se resuelve por EAN en el maestro VL.
-  const raw=processVal(refRow,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
+  // Fuente EXCLUSIVA: Doc_Oc de Inventario Referencia.
+  // Ej.: 4501998850-4501998850 => 4501998850.
+  // MULTIPRODUCTO se conserva para resolver proveedor por EAN en el maestro VL.
+  let raw=processVal(refRow,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
+  // Tolerar variaciones de nombre de clave del JSON sin buscar la OC en otros campos.
+  if((raw===undefined||raw===null||String(raw).trim()==='') && refRow && typeof refRow==='object'){
+    const key=Object.keys(refRow).find(k=>String(k).toLowerCase().replace(/[^a-z0-9]/g,'')==='dococ');
+    if(key) raw=refRow[key];
+  }
   const value=String(raw??'').trim();
   if(!value)return '';
   if(receiptNorm(value)==='multiproducto')return 'MULTIPRODUCTO';
+  const first=value.split('-')[0].trim();
+  if(/^45\d{8}$/.test(first))return first;
   const m=value.match(/45\d{8}/);
   return m?m[0]:'';
 }
@@ -3368,7 +3376,7 @@ function enrichReceiptRowsWithReferenceAndProvider(rows,planRows){
     r._receiptFactura=receiptCompact(processVal(r,['Factura','factura']));
     r._receiptOrdNo=receiptCompact(processVal(r,['ord_no','Ord_no','ORD_NO']));
     r._receiptInventoryOC=inventoryOC;
-    r._receiptOC=(inventoryOC==='MULTIPRODUCTO'?'':inventoryOC) || (p?receiptCompact(processVal(p,['doctoERP','DoctoERP','numDocumento','numdocumento'])):'');
+    r._receiptOC=inventoryOC || (p?receiptCompact(processVal(p,['doctoERP','DoctoERP','numDocumento','numdocumento'])):'');
     r._receiptPlanProveedor=planProvider;
     r._receiptPlanIsMultiproducto=(inventoryOC==='MULTIPRODUCTO')||receiptNorm(planProvider)==='multiproducto';
     // El proveedor final se decide después de cargar el maestro VL por EAN.
