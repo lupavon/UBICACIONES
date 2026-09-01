@@ -4484,7 +4484,7 @@ rebuild();
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },30000);
+  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },10000);
 }
 
 const refreshBtn=document.getElementById('refreshStockBtn');
@@ -4504,7 +4504,7 @@ if(refreshBtn){
 // Arranque único del dashboard:
 // 1) mostrar cache inmediatamente;
 // 2) buscar stock nuevo en segundo plano;
-// 3) refrescar cada 30 segundos desde Cloudflare.
+// 3) refrescar cada 10 segundos desde Cloudflare.
 placeDetailForMode(displayMode);
 loadCachedStock();
 refreshVisibleStockStatus();
@@ -4571,7 +4571,7 @@ async function loadSyncHealth(){
 }
 
 loadSyncHealth();
-setInterval(loadSyncHealth,30000);
+setInterval(loadSyncHealth,10000);
 
 </script>
 </body></html>
