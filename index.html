@@ -1894,6 +1894,33 @@ body.heatSplit .layoutHeatGrid{
   </div>
 </div>
 
+<style>
+.receiptSupplierSummary{margin:14px 0 10px;border:1px solid var(--line,#2b3542);border-radius:9px;overflow:hidden;background:var(--panel,#111820)}
+.receiptSupplierHead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line,#2b3542)}
+.receiptSupplierHead h3{margin:0;font-size:14px}.receiptSupplierHead small{opacity:.72}
+.receiptSupplierWrap{max-height:300px;overflow:auto}
+.receiptSupplierTable{width:100%;border-collapse:collapse;font-size:12px}
+.receiptSupplierTable th,.receiptSupplierTable td{padding:8px 12px;border-bottom:1px solid var(--line,#26303b);text-align:right;white-space:nowrap}
+.receiptSupplierTable th:first-child,.receiptSupplierTable td:first-child{text-align:left}
+.receiptSupplierTable thead th{position:sticky;top:0;z-index:1;background:var(--panel2,#151d27)}
+.receiptSupplierTable tfoot td{font-weight:700;background:var(--panel2,#151d27)}
+.receiptSupplierEmpty{padding:18px;text-align:center;opacity:.7}
+</style>
+<div class="receiptSupplierSummary" id="receiptSupplierSummary">
+  <div class="receiptSupplierHead">
+    <div><h3>Resumen por proveedor</h3><small>Cajas distintas, unidades y SKU según el filtro de antigüedad seleccionado</small></div>
+    <small id="receiptSupplierScope"></small>
+  </div>
+  <div class="receiptSupplierWrap">
+    <table class="receiptSupplierTable">
+      <thead><tr><th>Proveedor</th><th>Cajas</th><th>Unidades</th><th>SKU</th></tr></thead>
+      <tbody id="receiptSupplierBody"></tbody>
+      <tfoot id="receiptSupplierFoot"></tfoot>
+    </table>
+    <div id="receiptSupplierEmpty" class="receiptSupplierEmpty" style="display:none">No hay datos para el filtro seleccionado.</div>
+  </div>
+</div>
+
 <div class="receiptToolbar">
 <input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, macrozona, proveedor, descripción, responsable o equipo..."/>
 <select id="receiptTeamFilter" autocomplete="off"><option value="">Todos los equipos</option></select>
@@ -3128,6 +3155,37 @@ function updateReceiptQuickSummary(rows){
   set('receiptUnitTotalQuick',fmt(totalUnits));
 }
 
+function updateReceiptSupplierSummary(rows,ageMode){
+  const body=$('receiptSupplierBody'),foot=$('receiptSupplierFoot'),empty=$('receiptSupplierEmpty');
+  if(!body||!foot||!empty)return;
+  const source=Array.isArray(rows)?rows:[];
+  const byProvider=new Map();
+  for(const r of source){
+    const provider=String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar';
+    if(!byProvider.has(provider))byProvider.set(provider,{boxes:new Set(),skus:new Set(),units:0});
+    const g=byProvider.get(provider);
+    const box=String(receiptField(r,'caja')||'').trim();
+    const sku=String(receiptField(r,'sku')||'').trim();
+    if(box)g.boxes.add(box);
+    if(sku)g.skus.add(sku);
+    g.units+=Number(String(receiptField(r,'saldo')||0).replace(',','.'))||0;
+  }
+  const arr=[...byProvider.entries()].map(([provider,g])=>({provider,boxes:g.boxes.size,units:g.units,skus:g.skus.size}))
+    .sort((a,b)=>b.units-a.units||b.boxes-a.boxes||a.provider.localeCompare(b.provider,'es',{sensitivity:'base'}));
+  const fmt=n=>Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:2});
+  body.innerHTML=arr.map(x=>'<tr><td>'+esc(x.provider)+'</td><td>'+fmt(x.boxes)+'</td><td>'+fmt(x.units)+'</td><td>'+fmt(x.skus)+'</td></tr>').join('');
+  empty.style.display=arr.length?'none':'block';
+  const totalBoxes=new Set(source.map(r=>String(receiptField(r,'caja')||'').trim()).filter(Boolean)).size;
+  const totalSkus=new Set(source.map(r=>String(receiptField(r,'sku')||'').trim()).filter(Boolean)).size;
+  const totalUnits=source.reduce((a,r)=>a+(Number(String(receiptField(r,'saldo')||0).replace(',','.'))||0),0);
+  foot.innerHTML=arr.length?'<tr><td>TOTAL</td><td>'+fmt(totalBoxes)+'</td><td>'+fmt(totalUnits)+'</td><td>'+fmt(totalSkus)+'</td></tr>':'';
+  const scope=$('receiptSupplierScope');
+  if(scope){
+    const labels={all:'Todo actual',exclude_today:'Hasta ayer (excluye hoy)',yesterday:'Solo ayer',old:'Viejos (anteriores a ayer)',today:'Solo hoy'};
+    scope.textContent=labels[ageMode]||'';
+  }
+}
+
 function renderReceipt(){
   const body=$('receiptBody'),empty=$('receiptEmpty');if(!body||!empty)return;
   const q=String($('receiptSearch')?.value||'').trim().toLowerCase();
@@ -3176,7 +3234,9 @@ function renderReceipt(){
   $('receiptIdentifiedCount').textContent=identified.toLocaleString('es-AR');
   // Los gráficos responden únicamente al filtro de antigüedad.
   // El filtro de equipo, búsqueda y filtros de tabla NO los modifican.
-  updateReceiptQuickSummary(RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,ageMode)));
+  const receiptAgeRows=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,ageMode));
+  updateReceiptQuickSummary(receiptAgeRows);
+  updateReceiptSupplierSummary(receiptAgeRows,ageMode);
 }
 
 // ===== v46 · En recibo desde fuentes originales de Copérnico =====
