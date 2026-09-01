@@ -3307,13 +3307,18 @@ function receiptPlanRange(rows){
   return {from:receiptYmd(start),to:receiptYmd(end)};
 }
 async function loadCopernicoReferenceRows(force=false){
-  // FUENTE DE VERDAD DE EN RECIBO: Inventario Referencia de Copérnico.
-  // Si esta consulta falla, NO se completa la tabla con otras fuentes.
-  const res=await fetch(COPERNICO_REFERENCE_URL+(COPERNICO_REFERENCE_URL.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
-  if(!res.ok)throw new Error('Inventario Referencia HTTP '+res.status);
-  const payload=await res.json();
-  const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-  if(!rows.length)throw new Error('Inventario Referencia sin filas');
+  // FUENTE DE VERDAD DE EN RECIBO: el stock publicado del proyecto,
+  // que proviene de Inventario Referencia vía Worker/GitHub.
+  // No consultamos Copérnico directo desde el navegador para evitar HTTP 500.
+  if(force || !Array.isArray(DATA) || !DATA.length){
+    try{ await loadPublishedStock({silent:true}); }catch(_e){}
+  }
+  // Si ya había una carga en curso, esperar brevemente a que DATA quede disponible.
+  for(let i=0;i<20 && (!Array.isArray(DATA)||!DATA.length);i++){
+    await new Promise(r=>setTimeout(r,150));
+  }
+  const rows=Array.isArray(DATA)?DATA:[];
+  if(!rows.length)throw new Error('Stock publicado de Inventario Referencia sin filas');
   return rows.filter(receiptIsCurrentRecibo);
 }
 async function loadCopernicoReceiptPlan(rows,force=false){
@@ -3422,7 +3427,7 @@ function enrichReceiptRowsWithMaster(rows,master){
 async function buildReceiptPanel(force=false){
   if(RECEIPT_LOADED&&!force){renderReceipt();return}
   const st=$('receiptStatus');
-  if(st){st.className='processStatus';st.textContent='Cargando Inventario Referencia → RECIBO → Consulta Recibo → trazabilidad…'}
+  if(st){st.className='processStatus';st.textContent='Cargando stock publicado de Inventario Referencia → RECIBO → Plan Recibo → trazabilidad…'}
   try{
     const baseRows=await loadCopernicoReferenceRows(force);
 
@@ -3467,7 +3472,7 @@ async function buildReceiptPanel(force=false){
     renderReceipt();
   }catch(err){
     RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();
-    if(st){st.className='processStatus bad';st.textContent='No se pudo construir En recibo desde Copérnico · '+(err.message||String(err))}
+    if(st){st.className='processStatus bad';st.textContent='No se pudo construir En recibo desde el stock publicado · '+(err.message||String(err))}
   }
 }
 
