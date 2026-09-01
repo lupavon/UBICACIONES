@@ -3155,6 +3155,18 @@ function updateReceiptQuickSummary(rows){
   set('receiptUnitTotalQuick',fmt(totalUnits));
 }
 
+function receiptProviderKey(value){
+  return String(value??'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\u200B-\u200D\uFEFF]/g,'')
+    .replace(/[\u0000-\u001F\u007F]/g,'')
+    .toLowerCase()
+    .replace(/&/g,' y ')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim()
+    .replace(/\s+/g,' ');
+}
+
 function updateReceiptSupplierSummary(rows,ageMode){
   const body=$('receiptSupplierBody'),foot=$('receiptSupplierFoot'),empty=$('receiptSupplierEmpty');
   if(!body||!foot||!empty)return;
@@ -3164,7 +3176,7 @@ function updateReceiptSupplierSummary(rows,ageMode){
     const rawProvider=String(receiptField(r,'proveedor')||'Sin asociar').trim()||'Sin asociar';
     // Agrupa solamente variantes de escritura del mismo proveedor:
     // mayúsculas/minúsculas, acentos y espacios de más. No mezcla razones sociales distintas.
-    const providerKey=receiptNorm(rawProvider)||'sin asociar';
+    const providerKey=receiptProviderKey(rawProvider)||'sin asociar';
     if(!byProvider.has(providerKey))byProvider.set(providerKey,{boxes:new Set(),skus:new Set(),units:0,names:new Map()});
     const g=byProvider.get(providerKey);
     g.names.set(rawProvider,(g.names.get(rawProvider)||0)+1);
@@ -4410,40 +4422,44 @@ async function loadPublishedStock({silent=false}={}){
   if(status && !DATA.length && !silent) status.textContent='Buscando stock…';
 
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),20000);
+  const timeout=setTimeout(()=>controller.abort(),15000);
 
   try{
-    let payload=null;
-    let sourceError=null;
     const sources=[
-      'https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now(),
-      './stock.json?v='+Date.now()
+      {name:'Worker',url:'https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now()},
+      {name:'GitHub',url:'./stock.json?v='+Date.now()}
     ];
 
-    for(const url of sources){
-      try{
-        const res=await fetch(url,{cache:'no-store',signal:controller.signal});
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const candidate=await res.json();
-        const candidateRows=Array.isArray(candidate)?candidate:(Array.isArray(candidate?.rows)?candidate.rows:[]);
-        if(!candidateRows.length) throw new Error('sin filas');
-        payload=candidate;
-        break;
-      }catch(err){
-        sourceError=err;
-        console.warn('Fuente de stock no disponible:',url,err);
-      }
+    const results=await Promise.allSettled(sources.map(async src=>{
+      const res=await fetch(src.url,{
+        cache:'no-store',
+        signal:controller.signal,
+        headers:{'Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache'}
+      });
+      if(!res.ok) throw new Error(src.name+' HTTP '+res.status);
+      const candidate=await res.json();
+      const rows=Array.isArray(candidate)?candidate:(Array.isArray(candidate?.rows)?candidate.rows:[]);
+      if(!rows.length) throw new Error(src.name+' sin filas');
+      const rawTs=candidate?.updated_at||candidate?.updatedAt||candidate?.generated_at||'';
+      const ts=rawTs ? new Date(rawTs).getTime() : 0;
+      return {payload:candidate,ts:isNaN(ts)?0:ts,source:src.name};
+    }));
+
+    const valid=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
+    if(!valid.length){
+      const errors=results.map(r=>r.status==='rejected'?String(r.reason?.message||r.reason):'').filter(Boolean);
+      throw new Error(errors.join(' · ')||'No se pudo obtener stock remoto');
     }
 
-    if(!payload) throw (sourceError||new Error('No se pudo obtener stock remoto'));
+    // Tomar SIEMPRE la fuente más fresca entre Worker y GitHub Pages.
+    valid.sort((a,b)=>b.ts-a.ts);
+    const chosen=valid[0];
+    const payload=chosen.payload;
     const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
     const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
 
-    // Si es la misma versión y ya tenemos datos renderizados, no redibujar todo.
     if(DATA.length && updatedAt && cachedMeta===updatedAt){
-      if(status){
-        status.textContent=formatStockStatus(updatedAt);
-      }
+      if(status) status.textContent=formatStockStatus(updatedAt);
       lastGoodStockAt=Date.now();
       return;
     }
@@ -4451,6 +4467,7 @@ async function loadPublishedStock({silent=false}={}){
     applyStockPayload(payload,{fromCache:false});
     saveStockCache(payload);
     lastGoodStockAt=Date.now();
+    if(status) status.textContent=formatStockStatus(updatedAt);
 
   }catch(err){
     console.error('loadPublishedStock',err);
@@ -4484,7 +4501,7 @@ rebuild();
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },10000);
+  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },8000);
 }
 
 const refreshBtn=document.getElementById('refreshStockBtn');
@@ -4504,7 +4521,7 @@ if(refreshBtn){
 // Arranque único del dashboard:
 // 1) mostrar cache inmediatamente;
 // 2) buscar stock nuevo en segundo plano;
-// 3) refrescar cada 10 segundos desde Cloudflare.
+// 3) refrescar cada 8 segundos y elegir la fuente más fresca entre Worker y GitHub.
 placeDetailForMode(displayMode);
 loadCachedStock();
 refreshVisibleStockStatus();
@@ -4571,7 +4588,7 @@ async function loadSyncHealth(){
 }
 
 loadSyncHealth();
-setInterval(loadSyncHealth,10000);
+setInterval(loadSyncHealth,8000);
 
 </script>
 </body></html>
