@@ -4485,6 +4485,10 @@ function negCmp(a,b,key){
   return String(negVal(a,key)||'').localeCompare(String(negVal(b,key)||''),'es',{numeric:true,sensitivity:'base'});
 }
 function renderNegations(){
+  // Formatter local: no depender de los `fmt` declarados dentro de otros módulos.
+  // Antes esto generaba ReferenceError al intentar actualizar KPIs/resumen y el catch
+  // terminaba vaciando NEG_ROWS, aunque negaciones.json sí tuviera registros.
+  const negFmt=n=>Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:2});
   const q=String($('negSearch')?.value||'').trim().toLowerCase();
   const zoneRaw=String($('negZoneFilter')?.value||'__ALL__').trim();
   const zone=zoneRaw.toUpperCase();
@@ -4502,14 +4506,14 @@ function renderNegations(){
   document.querySelectorAll('[data-neg-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.negSort===NEG_SORT.key?(NEG_SORT.dir===1?'↑':'↓'):'↕';});
 
   const all=rows;
-  $('negCount').textContent=fmt(all.length);
-  $('negUnits').textContent=fmt(all.reduce((s,r)=>s+(Number(negVal(r,'cantidad'))||0),0));
-  $('negOrders').textContent=fmt(new Set(all.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
-  $('negSkus').textContent=fmt(new Set(all.map(r=>String(negVal(r,'sku')||'')).filter(Boolean)).size);
+  $('negCount').textContent=negFmt(all.length);
+  $('negUnits').textContent=negFmt(all.reduce((s,r)=>s+(Number(negVal(r,'cantidad'))||0),0));
+  $('negOrders').textContent=negFmt(new Set(all.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
+  $('negSkus').textContent=negFmt(new Set(all.map(r=>String(negVal(r,'sku')||'')).filter(Boolean)).size);
   const by=new Map();
   for(const r of all){const p=String(negVal(r,'picker')||'Sin identificar').trim()||'Sin identificar';if(!by.has(p))by.set(p,{n:0,u:0,s:new Set()});const g=by.get(p);g.n++;g.u+=Number(negVal(r,'cantidad'))||0;const sku=String(negVal(r,'sku')||'');if(sku)g.s.add(sku);}
   const arr=[...by.entries()].sort((a,b)=>b[1].n-a[1].n||b[1].u-a[1].u);
-  $('negPickerBody').innerHTML=arr.map(([p,g])=>'<tr><td>'+esc(p)+'</td><td>'+fmt(g.n)+'</td><td>'+fmt(g.u)+'</td><td>'+fmt(g.s.size)+'</td></tr>').join('');
+  $('negPickerBody').innerHTML=arr.map(([p,g])=>'<tr><td>'+esc(p)+'</td><td>'+negFmt(g.n)+'</td><td>'+negFmt(g.u)+'</td><td>'+negFmt(g.s.size)+'</td></tr>').join('');
   $('negPickerEmpty').style.display=arr.length?'none':'block';
 }
 async function buildNegationsPanel(force=false){
@@ -4535,8 +4539,11 @@ async function buildNegationsPanel(force=false){
     if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'');}
     renderNegations();
   }catch(err){
-    console.error('Negaciones',err);NEG_ROWS=[];NEG_LOADED=false;renderNegations();
-    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar Negaciones: '+String(err.message||err);}
+    console.error('Negaciones',err);
+    // No borrar datos ya descargados por un error puramente visual.
+    if(!Array.isArray(NEG_ROWS) || !NEG_ROWS.length){NEG_ROWS=[];NEG_LOADED=false;}
+    try{renderNegations();}catch(renderErr){console.error('Render Negaciones',renderErr);}
+    if(st){st.className='processStatus bad';st.textContent='No se pudo mostrar Negaciones: '+String(err.message||err);}
   }
 }
 
