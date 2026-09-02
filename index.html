@@ -1968,7 +1968,7 @@ body.heatSplit .layoutHeatGrid{
 </div>
 <div id="negationsView" style="display:none">
   <div class="layoutHeatTitle">Negaciones</div>
-  <div class="layoutHeatSubtitle">Todas las líneas de picking del día con <b>EstadoDeLinea = Negada</b>. Se cruzan con Productividad del mismo día para identificar al picker y la hora de trabajo. Podés filtrar por zona, incluida <b>RC</b>.</div>
+  <div class="layoutHeatSubtitle">Todas las negaciones detectadas directamente en <b>Productividad</b> del día. Se cruzan con Líneas de Picking para completar zona, ubicación y datos del pedido. Podés filtrar por zona, incluida <b>RC</b>.</div>
   <div class="processKpis">
     <div class="processKpi"><small>NEGACIONES</small><b id="negCount">0</b><span>líneas negadas</span></div>
     <div class="processKpi"><small>UNIDADES</small><b id="negUnits">0</b><span>cantidad negada</span></div>
@@ -4529,7 +4529,7 @@ async function buildNegationsPanel(force=false){
     const when=payload?.updated_at||payload?.fecha||'';
     if($('negUpdated'))$('negUpdated').textContent=payload?.fecha?('Día '+payload.fecha):'';
     const zoneCount=new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean)).size;
-    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' cruzadas con Productividad':'');}
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'');}
     renderNegations();
   }catch(err){
     console.error('Negaciones',err);NEG_ROWS=[];NEG_LOADED=false;renderNegations();
