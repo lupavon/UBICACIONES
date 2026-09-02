@@ -40,7 +40,8 @@ jobs:
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
-          PLANRECIBO_URL = "https://services.copernicowms.com/backweb25/planrecibo"
+          PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
+          PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/picking"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
@@ -53,6 +54,7 @@ jobs:
           RECEIPT_FILE = Path("en-recibo.json")
           TRACE_FILE = Path("trazabilidad-cajas.json")
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
+          NEGATIONS_FILE = Path("negaciones.json")
 
           # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
           GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
@@ -683,527 +685,6 @@ jobs:
                   )
               }
 
-          def normalize_receipt_link(value):
-              return (
-                  str(value or "")
-                  .strip()
-                  .upper()
-                  .replace(" ", "")
-              )
-
-          def receipt_key_variants(value):
-              """
-              Normaliza identificadores de recepción y agrega una variante simple
-              cuando Copérnico repite el mismo número (ej. 450...-450...).
-              """
-              raw = normalize_receipt_link(value)
-              if not raw:
-                  return set()
-
-              keys = {raw}
-              parts = [p for p in raw.split("-") if p]
-
-              if len(parts) == 2 and parts[0] == parts[1]:
-                  keys.add(parts[0])
-
-              return keys
-
-          def usable_receipt_key(value):
-              raw = normalize_receipt_link(value)
-              if not raw:
-                  return False
-
-              # Valores genéricos que no identifican de forma unívoca un recibo.
-              if raw in {
-                  "MULTIPRODUCTO", "MULTI", "N/A", "NA", "NINGUNO",
-                  "SINOC", "SINORDEN", "SINDATO", "-"
-              }:
-                  return False
-
-              return len(raw) >= 4
-
-          def stock_receipt_keys(row):
-              """
-              Identificadores disponibles en Inventario Referencia que pueden
-              vincular una caja actual en RECIBO con Consulta Recibo.
-
-              La prioridad operativa sigue siendo ord_no/documentooc; Factura y
-              PedProv se usan como fallback porque en Consulta Recibo el campo
-              ord_no puede contener el documento del proveedor.
-              """
-              values = (
-                  field(row, "ord_no", "OrdNo", "ordno"),
-                  field(row, "documentooc", "DocumentoOC", "documento_oc", "DocumentoOc"),
-                  field(row, "Factura", "factura"),
-                  field(row, "PedProv", "pedprov", "pedProv"),
-              )
-
-              keys = []
-              seen = set()
-              for value in values:
-                  if not usable_receipt_key(value):
-                      continue
-                  for key in receipt_key_variants(value):
-                      if key not in seen:
-                          seen.add(key)
-                          keys.append(key)
-              return keys
-
-          def receipt_date_window(receipt_rows):
-              today = now_utc().date()
-              candidates = []
-
-              for row in receipt_rows:
-                  raw = field(
-                      row,
-                      "fecharegistro", "FechaRegistro",
-                      "f_ultimo_movimiento", "FechaUltimoMovimiento"
-                  )
-                  ts = parse_date(raw)
-                  if ts != float("-inf"):
-                      try:
-                          candidates.append(
-                              datetime.fromtimestamp(ts, timezone.utc).date()
-                          )
-                      except Exception:
-                          pass
-
-              # Buffer amplio porque una caja puede seguir en RECIBO aunque la OC
-              # haya sido creada bastante antes del último movimiento.
-              if candidates:
-                  start = min(candidates) - timedelta(days=90)
-              else:
-                  start = today - timedelta(days=730)
-
-              floor = today - timedelta(days=730)
-              if start < floor:
-                  start = floor
-
-              return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
-
-          def load_supplier_by_unido(receipt_rows, jwt):
-              if not receipt_rows:
-                  return {}, {"queried": 0, "matched_keys": 0}
-
-              fecha_inicial, fecha_final = receipt_date_window(receipt_rows)
-
-              # La pantalla de Consulta Recibo devuelve [] cuando documentooc va
-              # vacío. Usamos como disparador una OC real presente hoy en RECIBO.
-              documentooc_trigger = ""
-              fallback_trigger = ""
-
-              for row in receipt_rows:
-                  raw_ord = str(
-                      field(row, "ord_no", "OrdNo", "ordno") or ""
-                  ).strip()
-
-                  for key in receipt_key_variants(raw_ord):
-                      if not fallback_trigger and key:
-                          fallback_trigger = key
-
-                      # Priorizar formato OC SAP observado: 45xxxxxxxx
-                      if key.isdigit() and len(key) >= 10 and key.startswith("45"):
-                          documentooc_trigger = key
-                          break
-
-                  if documentooc_trigger:
-                      break
-
-              if not documentooc_trigger:
-                  documentooc_trigger = fallback_trigger
-
-              print(
-                  "PLANRECIBO documentooc disparador:",
-                  documentooc_trigger or "(vacío)"
-              )
-
-              # V12: detectar automáticamente qué valores de tipodeplaneacion
-              # devuelven información. Probamos contra el período más reciente,
-              # que es donde están las cajas actuales en RECIBO.
-              probe_end = datetime.strptime(fecha_final, "%Y%m%d").date()
-              probe_start = max(
-                  datetime.strptime(fecha_inicial, "%Y%m%d").date(),
-                  probe_end.replace(day=1)
-              )
-
-              tipodeplaneacion_con_datos = []
-              probe_resultados = {}
-
-              for tipo_plan in range(1, 31):
-                  probe_params = urllib.parse.urlencode({
-                      "documentooc": documentooc_trigger,
-                      "tipodeplaneacion": str(tipo_plan),
-                      "estado": "1",
-                      "tipodocto": "",
-                      "bodega": "47",
-                      "fecha_inicial": probe_start.strftime("%Y%m%d"),
-                      "fecha_final": probe_end.strftime("%Y%m%d")
-                  })
-
-                  try:
-                      probe_payload, probe_http, probe_size = request_json(
-                          PLANRECIBO_URL + "?" + probe_params,
-                          method="GET",
-                          jwt=jwt,
-                          timeout=120
-                      )
-                      probe_rows = extract_rows(probe_payload)
-                  except Exception as e:
-                      print(
-                          "PLANRECIBO PROBE ERROR:",
-                          "tipodeplaneacion", tipo_plan,
-                          "·", str(e)[:160]
-                      )
-                      continue
-
-                  probe_resultados[str(tipo_plan)] = len(probe_rows)
-
-                  if probe_rows:
-                      tipodeplaneacion_con_datos.append(str(tipo_plan))
-
-                  print(
-                      "PLANRECIBO PROBE:",
-                      "tipodeplaneacion", tipo_plan,
-                      "· HTTP:", probe_http,
-                      "· filas:", len(probe_rows)
-                  )
-
-              if not tipodeplaneacion_con_datos:
-                  tipodeplaneacion_con_datos = ["12"]
-
-              print(
-                  "TIPODEPLANEACION CON DATOS:",
-                  tipodeplaneacion_con_datos
-              )
-              # Consulta Recibo: mantenemos los parámetros obligatorios de la
-              # pantalla y agregamos el rango de fechas que usa el endpoint para
-              # devolver recepciones históricas/actuales.
-
-              # Copérnico devuelve [] cuando el rango es demasiado amplio.
-              # Consultamos por bloques mensuales y acumulamos resultados.
-              start_dt = datetime.strptime(fecha_inicial, "%Y%m%d").date()
-              end_dt = datetime.strptime(fecha_final, "%Y%m%d").date()
-
-              plan_rows = []
-              total_bytes = 0
-              monthly_calls = 0
-              estado_calls = 0
-              estados_con_datos = set()
-
-              # Copérnico filtra por estado y tipodeplaneacion. Usamos los
-              # tipos detectados arriba y todos los estados operativos.
-              estados_planrecibo = [str(x) for x in range(1, 10)]
-
-              cursor = start_dt.replace(day=1)
-              while cursor <= end_dt:
-                  if cursor.month == 12:
-                      next_month = cursor.replace(
-                          year=cursor.year + 1,
-                          month=1,
-                          day=1
-                      )
-                  else:
-                      next_month = cursor.replace(
-                          month=cursor.month + 1,
-                          day=1
-                      )
-
-                  chunk_start = max(start_dt, cursor)
-                  chunk_end = min(end_dt, next_month - timedelta(days=1))
-
-                  for tipo_plan in tipodeplaneacion_con_datos:
-                      for estado_value in estados_planrecibo:
-                          chunk_params = urllib.parse.urlencode({
-                              "documentooc": documentooc_trigger,
-                              "tipodeplaneacion": tipo_plan,
-                              "estado": estado_value,
-                              "tipodocto": "",
-                              "bodega": "47",
-                              "fecha_inicial": chunk_start.strftime("%Y%m%d"),
-                              "fecha_final": chunk_end.strftime("%Y%m%d")
-                          })
-
-                          try:
-                              payload, http_status, size = request_json(
-                                  PLANRECIBO_URL + "?" + chunk_params,
-                                  method="GET",
-                                  jwt=jwt,
-                                  timeout=120
-                              )
-                              chunk_rows = extract_rows(payload)
-                          except Exception as e:
-                              print(
-                                  "PLANRECIBO BLOQUE ERROR:",
-                                  chunk_start.strftime("%Y%m%d"),
-                                  "a",
-                                  chunk_end.strftime("%Y%m%d"),
-                                  "· tipodeplaneacion:", tipo_plan,
-                                  "· estado:", estado_value,
-                                  "·", str(e)[:180]
-                              )
-                              estado_calls += 1
-                              continue
-
-                          plan_rows.extend(chunk_rows)
-                          total_bytes += size
-                          estado_calls += 1
-
-                          if chunk_rows:
-                              estados_con_datos.add(estado_value)
-
-                          print(
-                              "PLANRECIBO BLOQUE:",
-                              chunk_start.strftime("%Y%m%d"),
-                              "a",
-                              chunk_end.strftime("%Y%m%d"),
-                              "· tipodeplaneacion:", tipo_plan,
-                              "· estado:", estado_value,
-                              "· HTTP:", http_status,
-                              "· filas:", len(chunk_rows)
-                          )
-
-                  monthly_calls += 1
-                  cursor = next_month
-
-              # Deduplicar documentos devueltos en más de un bloque.
-              deduped = []
-              seen = set()
-              for row in plan_rows:
-                  signature = (
-                      str(field(row, "id", "Id") or "").strip(),
-                      str(field(row, "unido", "Unido") or "").strip(),
-                      str(field(row, "doctoERP", "DoctoERP") or "").strip(),
-                      str(field(row, "numDocumento", "NumDocumento") or "").strip()
-                  )
-                  if signature in seen:
-                      continue
-                  seen.add(signature)
-                  deduped.append(row)
-
-              plan_rows = deduped
-              size = total_bytes
-
-              # Construimos primero candidatos por clave. Solo publicamos una
-              # asociación cuando esa clave apunta a un único proveedor; así
-              # evitamos falsos positivos por identificadores repetidos.
-              supplier_candidates = {}
-
-              for plan_row in plan_rows:
-                  proveedor = str(
-                      field(
-                          plan_row,
-                          "nombreProveedor", "NombreProveedor",
-                          "proveedor", "Proveedor"
-                      ) or ""
-                  ).strip()
-
-                  if not proveedor:
-                      continue
-
-                  # Claves principales de Consulta Recibo + ord_no, que en varios
-                  # recibos contiene el documento/factura del proveedor.
-                  for raw_key in (
-                      field(plan_row, "unido", "Unido"),
-                      field(plan_row, "doctoERP", "DoctoERP"),
-                      field(plan_row, "numDocumento", "NumDocumento"),
-                      field(plan_row, "numdocumento"),
-                      field(plan_row, "documentooc", "DocumentoOC", "DocumentoOc"),
-                      field(plan_row, "ord_no", "OrdNo", "ordno")
-                  ):
-                      if not usable_receipt_key(raw_key):
-                          continue
-                      for key in receipt_key_variants(raw_key):
-                          supplier_candidates.setdefault(key, set()).add(proveedor)
-
-              supplier_by_key = {
-                  key: next(iter(proveedores))
-                  for key, proveedores in supplier_candidates.items()
-                  if len(proveedores) == 1
-              }
-              ambiguous_supplier_keys = {
-                  key: sorted(proveedores)
-                  for key, proveedores in supplier_candidates.items()
-                  if len(proveedores) > 1
-              }
-
-              stock_keys = []
-              for row in receipt_rows:
-                  stock_keys.extend(stock_receipt_keys(row))
-
-              direct_hits = sum(1 for key in stock_keys if key in supplier_by_key)
-              print(
-                  "PLANRECIBO claves ambiguas descartadas:",
-                  len(ambiguous_supplier_keys)
-              )
-
-              # V11: resolver faltantes consultando cada documento actual de RECIBO
-              # directamente en Consulta Recibo. Se consulta una sola vez por
-              # ord_no único y se conserva el mapa ya resuelto por la consulta general.
-              unresolved_docs = []
-              seen_unresolved = set()
-
-              for row in receipt_rows:
-                  variants = set(stock_receipt_keys(row))
-
-                  if not variants:
-                      continue
-
-                  if any(key in supplier_by_key for key in variants):
-                      continue
-
-                  # Si viene repetido (450...-450...), preferimos la variante simple.
-                  preferred = ""
-                  simple_variants = sorted(
-                      [k for k in variants if "-" not in k],
-                      key=lambda x: (0 if x.startswith("45") else 1, -len(x))
-                  )
-                  if simple_variants:
-                      preferred = simple_variants[0]
-                  else:
-                      preferred = sorted(variants)[0]
-
-                  if preferred and preferred not in seen_unresolved:
-                      seen_unresolved.add(preferred)
-                      unresolved_docs.append(preferred)
-
-              print(
-                  "PLANRECIBO consultas directas pendientes:",
-                  len(unresolved_docs),
-                  unresolved_docs[:40]
-              )
-
-              direct_doc_calls = 0
-              direct_doc_rows = 0
-              direct_doc_resolved = 0
-
-              # Para cada documento hacemos una consulta focalizada con estado 1,
-              # que es el único estado que devolvió información en las pruebas.
-              # Usamos el mismo período global ya calculado.
-              for documento in unresolved_docs:
-                  found_supplier = ""
-                  rows_direct_total = []
-
-                  for tipo_plan in tipodeplaneacion_con_datos:
-                      params_direct = urllib.parse.urlencode({
-                          "documentooc": documento,
-                          "tipodeplaneacion": tipo_plan,
-                          "estado": "1",
-                          "tipodocto": "",
-                          "bodega": "47",
-                          "fecha_inicial": fecha_inicial,
-                          "fecha_final": fecha_final
-                      })
-
-                      direct_doc_calls += 1
-
-                      try:
-                          payload_direct, http_direct, size_direct = request_json(
-                              PLANRECIBO_URL + "?" + params_direct,
-                              method="GET",
-                              jwt=jwt,
-                              timeout=120
-                          )
-                          rows_direct = extract_rows(payload_direct)
-                      except Exception as e:
-                          print(
-                              "PLANRECIBO DIRECTO ERROR:",
-                              documento,
-                              "· tipodeplaneacion:", tipo_plan,
-                              "·",
-                              str(e)[:180]
-                          )
-                          continue
-
-                      rows_direct_total.extend(rows_direct)
-                      direct_doc_rows += len(rows_direct)
-
-                      for plan_row in rows_direct:
-                          proveedor = str(
-                              field(
-                                  plan_row,
-                                  "nombreProveedor", "NombreProveedor",
-                                  "proveedor", "Proveedor"
-                              ) or ""
-                          ).strip()
-
-                          if not proveedor:
-                              continue
-
-                          row_keys = set()
-                          for raw_key in (
-                              field(plan_row, "unido", "Unido"),
-                              field(plan_row, "doctoERP", "DoctoERP"),
-                              field(plan_row, "numDocumento", "NumDocumento"),
-                              field(plan_row, "numdocumento"),
-                              field(plan_row, "documentooc", "DocumentoOC", "DocumentoOc"),
-                              field(plan_row, "ord_no", "OrdNo", "ordno")
-                          ):
-                              if usable_receipt_key(raw_key):
-                                  row_keys.update(receipt_key_variants(raw_key))
-
-                          # Primero intentamos coincidencia exacta con el documento
-                          # consultado; después publicamos todas sus variantes.
-                          if documento in row_keys:
-                              found_supplier = proveedor
-
-                          for key in row_keys:
-                              supplier_by_key[key] = proveedor
-
-                  if found_supplier:
-                      direct_doc_resolved += 1
-
-                  print(
-                      "PLANRECIBO DIRECTO:",
-                      documento,
-                      "· filas totales:", len(rows_direct_total),
-                      "· proveedor:", found_supplier or "SIN MATCH EXACTO"
-                  )
-
-              # Recalcular coincidencias después del enriquecimiento directo.
-              direct_hits = sum(
-                  1 for key in stock_keys if key in supplier_by_key
-              )
-
-              print(
-                  "PLANRECIBO DIRECTO RESUMEN:",
-                  "llamadas:", direct_doc_calls,
-                  "· filas:", direct_doc_rows,
-                  "· documentos resueltos:", direct_doc_resolved,
-                  "· coincidencias finales:", direct_hits
-              )
-
-              print(
-                  "PLANRECIBO HTTP:", http_status,
-                  "· estados:", ",".join(sorted(estados_con_datos)) or "sin datos",
-                  "· tipodeplaneacion:", ",".join(tipodeplaneacion_con_datos),
-                  "· período:", fecha_inicial, "a", fecha_final,
-                  "· bloques:", monthly_calls,
-                  "· llamadas estado:", estado_calls,
-                  "· filas:", len(plan_rows),
-                  "· claves proveedor:", len(supplier_by_key),
-                  "· ord_no no vacíos:", len(stock_keys),
-                  "· coincidencias de clave:", direct_hits,
-                  "· bytes:", size
-              )
-
-              print("MUESTRA ord_no RECIBO:", stock_keys[:10])
-              print("MUESTRA claves PLANRECIBO:", list(supplier_by_key.keys())[:10])
-
-              return supplier_by_key, {
-                  "queried": len(plan_rows),
-                  "matched_keys": len(supplier_by_key),
-                  "fecha_inicial": fecha_inicial,
-                  "fecha_final": fecha_final,
-                  "direct_hits": direct_hits,
-                  "estados_con_datos": sorted(estados_con_datos),
-                  "estado_calls": estado_calls,
-                  "direct_doc_calls": direct_doc_calls,
-                  "direct_doc_rows": direct_doc_rows,
-                  "direct_doc_resolved": direct_doc_resolved,
-                  "tipodeplaneacion_con_datos": tipodeplaneacion_con_datos,
-                  "probe_resultados": probe_resultados
-              }
-
           # -----------------------------
           # EN RECIBO
           # -----------------------------
@@ -1275,7 +756,7 @@ jobs:
               ) or "").strip()
               return EMPLOYEE_TEAM_BY_ID.get(emp_id, "Sin clasificar")
 
-          def build_receipt_row(stock_row, trace_move=None, trace_error="", proveedor=""):
+          def build_receipt_row(stock_row, trace_move=None, trace_error=""):
               return {
                   "Caja": field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja"),
                   "EAN": field(stock_row, "EAN", "ean"),
@@ -1289,7 +770,6 @@ jobs:
                   "Responsable": (field(trace_move, "Nombre_empleado", "NombreEmpleado", "nombreEmpleado", "Empleado") if trace_move else ""),
                   "Id_empleado": (field(trace_move, "Id_empleado", "IdEmpleado", "idEmpleado") if trace_move else ""),
                   "Equipo": employee_team(trace_move),
-                  "Proveedor": str(proveedor or "").strip() or "Sin asociar",
                   "FechaIngresoRecibo": (field(trace_move, "fecha", "Fecha", "FechaMovimiento", "fecha_movimiento") if trace_move else ""),
                   "Trazabilidad": ("OK" if trace_move else (trace_error or "Sin movimiento a RECIBO identificado"))
               }
@@ -1495,6 +975,120 @@ jobs:
               print("stock.json generado correctamente")
 
               # A partir de acá, si algo secundario falla, stock igual queda válido.
+              print("=== 2B. NEGACIONES RC DEL DÍA ===")
+              try:
+                  ar_tz = timezone(timedelta(hours=-3))
+                  day = datetime.now(ar_tz).strftime("%Y%m%d")
+                  day_label = datetime.now(ar_tz).strftime("%d/%m/%Y")
+
+                  prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
+                      "fecha": day,
+                      "tipo_productividad": "ProductividadPIK"
+                  })
+                  pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({"fecha": day})
+
+                  prod_response, prod_http, _ = request_json(prod_url, jwt=jwt, timeout=180)
+                  pick_response, pick_http, _ = request_json(pick_url, jwt=jwt, timeout=180)
+                  prod_rows = extract_rows(prod_response)
+                  pick_rows = extract_rows(pick_response)
+
+                  def sval(row, *names):
+                      v = field(row, *names)
+                      return str(v if v is not None else "").strip()
+
+                  def nkey(v):
+                      return str(v if v is not None else "").strip().upper()
+
+                  def sku_keys(row, source):
+                      if source == "prod":
+                          vals = [sval(row,"ean","EAN"), sval(row,"ref","Ref","Referencia"), sval(row,"barcode","Barcode")]
+                      else:
+                          vals = [sval(row,"ean","EAN"), sval(row,"product","Product","producto","Producto")]
+                      return [nkey(x) for x in vals if nkey(x)]
+
+                  prod_by_exact = {}
+                  prod_by_pick_sku = {}
+                  prod_by_pick_order = {}
+                  prod_by_pick = {}
+                  for pr in prod_rows:
+                      pnum = nkey(sval(pr,"Picking","picking","NumPicking"))
+                      order = nkey(sval(pr,"NumPedido","pedido","Pedido"))
+                      if not pnum:
+                          continue
+                      prod_by_pick.setdefault(pnum, []).append(pr)
+                      if order:
+                          prod_by_pick_order.setdefault((pnum,order), []).append(pr)
+                      for sk in sku_keys(pr,"prod"):
+                          prod_by_pick_sku.setdefault((pnum,sk), []).append(pr)
+                          if order:
+                              prod_by_exact.setdefault((pnum,order,sk), []).append(pr)
+
+                  def choose_productivity(line):
+                      pnum = nkey(sval(line,"NumPicking","Picking","picking"))
+                      order = nkey(sval(line,"pedido","Pedido","NumPedido"))
+                      sks = sku_keys(line,"pick")
+                      for sk in sks:
+                          vals = prod_by_exact.get((pnum,order,sk), [])
+                          if vals: return vals[0], "Picking+Pedido+SKU"
+                      for sk in sks:
+                          vals = prod_by_pick_sku.get((pnum,sk), [])
+                          if vals: return vals[0], "Picking+SKU"
+                      vals = prod_by_pick_order.get((pnum,order), [])
+                      if len(vals) == 1: return vals[0], "Picking+Pedido"
+                      vals = prod_by_pick.get(pnum, [])
+                      if len(vals) == 1: return vals[0], "Picking"
+                      return None, "Sin cruce"
+
+                  neg_rows = []
+                  for ln in pick_rows:
+                      zone = nkey(sval(ln,"zonapiso","ZonaPiso","zona","Zona"))
+                      state = nkey(sval(ln,"EstadoDeLinea","estadoDeLinea","estadolinea","EstadoLinea"))
+                      if zone != "RC" or state != "NEGADA":
+                          continue
+                      pr, match_type = choose_productivity(ln)
+                      sku = sval(ln,"ean","EAN") or sval(ln,"product","Product","producto")
+                      row = {
+                          "Hora": (sval(pr,"hora","Hora","fecharegistro","FechaRegistro") if pr else "") or sval(ln,"hora","Hora"),
+                          "Pedido": sval(ln,"pedido","Pedido","NumPedido"),
+                          "Picking": sval(ln,"NumPicking","Picking","picking"),
+                          "SKU": sku,
+                          "EAN": sval(ln,"ean","EAN"),
+                          "Producto": sval(ln,"product","Product"),
+                          "Descripcion": sval(ln,"descripcion","Descripcion","Descripción"),
+                          "CantidadNegada": field(ln,"Cant","cant","Cantidad","cantidad") or 0,
+                          "Unidad": sval(ln,"unidad","Unidad"),
+                          "Ubicacion": sval(ln,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion"),
+                          "Zona": zone,
+                          "EstadoDeLinea": sval(ln,"EstadoDeLinea","estadoDeLinea"),
+                          "Picker": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado") if pr else "",
+                          "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado") if pr else "",
+                          "Caja": sval(pr,"Caja","caja") if pr else "",
+                          "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro") if pr else "",
+                          "Cruce": match_type
+                      }
+                      neg_rows.append(row)
+
+                  matched = sum(1 for r in neg_rows if r.get("Picker") or r.get("IdEmpleado"))
+                  neg_payload = {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico ProductividadPIK + Líneas de Picking · zona RC · Negada",
+                      "productividad_http": prod_http,
+                      "lineas_picking_http": pick_http,
+                      "productividad_count": len(prod_rows),
+                      "lineas_picking_count": len(pick_rows),
+                      "negaciones_count": len(neg_rows),
+                      "matched_count": matched,
+                      "rows": neg_rows
+                  }
+                  save_json_file(NEGATIONS_FILE, neg_payload)
+                  print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
+                  print("Negaciones RC:", len(neg_rows), "· cruzadas:", matched)
+                  print("negaciones.json generado correctamente")
+              except Exception as e:
+                  print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
+
               print("=== 3. PALLETS EN PROCESO ===")
 
               try:
@@ -1662,23 +1256,6 @@ jobs:
                       if str(field(row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                   })
 
-                  # Proveedor: se resuelve una vez por ciclo usando la relación nativa
-                  # de Copérnico ord_no (Inventario Referencia) -> unido (Consulta Recibo).
-                  supplier_by_unido = {}
-                  supplier_stats = {}
-                  try:
-                      supplier_by_unido, supplier_stats = load_supplier_by_unido(
-                          receipt_stock_rows,
-                          jwt
-                      )
-                  except Exception as e:
-                      # El proveedor es un enriquecimiento secundario: si falla, no se
-                      # pierde ninguna caja de RECIBO ni se bloquea la actualización.
-                      print(
-                          "AVISO: no se pudo consultar proveedor en planrecibo:",
-                          str(e)[:300]
-                      )
-
                   receipt_trace_by_box = {}
 
                   def trace_receipt_one(caja):
@@ -1715,89 +1292,11 @@ jobs:
                   for stock_row in receipt_stock_rows:
                       caja = str(field(stock_row, "Caja", "caja", "numeroCaja", "NroCaja")).strip()
                       trace = receipt_trace_by_box.get(caja, {})
-                      proveedor = ""
-
-                      # Intentamos todas las relaciones disponibles de la fila
-                      # actual: ord_no, documentooc, Factura y PedProv.
-                      for receipt_link in stock_receipt_keys(stock_row):
-                          proveedor = supplier_by_unido.get(receipt_link, "")
-                          if proveedor:
-                              break
-
                       receipt_rows.append(build_receipt_row(
-                          stock_row,
-                          trace_move=trace.get("event"),
-                          trace_error=trace.get("error", ""),
-                          proveedor=proveedor
+                          stock_row, trace_move=trace.get("event"), trace_error=trace.get("error", "")
                       ))
 
                   identified_receipt = sum(1 for row in receipt_rows if row["Responsable"])
-                  suppliers_identified = sum(
-                      1 for row in receipt_rows
-                      if row.get("Proveedor") and row.get("Proveedor") != "Sin asociar"
-                  )
-
-                  unmatched_provider_rows = []
-                  for stock_row, receipt_row in zip(receipt_stock_rows, receipt_rows):
-                      if receipt_row.get("Proveedor") != "Sin asociar":
-                          continue
-
-                      raw_ord_no = str(
-                          field(stock_row, "ord_no", "OrdNo", "ordno") or ""
-                      ).strip()
-
-                      unmatched_provider_rows.append({
-                          "Caja": receipt_row.get("Caja"),
-                          "EAN": receipt_row.get("EAN"),
-                          "Referencia": receipt_row.get("Referencia"),
-                          "Descripcion": receipt_row.get("Descripcion"),
-                          "ord_no": raw_ord_no,
-                          "documentooc": str(
-                              field(
-                                  stock_row,
-                                  "documentooc", "DocumentoOC",
-                                  "documento_oc", "DocumentoOc"
-                              ) or ""
-                          ).strip(),
-                          "PedProv": str(
-                              field(stock_row, "PedProv", "pedprov", "pedProv") or ""
-                          ).strip(),
-                          "NumControl": str(
-                              field(stock_row, "NumControl", "numcontrol", "numControl") or ""
-                          ).strip(),
-                          "Factura": str(
-                              field(stock_row, "Factura", "factura") or ""
-                          ).strip(),
-                          "fecharegistro": str(
-                              field(stock_row, "fecharegistro", "FechaRegistro") or ""
-                          ).strip()
-                      })
-
-                  unmatched_ord_nos = sorted({
-                      x["ord_no"] for x in unmatched_provider_rows if x["ord_no"]
-                  })
-
-                  print(
-                      "Proveedor asociado:",
-                      suppliers_identified,
-                      "de",
-                      len(receipt_rows),
-                      "líneas actuales en RECIBO"
-                  )
-                  print(
-                      "Sin proveedor:",
-                      len(unmatched_provider_rows),
-                      "líneas · ord_no únicos:",
-                      len(unmatched_ord_nos)
-                  )
-                  print(
-                      "MUESTRA SIN PROVEEDOR:",
-                      unmatched_provider_rows[:20]
-                  )
-                  print(
-                      "ORD_NO SIN PROVEEDOR:",
-                      unmatched_ord_nos[:80]
-                  )
                   save_json_file(
                       RECEIPT_FILE,
                       {
@@ -1806,10 +1305,6 @@ jobs:
                           "total_lineas": len(receipt_rows),
                           "total_cajas": len(receipt_boxes),
                           "identificados": identified_receipt,
-                          "proveedores_identificados": suppliers_identified,
-                          "proveedores_sin_asociar": len(unmatched_provider_rows),
-                          "ord_no_sin_proveedor": unmatched_ord_nos,
-                          "diagnostico_sin_proveedor": unmatched_provider_rows,
                           "rows": receipt_rows
                       }
                   )
@@ -2354,7 +1849,7 @@ jobs:
 
           mkdir -p /tmp/ubicaciones-sync
 
-          for f in stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
@@ -2363,13 +1858,13 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          for f in stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "/tmp/ubicaciones-sync/$f" ]; then
               cp "/tmp/ubicaciones-sync/$f" "$f"
             fi
           done
 
-          git add stock.json pallets-proceso.json en-recibo.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
