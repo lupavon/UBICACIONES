@@ -975,7 +975,7 @@ jobs:
               print("stock.json generado correctamente")
 
               # A partir de acá, si algo secundario falla, stock igual queda válido.
-              print("=== 2B. NEGACIONES RC DEL DÍA ===")
+              print("=== 2B. NEGACIONES DEL DÍA ===")
               try:
                   ar_tz = timezone(timedelta(hours=-3))
                   day = datetime.now(ar_tz).strftime("%Y%m%d")
@@ -1043,7 +1043,7 @@ jobs:
                   for ln in pick_rows:
                       zone = nkey(sval(ln,"zonapiso","ZonaPiso","zona","Zona"))
                       state = nkey(sval(ln,"EstadoDeLinea","estadoDeLinea","estadolinea","EstadoLinea"))
-                      if zone != "RC" or state != "NEGADA":
+                      if state != "NEGADA":
                           continue
                       pr, match_type = choose_productivity(ln)
                       sku = sval(ln,"ean","EAN") or sval(ln,"product","Product","producto")
@@ -1073,7 +1073,7 @@ jobs:
                       "updated_at": now_iso,
                       "fecha": day_label,
                       "fecha_query": day,
-                      "source": "Copernico ProductividadPIK + Líneas de Picking · zona RC · Negada",
+                      "source": "Copernico ProductividadPIK + Líneas de Picking · todas las zonas · Negada",
                       "productividad_http": prod_http,
                       "lineas_picking_http": pick_http,
                       "productividad_count": len(prod_rows),
@@ -1084,7 +1084,7 @@ jobs:
                   }
                   save_json_file(NEGATIONS_FILE, neg_payload)
                   print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
-                  print("Negaciones RC:", len(neg_rows), "· cruzadas:", matched)
+                  print("Negaciones:", len(neg_rows), "· cruzadas:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("negaciones.json generado correctamente")
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
