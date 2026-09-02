@@ -1968,9 +1968,9 @@ body.heatSplit .layoutHeatGrid{
 </div>
 <div id="negationsView" style="display:none">
   <div class="layoutHeatTitle">Negaciones</div>
-  <div class="layoutHeatSubtitle">Líneas de picking del día con <b>Zona RC</b> y <b>EstadoDeLinea = Negada</b>. Se cruzan con Productividad del mismo día para identificar al picker y la hora de trabajo.</div>
+  <div class="layoutHeatSubtitle">Todas las líneas de picking del día con <b>EstadoDeLinea = Negada</b>. Se cruzan con Productividad del mismo día para identificar al picker y la hora de trabajo. Podés filtrar por zona, incluida <b>RC</b>.</div>
   <div class="processKpis">
-    <div class="processKpi"><small>NEGACIONES</small><b id="negCount">0</b><span>líneas negadas en RC</span></div>
+    <div class="processKpi"><small>NEGACIONES</small><b id="negCount">0</b><span>líneas negadas</span></div>
     <div class="processKpi"><small>UNIDADES</small><b id="negUnits">0</b><span>cantidad negada</span></div>
     <div class="processKpi"><small>PEDIDOS</small><b id="negOrders">0</b><span>pedidos afectados</span></div>
     <div class="processKpi"><small>SKU</small><b id="negSkus">0</b><span>SKU afectados</span></div>
@@ -1982,11 +1982,12 @@ body.heatSplit .layoutHeatGrid{
         <thead><tr><th>Picker</th><th>Negaciones</th><th>Unidades</th><th>SKU</th></tr></thead>
         <tbody id="negPickerBody"></tbody>
       </table>
-      <div id="negPickerEmpty" class="receiptSupplierEmpty" style="display:none">No hay negaciones RC para el día.</div>
+      <div id="negPickerEmpty" class="receiptSupplierEmpty" style="display:none">No hay negaciones para el filtro seleccionado.</div>
     </div>
   </div>
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
+    <select id="negZoneFilter" class="select"><option value="">Todas las zonas</option></select>
     <button class="btn" id="negRefreshBtn">↻ Actualizar</button>
   </div>
   <div class="processStatus" id="negStatus">Cargando negaciones del día…</div>
@@ -2007,7 +2008,7 @@ body.heatSplit .layoutHeatGrid{
       </tr></thead>
       <tbody id="negBody"></tbody>
     </table>
-    <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones en zona RC para hoy.</div>
+    <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones para el filtro seleccionado.</div>
   </div>
 </div>
 </main>
@@ -4470,7 +4471,7 @@ $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilter
 // Forzar el default visual desde el arranque; luego applyReceiptDefaults fija también Recepción cuando cargan los equipos.
 if($('receiptAgeFilter'))$('receiptAgeFilter').value='exclude_today';
 
-// ===== NEGACIONES RC · Productividad + Líneas de Picking =====
+// ===== NEGACIONES · Productividad + Líneas de Picking =====
 let NEG_ROWS=[];
 let NEG_LOADED=false;
 let NEG_SORT={key:'hora',dir:-1};
@@ -4485,18 +4486,20 @@ function negCmp(a,b,key){
 }
 function renderNegations(){
   const q=String($('negSearch')?.value||'').trim().toLowerCase();
+  const zone=String($('negZoneFilter')?.value||'').trim().toUpperCase();
   let rows=NEG_ROWS.slice();
+  if(zone)rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
   if(q)rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
   rows.sort((a,b)=>negCmp(a,b,NEG_SORT.key)*NEG_SORT.dir);
   const body=$('negBody'),empty=$('negEmpty');
   if(empty)empty.style.display=rows.length?'none':'block';
   if(body)body.innerHTML=rows.map(r=>'<tr>'+[
     negVal(r,'hora')||'—',negVal(r,'pedido')||'—',negVal(r,'picking')||'—',negVal(r,'sku')||'—',negVal(r,'desc')||'—',
-    negVal(r,'cantidad')||'0',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'RC'
+    negVal(r,'cantidad')||'0',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'—'
   ].map((v,i)=>'<td'+(i===7?' class="who"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
   document.querySelectorAll('[data-neg-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.negSort===NEG_SORT.key?(NEG_SORT.dir===1?'↑':'↓'):'↕';});
 
-  const all=NEG_ROWS;
+  const all=rows;
   $('negCount').textContent=fmt(all.length);
   $('negUnits').textContent=fmt(all.reduce((s,r)=>s+(Number(negVal(r,'cantidad'))||0),0));
   $('negOrders').textContent=fmt(new Set(all.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
@@ -4509,16 +4512,24 @@ function renderNegations(){
 }
 async function buildNegationsPanel(force=false){
   if(NEG_LOADED&&!force){renderNegations();return;}
-  const st=$('negStatus');if(st)st.textContent='Cargando negaciones RC del día…';
+  const st=$('negStatus');if(st)st.textContent='Cargando negaciones del día…';
   try{
     const res=await fetch('./negaciones.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}});
     if(!res.ok)throw new Error('negaciones.json HTTP '+res.status);
     const payload=await res.json();
     NEG_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
     NEG_LOADED=true;
+    const zoneSel=$('negZoneFilter');
+    if(zoneSel){
+      const current=zoneSel.value;
+      const zones=[...new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'}));
+      zoneSel.innerHTML='<option value="">Todas las zonas</option>'+zones.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
+      if(zones.includes(current))zoneSel.value=current;
+    }
     const when=payload?.updated_at||payload?.fecha||'';
     if($('negUpdated'))$('negUpdated').textContent=payload?.fecha?('Día '+payload.fecha):'';
-    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones RC'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' cruzadas con Productividad':'');}
+    const zoneCount=new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean)).size;
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' cruzadas con Productividad':'');}
     renderNegations();
   }catch(err){
     console.error('Negaciones',err);NEG_ROWS=[];NEG_LOADED=false;renderNegations();
@@ -4529,6 +4540,7 @@ async function buildNegationsPanel(force=false){
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('negSearch').oninput=()=>renderNegations();
+$('negZoneFilter').onchange=()=>renderNegations();
 $('negRefreshBtn').onclick=()=>buildNegationsPanel(true);
 document.querySelectorAll('[data-neg-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.negSort;if(NEG_SORT.key===k)NEG_SORT.dir*=-1;else{NEG_SORT.key=k;NEG_SORT.dir=1}renderNegations();});
 $('receiptSearch').oninput=()=>renderReceipt();
