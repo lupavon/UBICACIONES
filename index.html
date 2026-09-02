@@ -1987,7 +1987,7 @@ body.heatSplit .layoutHeatGrid{
   </div>
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
-    <select id="negZoneFilter" class="select"><option value="">Todas las zonas</option></select>
+    <select id="negZoneFilter" class="select"><option value="__ALL__">Todas las zonas</option></select>
     <button class="btn" id="negRefreshBtn">↻ Actualizar</button>
   </div>
   <div class="processStatus" id="negStatus">Cargando negaciones del día…</div>
@@ -4486,9 +4486,11 @@ function negCmp(a,b,key){
 }
 function renderNegations(){
   const q=String($('negSearch')?.value||'').trim().toLowerCase();
-  const zone=String($('negZoneFilter')?.value||'').trim().toUpperCase();
-  let rows=NEG_ROWS.slice();
-  if(zone)rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
+  const zoneRaw=String($('negZoneFilter')?.value||'__ALL__').trim();
+  const zone=zoneRaw.toUpperCase();
+  let rows=Array.isArray(NEG_ROWS)?NEG_ROWS.slice():[];
+  // Todas las zonas no debe filtrar nada. Solo filtrar cuando el usuario elige una zona concreta.
+  if(zone && zone!=='__ALL__')rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
   if(q)rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
   rows.sort((a,b)=>negCmp(a,b,NEG_SORT.key)*NEG_SORT.dir);
   const body=$('negBody'),empty=$('negEmpty');
@@ -4521,10 +4523,11 @@ async function buildNegationsPanel(force=false){
     NEG_LOADED=true;
     const zoneSel=$('negZoneFilter');
     if(zoneSel){
-      const current=zoneSel.value;
+      const current=zoneSel.value||'__ALL__';
       const zones=[...new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'}));
-      zoneSel.innerHTML='<option value="">Todas las zonas</option>'+zones.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
-      if(zones.includes(current))zoneSel.value=current;
+      zoneSel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+zones.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
+      if(current==='__ALL__' || !zones.includes(current)) zoneSel.value='__ALL__';
+      else zoneSel.value=current;
     }
     const when=payload?.updated_at||payload?.fecha||'';
     if($('negUpdated'))$('negUpdated').textContent=payload?.fecha?('Día '+payload.fecha):'';
