@@ -1995,6 +1995,11 @@ body.heatSplit .layoutHeatGrid{
   </div>
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
+    <select id="negProcessFilter" class="select" title="Proceso">
+      <option value="PICKING" selected>Picking</option>
+      <option value="ADUANA">Aduana</option>
+      <option value="__ALL__">Todos</option>
+    </select>
     <select id="negZoneFilter" class="select"><option value="__ALL__">Todas las zonas</option></select>
     <button class="btn" id="negExportBtn">⬇ Exportar XLS</button>
     <button class="btn" id="negRefreshBtn">↻ Actualizar</button>
@@ -4489,13 +4494,19 @@ let NEG_ROWS=[];
 let NEG_LOADED=false;
 let NEG_SORT={key:'hora',dir:-1};
 function negVal(r,k){
-  const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso']};
+  const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso'],proceso:['Proceso','proceso','TipoProceso','tipoProceso']};
   for(const key of (m[k]||[])){ if(r&&r[key]!==undefined&&r[key]!==null&&String(r[key]).trim()!=='')return r[key]; }
   return '';
 }
 function negCmp(a,b,key){
   if(key==='cantidad')return (Number(negVal(a,key))||0)-(Number(negVal(b,key))||0);
   return String(negVal(a,key)||'').localeCompare(String(negVal(b,key)||''),'es',{numeric:true,sensitivity:'base'});
+}
+function negProcess(r){
+  const proceso=String(negVal(r,'proceso')||'').trim().toUpperCase();
+  if(proceso.includes('ADUANA'))return 'ADUANA';
+  if(proceso.includes('PICK'))return 'PICKING';
+  return 'SIN_PROCESO';
 }
 function renderNegations(){
   // Formatter local: no depender de los `fmt` declarados dentro de otros módulos.
@@ -4506,6 +4517,10 @@ function renderNegations(){
   const zoneRaw=String($('negZoneFilter')?.value||'__ALL__').trim();
   const zone=zoneRaw.toUpperCase();
   let rows=Array.isArray(NEG_ROWS)?NEG_ROWS.slice():[];
+  const process=String($('negProcessFilter')?.value||'PICKING').trim().toUpperCase();
+  // Default: solo negaciones cuyo Proceso de la línea es Picking.
+  // No se usa el perfil del empleado para clasificar.
+  if(process && process!=='__ALL__')rows=rows.filter(r=>negProcess(r)===process);
   // Todas las zonas no debe filtrar nada. Solo filtrar cuando el usuario elige una zona concreta.
   if(zone && zone!=='__ALL__')rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
   if(q)rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
@@ -4534,7 +4549,9 @@ function getFilteredNegRows(){
   const q=String($('negSearch')?.value||'').trim().toLowerCase();
   const zoneRaw=String($('negZoneFilter')?.value||'').trim();
   const zone=zoneRaw.toUpperCase();
+  const process=String($('negProcessFilter')?.value||'PICKING').trim().toUpperCase();
   let rows=NEG_ROWS.slice();
+  if(process && process!=='__ALL__') rows=rows.filter(r=>negProcess(r)===process);
   if(zone && zone!=='__ALL__') rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
   if(q) rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
   rows.sort((a,b)=>negCmp(a,b,NEG_SORT.key)*NEG_SORT.dir);
@@ -4567,7 +4584,9 @@ function exportNegationsXls(){
     const d=new Date();
     const date=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
     const safeZone=zoneLabel.replace(/[^a-zA-Z0-9_-]+/g,'_');
-    XLSX.writeFile(wb,'Negaciones_'+date+'_'+safeZone+'.xls',{bookType:'xls'});
+    const process=String($('negProcessFilter')?.value||'PICKING').trim();
+    const processLabel=process==='__ALL__'?'Todos':process;
+    XLSX.writeFile(wb,'Negaciones_'+date+'_'+processLabel+'_'+safeZone+'.xls',{bookType:'xls'});
   }catch(err){
     console.error('Exportar Negaciones XLS',err);
     alert('No se pudo exportar el XLS: '+String(err.message||err));
@@ -4608,6 +4627,7 @@ async function buildNegationsPanel(force=false){
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('negSearch').oninput=()=>renderNegations();
+$('negProcessFilter').onchange=()=>renderNegations();
 $('negZoneFilter').onchange=()=>renderNegations();
 $('negExportBtn').onclick=()=>exportNegationsXls();
 $('negRefreshBtn').onclick=()=>buildNegationsPanel(true);
