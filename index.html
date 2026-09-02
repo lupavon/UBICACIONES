@@ -4923,7 +4923,7 @@ const AUTH_TOKEN_KEY = 'ubicaciones_auth_token';
 let AUTH_USER=null;
 const getAuthToken=()=>sessionStorage.getItem(AUTH_TOKEN_KEY)||'';
 const setAuthToken=(t)=>{if(t)sessionStorage.setItem(AUTH_TOKEN_KEY,t);else sessionStorage.removeItem(AUTH_TOKEN_KEY)};
-const authFetch=async(path,opts={})=>{const token=getAuthToken();const headers={'Content-Type':'application/json',...(opts.headers||{})};if(token)headers['Authorization']='Bearer '+token;return fetch(AUTH_API+path,{...opts,credentials:'include',headers})};
+const authFetch=async(path,opts={})=>{const token=getAuthToken();const headers={'Content-Type':'application/json',...(opts.headers||{})};if(token)headers['Authorization']='Bearer '+token;return fetch(AUTH_API+path,{...opts,headers})};
 function showLogin(msg=''){document.getElementById('authGate').classList.remove('hidden');document.getElementById('loginError').textContent=msg;document.getElementById('userChip').style.display='none'}
 function applyAuthUser(u){AUTH_USER=u;document.getElementById('authGate').classList.add('hidden');document.getElementById('userChip').style.display='flex';document.getElementById('currentUserName').textContent=u.name||u.username;document.getElementById('currentUserRole').textContent=u.role==='administrador'?'Administrador':'Operativo';document.querySelectorAll('.adminOnly').forEach(el=>el.style.display=u.username==='lpavon'?'inline-block':'none')}
 async function authBoot(){try{const r=await authFetch('/session');if(!r.ok){setAuthToken('');return showLogin();}const d=await r.json();if(d?.user)applyAuthUser(d.user);else{setAuthToken('');showLogin();}}catch(e){showLogin('No se pudo conectar con el servicio de autenticación.')}}
