@@ -1643,6 +1643,7 @@ body.heatSplit .layoutHeatGrid{
 <button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
 <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
 <button class="btn" id="receiptModeBtn">📥 En recibo</button>
+<button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
 </div>
 <div id="rackView">
 <div class="viewtitle" id="viewTitle">MFCA · L</div>
@@ -1964,6 +1965,50 @@ body.heatSplit .layoutHeatGrid{
 </table>
 <div class="processEmpty" id="receiptEmpty" style="display:none">No hay unidades actualmente en RECIBO.</div>
 </div>
+</div>
+<div id="negationsView" style="display:none">
+  <div class="layoutHeatTitle">Negaciones</div>
+  <div class="layoutHeatSubtitle">Líneas de picking del día con <b>Zona RC</b> y <b>EstadoDeLinea = Negada</b>. Se cruzan con Productividad del mismo día para identificar al picker y la hora de trabajo.</div>
+  <div class="processKpis">
+    <div class="processKpi"><small>NEGACIONES</small><b id="negCount">0</b><span>líneas negadas en RC</span></div>
+    <div class="processKpi"><small>UNIDADES</small><b id="negUnits">0</b><span>cantidad negada</span></div>
+    <div class="processKpi"><small>PEDIDOS</small><b id="negOrders">0</b><span>pedidos afectados</span></div>
+    <div class="processKpi"><small>SKU</small><b id="negSkus">0</b><span>SKU afectados</span></div>
+  </div>
+  <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead"><div><b>Resumen por picker</b><small>Negaciones, unidades y SKU distintos del día</small></div><small id="negUpdated"></small></div>
+    <div class="receiptSupplierWrap">
+      <table class="receiptSupplierTable">
+        <thead><tr><th>Picker</th><th>Negaciones</th><th>Unidades</th><th>SKU</th></tr></thead>
+        <tbody id="negPickerBody"></tbody>
+      </table>
+      <div id="negPickerEmpty" class="receiptSupplierEmpty" style="display:none">No hay negaciones RC para el día.</div>
+    </div>
+  </div>
+  <div class="receiptToolbar" style="margin-top:14px">
+    <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
+    <button class="btn" id="negRefreshBtn">↻ Actualizar</button>
+  </div>
+  <div class="processStatus" id="negStatus">Cargando negaciones del día…</div>
+  <div class="receiptTableWrap">
+    <table class="receiptTable">
+      <thead><tr>
+        <th data-neg-sort="hora">Hora <span class="sortMark">↕</span></th>
+        <th data-neg-sort="pedido">Pedido <span class="sortMark">↕</span></th>
+        <th data-neg-sort="picking">Picking <span class="sortMark">↕</span></th>
+        <th data-neg-sort="sku">SKU / EAN <span class="sortMark">↕</span></th>
+        <th data-neg-sort="desc">Descripción <span class="sortMark">↕</span></th>
+        <th data-neg-sort="cantidad">Cant. negada <span class="sortMark">↕</span></th>
+        <th data-neg-sort="ubicacion">Ubicación <span class="sortMark">↕</span></th>
+        <th data-neg-sort="picker">Picker <span class="sortMark">↕</span></th>
+        <th data-neg-sort="id">ID empleado <span class="sortMark">↕</span></th>
+        <th data-neg-sort="caja">Caja <span class="sortMark">↕</span></th>
+        <th data-neg-sort="zona">Zona <span class="sortMark">↕</span></th>
+      </tr></thead>
+      <tbody id="negBody"></tbody>
+    </table>
+    <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones en zona RC para hoy.</div>
+  </div>
 </div>
 </main>
 </div>
@@ -2754,6 +2799,7 @@ function setDisplayMode(mode){
   $('sanitationView').style.display=mode==='sanitation'?'block':'none';
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
   $('receiptView').style.display=mode==='receipt'?'block':'none';
+  $('negationsView').style.display=mode==='negations'?'block':'none';
 
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -2762,6 +2808,7 @@ function setDisplayMode(mode){
   $('sanitationModeBtn').classList.toggle('active',mode==='sanitation');
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
+  $('negationsModeBtn').classList.toggle('active',mode==='negations');
 
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
@@ -2769,6 +2816,7 @@ function setDisplayMode(mode){
   if(mode==='sanitation') buildSanitationPanel();
   if(mode==='process') buildPalletsProcessPanel();
   if(mode==='receipt') buildReceiptPanel();
+  if(mode==='negations') buildNegationsPanel();
 }
 
 
@@ -3355,21 +3403,48 @@ async function loadCopernicoReferenceRows(force=false){
     console.warn('No se pudo leer stock.json completo para Doc_Oc',err);
   }
 
-  const keyOf=r=>String(processVal(r,['Caja','caja'])||'').trim()+'|'+String(processVal(r,['EAN','ean','SKU','sku'])||'').trim();
-  const fullByKey=new Map();
+  const normKey=v=>String(v??'').trim().toUpperCase().replace(/\s+/g,'');
+  const cajaOf=r=>normKey(processVal(r,['Caja','caja','numeroCaja','NroCaja']));
+  const skuOf=r=>normKey(processVal(r,['EAN','ean','SKU','sku']));
+  const refOf=r=>normKey(processVal(r,['referencia','Referencia']));
+  const docOcOf=r=>{
+    if(!r||typeof r!=='object')return '';
+    for(const [k,v] of Object.entries(r)){
+      const nk=String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+      if(nk==='dococ' && String(v??'').trim()) return String(v).trim();
+    }
+    return '';
+  };
+
+  const byCajaSku=new Map(), byCajaRef=new Map(), byCaja=new Map();
   for(const r of fullRows){
-    if(receiptIsCurrentRecibo(r)) fullByKey.set(keyOf(r),r);
+    if(!receiptIsCurrentRecibo(r))continue;
+    const caja=cajaOf(r), sku=skuOf(r), ref=refOf(r), doc=docOcOf(r);
+    if(!doc)continue;
+    if(caja&&sku&&!byCajaSku.has(caja+'|'+sku))byCajaSku.set(caja+'|'+sku,r);
+    if(caja&&ref&&!byCajaRef.has(caja+'|'+ref))byCajaRef.set(caja+'|'+ref,r);
+    if(caja){
+      if(!byCaja.has(caja))byCaja.set(caja,[]);
+      byCaja.get(caja).push(r);
+    }
   }
 
   return currentRows.filter(receiptIsCurrentRecibo).map(r=>{
-    const full=fullByKey.get(keyOf(r));
-    if(!full)return r;
-    const merged={...r};
-    for(const [k,v] of Object.entries(full)){
-      const nk=String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
-      if(nk==='dococ') merged.Doc_Oc=v;
+    // Si la propia fila ya trae Doc_Oc, usarlo directamente.
+    const direct=docOcOf(r);
+    if(direct)return {...r,Doc_Oc:direct};
+
+    const caja=cajaOf(r), sku=skuOf(r), ref=refOf(r);
+    let full=(caja&&sku)?byCajaSku.get(caja+'|'+sku):null;
+    if(!full && caja&&ref)full=byCajaRef.get(caja+'|'+ref);
+    // Último respaldo: si la caja tiene una sola fila cruda con Doc_Oc, usar esa.
+    if(!full && caja){
+      const arr=byCaja.get(caja)||[];
+      if(arr.length===1)full=arr[0];
     }
-    return merged;
+    if(!full)return r;
+    const doc=docOcOf(full);
+    return doc?{...r,Doc_Oc:doc}:r;
   });
 }
 async function loadCopernicoReceiptPlan(rows,force=false){
@@ -4394,7 +4469,68 @@ $('processGroupBy').onchange=()=>renderPalletsProcess();
 $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
 // Forzar el default visual desde el arranque; luego applyReceiptDefaults fija también Recepción cuando cargan los equipos.
 if($('receiptAgeFilter'))$('receiptAgeFilter').value='exclude_today';
+
+// ===== NEGACIONES RC · Productividad + Líneas de Picking =====
+let NEG_ROWS=[];
+let NEG_LOADED=false;
+let NEG_SORT={key:'hora',dir:-1};
+function negVal(r,k){
+  const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso']};
+  for(const key of (m[k]||[])){ if(r&&r[key]!==undefined&&r[key]!==null&&String(r[key]).trim()!=='')return r[key]; }
+  return '';
+}
+function negCmp(a,b,key){
+  if(key==='cantidad')return (Number(negVal(a,key))||0)-(Number(negVal(b,key))||0);
+  return String(negVal(a,key)||'').localeCompare(String(negVal(b,key)||''),'es',{numeric:true,sensitivity:'base'});
+}
+function renderNegations(){
+  const q=String($('negSearch')?.value||'').trim().toLowerCase();
+  let rows=NEG_ROWS.slice();
+  if(q)rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
+  rows.sort((a,b)=>negCmp(a,b,NEG_SORT.key)*NEG_SORT.dir);
+  const body=$('negBody'),empty=$('negEmpty');
+  if(empty)empty.style.display=rows.length?'none':'block';
+  if(body)body.innerHTML=rows.map(r=>'<tr>'+[
+    negVal(r,'hora')||'—',negVal(r,'pedido')||'—',negVal(r,'picking')||'—',negVal(r,'sku')||'—',negVal(r,'desc')||'—',
+    negVal(r,'cantidad')||'0',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'RC'
+  ].map((v,i)=>'<td'+(i===7?' class="who"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
+  document.querySelectorAll('[data-neg-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.negSort===NEG_SORT.key?(NEG_SORT.dir===1?'↑':'↓'):'↕';});
+
+  const all=NEG_ROWS;
+  $('negCount').textContent=fmt(all.length);
+  $('negUnits').textContent=fmt(all.reduce((s,r)=>s+(Number(negVal(r,'cantidad'))||0),0));
+  $('negOrders').textContent=fmt(new Set(all.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
+  $('negSkus').textContent=fmt(new Set(all.map(r=>String(negVal(r,'sku')||'')).filter(Boolean)).size);
+  const by=new Map();
+  for(const r of all){const p=String(negVal(r,'picker')||'Sin identificar').trim()||'Sin identificar';if(!by.has(p))by.set(p,{n:0,u:0,s:new Set()});const g=by.get(p);g.n++;g.u+=Number(negVal(r,'cantidad'))||0;const sku=String(negVal(r,'sku')||'');if(sku)g.s.add(sku);}
+  const arr=[...by.entries()].sort((a,b)=>b[1].n-a[1].n||b[1].u-a[1].u);
+  $('negPickerBody').innerHTML=arr.map(([p,g])=>'<tr><td>'+esc(p)+'</td><td>'+fmt(g.n)+'</td><td>'+fmt(g.u)+'</td><td>'+fmt(g.s.size)+'</td></tr>').join('');
+  $('negPickerEmpty').style.display=arr.length?'none':'block';
+}
+async function buildNegationsPanel(force=false){
+  if(NEG_LOADED&&!force){renderNegations();return;}
+  const st=$('negStatus');if(st)st.textContent='Cargando negaciones RC del día…';
+  try{
+    const res=await fetch('./negaciones.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}});
+    if(!res.ok)throw new Error('negaciones.json HTTP '+res.status);
+    const payload=await res.json();
+    NEG_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    NEG_LOADED=true;
+    const when=payload?.updated_at||payload?.fecha||'';
+    if($('negUpdated'))$('negUpdated').textContent=payload?.fecha?('Día '+payload.fecha):'';
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones RC'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' cruzadas con Productividad':'');}
+    renderNegations();
+  }catch(err){
+    console.error('Negaciones',err);NEG_ROWS=[];NEG_LOADED=false;renderNegations();
+    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar Negaciones: '+String(err.message||err);}
+  }
+}
+
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
+$('negationsModeBtn').onclick=()=>setDisplayMode('negations');
+$('negSearch').oninput=()=>renderNegations();
+$('negRefreshBtn').onclick=()=>buildNegationsPanel(true);
+document.querySelectorAll('[data-neg-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.negSort;if(NEG_SORT.key===k)NEG_SORT.dir*=-1;else{NEG_SORT.key=k;NEG_SORT.dir=1}renderNegations();});
 $('receiptSearch').oninput=()=>renderReceipt();
 $('receiptTeamFilter').onchange=()=>renderReceipt();
 $('receiptAgeFilter').onchange=()=>renderReceipt();
