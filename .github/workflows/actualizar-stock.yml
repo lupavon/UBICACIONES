@@ -1088,6 +1088,7 @@ jobs:
                           "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                           "Caja": sval(pr,"Caja","caja"),
                           "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro"),
+                          "Proceso": (sval(ln,"Proceso","proceso","TipoProceso","tipoProceso") if ln else "") or sval(pr,"Proceso","proceso","TipoProceso","tipoProceso"),
                           "Cruce": match_type
                       }
                       neg_rows.append(row)
