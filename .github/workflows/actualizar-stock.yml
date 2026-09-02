@@ -41,7 +41,7 @@ jobs:
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
           PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
-          PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/picking"
+          PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/pasillos/lineas/picking"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
