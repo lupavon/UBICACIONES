@@ -1988,6 +1988,7 @@ body.heatSplit .layoutHeatGrid{
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
     <select id="negZoneFilter" class="select"><option value="__ALL__">Todas las zonas</option></select>
+    <button class="btn" id="negExportBtn">⬇ Exportar XLS</button>
     <button class="btn" id="negRefreshBtn">↻ Actualizar</button>
   </div>
   <div class="processStatus" id="negStatus">Cargando negaciones del día…</div>
@@ -4516,6 +4517,51 @@ function renderNegations(){
   $('negPickerBody').innerHTML=arr.map(([p,g])=>'<tr><td>'+esc(p)+'</td><td>'+negFmt(g.n)+'</td><td>'+negFmt(g.u)+'</td><td>'+negFmt(g.s.size)+'</td></tr>').join('');
   $('negPickerEmpty').style.display=arr.length?'none':'block';
 }
+
+function getFilteredNegRows(){
+  const q=String($('negSearch')?.value||'').trim().toLowerCase();
+  const zoneRaw=String($('negZoneFilter')?.value||'').trim();
+  const zone=zoneRaw.toUpperCase();
+  let rows=NEG_ROWS.slice();
+  if(zone && zone!=='__ALL__') rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
+  if(q) rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
+  rows.sort((a,b)=>negCmp(a,b,NEG_SORT.key)*NEG_SORT.dir);
+  return rows;
+}
+function exportNegationsXls(){
+  try{
+    if(typeof XLSX==='undefined') throw new Error('No se pudo cargar el exportador Excel.');
+    const rows=getFilteredNegRows();
+    if(!rows.length){ alert('No hay negaciones para exportar con los filtros actuales.'); return; }
+    const data=rows.map(r=>({
+      'Hora': negVal(r,'hora')||'',
+      'Pedido': negVal(r,'pedido')||'',
+      'Picking': negVal(r,'picking')||'',
+      'SKU / EAN': negVal(r,'sku')||'',
+      'Descripción': negVal(r,'desc')||'',
+      'Cant. negada': Number(negVal(r,'cantidad'))||0,
+      'Ubicación': negVal(r,'ubicacion')||'',
+      'Picker': negVal(r,'picker')||'',
+      'ID empleado': negVal(r,'id')||'',
+      'Caja': negVal(r,'caja')||'',
+      'Zona': negVal(r,'zona')||''
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    ws['!cols']=[{wch:12},{wch:16},{wch:14},{wch:18},{wch:48},{wch:14},{wch:18},{wch:26},{wch:14},{wch:14},{wch:10}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Negaciones');
+    const zoneRaw=String($('negZoneFilter')?.value||'').trim();
+    const zoneLabel=(!zoneRaw || zoneRaw==='__ALL__')?'Todas':zoneRaw;
+    const d=new Date();
+    const date=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    const safeZone=zoneLabel.replace(/[^a-zA-Z0-9_-]+/g,'_');
+    XLSX.writeFile(wb,'Negaciones_'+date+'_'+safeZone+'.xls',{bookType:'xls'});
+  }catch(err){
+    console.error('Exportar Negaciones XLS',err);
+    alert('No se pudo exportar el XLS: '+String(err.message||err));
+  }
+}
+
 async function buildNegationsPanel(force=false){
   if(NEG_LOADED&&!force){renderNegations();return;}
   const st=$('negStatus');if(st)st.textContent='Cargando negaciones del día…';
@@ -4551,6 +4597,7 @@ $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('negSearch').oninput=()=>renderNegations();
 $('negZoneFilter').onchange=()=>renderNegations();
+$('negExportBtn').onclick=()=>exportNegationsXls();
 $('negRefreshBtn').onclick=()=>buildNegationsPanel(true);
 document.querySelectorAll('[data-neg-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.negSort;if(NEG_SORT.key===k)NEG_SORT.dir*=-1;else{NEG_SORT.key=k;NEG_SORT.dir=1}renderNegations();});
 $('receiptSearch').oninput=()=>renderReceipt();
