@@ -1006,74 +1006,98 @@ jobs:
                           vals = [sval(row,"ean","EAN"), sval(row,"product","Product","producto","Producto")]
                       return [nkey(x) for x in vals if nkey(x)]
 
-                  prod_by_exact = {}
-                  prod_by_pick_sku = {}
-                  prod_by_pick_order = {}
-                  prod_by_pick = {}
-                  for pr in prod_rows:
-                      pnum = nkey(sval(pr,"Picking","picking","NumPicking"))
-                      order = nkey(sval(pr,"NumPedido","pedido","Pedido"))
+                  # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
+                  # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
+                  # de campo porque la API fue cambiando entre versiones.
+                  def productivity_is_negated(pr):
+                      candidate_names = (
+                          "EstadoLineaEtsscc", "estadoLineaEtsscc", "EstadoLineaETSSCC",
+                          "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea",
+                          "ConfirmacionLinea", "confirmacionLinea", "ConfirmacionDeLinea",
+                          "Estado", "estado"
+                      )
+                      for name in candidate_names:
+                          val = sval(pr, name)
+                          if "NEGAD" in nkey(val):
+                              return True
+                      # Fallback seguro: revisar solo claves cuyo nombre sea de estado/confirmación.
+                      if isinstance(pr, dict):
+                          for k, v in pr.items():
+                              nk = nkey(k).replace("Ó","O").replace("Í","I")
+                              if ("ESTADO" in nk or "CONFIRM" in nk) and "NEGAD" in nkey(v):
+                                  return True
+                      return False
+
+                  # Indexar Líneas de Picking para ENRIQUECER las negaciones detectadas en Productividad.
+                  pick_by_exact = {}
+                  pick_by_pick_sku = {}
+                  pick_by_pick_order = {}
+                  pick_by_pick = {}
+                  for ln in pick_rows:
+                      pnum = nkey(sval(ln,"NumPicking","Picking","picking"))
+                      order = nkey(sval(ln,"pedido","Pedido","NumPedido"))
                       if not pnum:
                           continue
-                      prod_by_pick.setdefault(pnum, []).append(pr)
+                      pick_by_pick.setdefault(pnum, []).append(ln)
                       if order:
-                          prod_by_pick_order.setdefault((pnum,order), []).append(pr)
-                      for sk in sku_keys(pr,"prod"):
-                          prod_by_pick_sku.setdefault((pnum,sk), []).append(pr)
+                          pick_by_pick_order.setdefault((pnum,order), []).append(ln)
+                      for sk in sku_keys(ln,"pick"):
+                          pick_by_pick_sku.setdefault((pnum,sk), []).append(ln)
                           if order:
-                              prod_by_exact.setdefault((pnum,order,sk), []).append(pr)
+                              pick_by_exact.setdefault((pnum,order,sk), []).append(ln)
 
-                  def choose_productivity(line):
-                      pnum = nkey(sval(line,"NumPicking","Picking","picking"))
-                      order = nkey(sval(line,"pedido","Pedido","NumPedido"))
-                      sks = sku_keys(line,"pick")
+                  def choose_picking_line(pr):
+                      pnum = nkey(sval(pr,"Picking","picking","NumPicking"))
+                      order = nkey(sval(pr,"NumPedido","pedido","Pedido"))
+                      sks = sku_keys(pr,"prod")
                       for sk in sks:
-                          vals = prod_by_exact.get((pnum,order,sk), [])
+                          vals = pick_by_exact.get((pnum,order,sk), [])
                           if vals: return vals[0], "Picking+Pedido+SKU"
                       for sk in sks:
-                          vals = prod_by_pick_sku.get((pnum,sk), [])
+                          vals = pick_by_pick_sku.get((pnum,sk), [])
                           if vals: return vals[0], "Picking+SKU"
-                      vals = prod_by_pick_order.get((pnum,order), [])
+                      vals = pick_by_pick_order.get((pnum,order), [])
                       if len(vals) == 1: return vals[0], "Picking+Pedido"
-                      vals = prod_by_pick.get(pnum, [])
+                      vals = pick_by_pick.get(pnum, [])
                       if len(vals) == 1: return vals[0], "Picking"
                       return None, "Sin cruce"
 
+                  neg_prod_rows = [pr for pr in prod_rows if productivity_is_negated(pr)]
                   neg_rows = []
-                  for ln in pick_rows:
-                      zone = nkey(sval(ln,"zonapiso","ZonaPiso","zona","Zona"))
-                      state = nkey(sval(ln,"EstadoDeLinea","estadoDeLinea","estadolinea","EstadoLinea"))
-                      if state != "NEGADA":
-                          continue
-                      pr, match_type = choose_productivity(ln)
-                      sku = sval(ln,"ean","EAN") or sval(ln,"product","Product","producto")
+                  for pr in neg_prod_rows:
+                      ln, match_type = choose_picking_line(pr)
+                      sku = (sval(ln,"ean","EAN") if ln else "") or (sval(ln,"product","Product","producto") if ln else "") or sval(pr,"ean","EAN") or sval(pr,"ref","Ref","Referencia")
+                      zone = (sval(ln,"zonapiso","ZonaPiso","zona","Zona") if ln else "") or sval(pr,"ZonaPiso","zonapiso","Zona","zona")
+                      qty = field(ln,"Cant","cant","Cantidad","cantidad") if ln else None
+                      if qty in (None, ""):
+                          qty = field(pr,"Cantidad","cantidad","Unidades","unidades") or 0
                       row = {
-                          "Hora": (sval(pr,"hora","Hora","fecharegistro","FechaRegistro") if pr else "") or sval(ln,"hora","Hora"),
-                          "Pedido": sval(ln,"pedido","Pedido","NumPedido"),
-                          "Picking": sval(ln,"NumPicking","Picking","picking"),
+                          "Hora": sval(pr,"fecharegistro","FechaRegistro") or sval(pr,"hora","Hora") or (sval(ln,"hora","Hora") if ln else ""),
+                          "Pedido": (sval(ln,"pedido","Pedido","NumPedido") if ln else "") or sval(pr,"NumPedido","pedido","Pedido"),
+                          "Picking": sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else ""),
                           "SKU": sku,
-                          "EAN": sval(ln,"ean","EAN"),
-                          "Producto": sval(ln,"product","Product"),
-                          "Descripcion": sval(ln,"descripcion","Descripcion","Descripción"),
-                          "CantidadNegada": field(ln,"Cant","cant","Cantidad","cantidad") or 0,
-                          "Unidad": sval(ln,"unidad","Unidad"),
-                          "Ubicacion": sval(ln,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion"),
-                          "Zona": zone,
-                          "EstadoDeLinea": sval(ln,"EstadoDeLinea","estadoDeLinea"),
-                          "Picker": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado") if pr else "",
-                          "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado") if pr else "",
-                          "Caja": sval(pr,"Caja","caja") if pr else "",
-                          "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro") if pr else "",
+                          "EAN": (sval(ln,"ean","EAN") if ln else "") or sval(pr,"ean","EAN"),
+                          "Producto": (sval(ln,"product","Product") if ln else "") or sval(pr,"ref","Ref","Referencia"),
+                          "Descripcion": sval(pr,"Descripcion","descripcion","Descripción") or (sval(ln,"descripcion","Descripcion","Descripción") if ln else ""),
+                          "CantidadNegada": qty,
+                          "Unidad": (sval(ln,"unidad","Unidad") if ln else "") or "UN",
+                          "Ubicacion": sval(ln,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion") if ln else "",
+                          "Zona": nkey(zone),
+                          "EstadoDeLinea": "Negada",
+                          "Picker": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
+                          "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
+                          "Caja": sval(pr,"Caja","caja"),
+                          "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro"),
                           "Cruce": match_type
                       }
                       neg_rows.append(row)
 
-                  matched = sum(1 for r in neg_rows if r.get("Picker") or r.get("IdEmpleado"))
+                  matched = sum(1 for r in neg_rows if r.get("Cruce") != "Sin cruce")
                   neg_payload = {
                       "updated_at": now_iso,
                       "fecha": day_label,
                       "fecha_query": day,
-                      "source": "Copernico ProductividadPIK + Líneas de Picking · todas las zonas · Negada",
+                      "source": "Copernico ProductividadPIK · Negada + Líneas de Picking para enriquecimiento",
                       "productividad_http": prod_http,
                       "lineas_picking_http": pick_http,
                       "productividad_count": len(prod_rows),
@@ -1084,7 +1108,7 @@ jobs:
                   }
                   save_json_file(NEGATIONS_FILE, neg_payload)
                   print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
-                  print("Negaciones:", len(neg_rows), "· cruzadas:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
+                  print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("negaciones.json generado correctamente")
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
