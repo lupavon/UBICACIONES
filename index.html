@@ -2048,17 +2048,17 @@ body.heatSplit .layoutHeatGrid{
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
         <thead><tr>
-          <th>Picker</th>
-          <th>Hora ingreso</th>
-          <th>Hora inicio</th>
-          <th>TM arranque</th>
-          <th>Antes del desayuno</th>
-          <th>Después del desayuno</th>
-          <th>TM desayuno</th>
-          <th>Antes del almuerzo</th>
-          <th>Hora salida</th>
-          <th>TM almuerzo</th>
-          <th>Tiempo muerto total</th>
+          <th data-time-sort="name">Picker <span class="sortMark">↕</span></th>
+          <th data-time-sort="ingreso">Hora ingreso <span class="sortMark">↕</span></th>
+          <th data-time-sort="inicio">Hora inicio <span class="sortMark">↕</span></th>
+          <th data-time-sort="arranque">TM arranque <span class="sortMark">↕</span></th>
+          <th data-time-sort="antesDesayuno">Antes del desayuno <span class="sortMark">↕</span></th>
+          <th data-time-sort="despuesDesayuno">Después del desayuno <span class="sortMark">↕</span></th>
+          <th data-time-sort="tmDesayuno">TM desayuno <span class="sortMark">↕</span></th>
+          <th data-time-sort="antesAlmuerzo">Antes del almuerzo <span class="sortMark">↕</span></th>
+          <th data-time-sort="salida">Hora salida <span class="sortMark">↕</span></th>
+          <th data-time-sort="tmAlmuerzo">TM almuerzo <span class="sortMark">↕</span></th>
+          <th data-time-sort="totalMuerto">Tiempo muerto total <span class="sortMark">↕</span></th>
         </tr></thead>
         <tbody id="timeDeadBody"></tbody>
       </table>
@@ -4716,59 +4716,21 @@ function timeFiltered(){
   const q=String($('timeSearch')?.value||'').trim().toLowerCase();
   return TIME_ROWS.filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
 }
+let TIME_DEAD_SORT={key:'name',dir:1};
+function timeSortValue(v){if(v==null)return null;if(v instanceof Date)return v.getHours()*3600+v.getMinutes()*60+v.getSeconds();return v;}
 function renderTimes(){
-  const rows=timeFiltered();
-  const by={};
-  rows.forEach(r=>{
-    const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();
-    if(!by[name])by[name]={name,id:r.Empleado||'',rows:[],hours:Array(8).fill(0)};
-    by[name].rows.push(r);
-    const h=Number(r.Hora);
-    if(h>=6&&h<14)by[name].hours[h-6]++;
-  });
+  const rows=timeFiltered(),by={};
+  rows.forEach(r=>{const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();if(!by[name])by[name]={name,id:r.Empleado||'',rows:[],hours:Array(8).fill(0)};by[name].rows.push(r);const h=Number(r.Hora);if(h>=6&&h<14)by[name].hours[h-6]++;});
   const pickers=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name,'es'));
-
   $('timeHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');
-
-  $('timeDeadBody').innerHTML=pickers.map(p=>{
-    const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
-    const first=dates[0]||null;
-    const mins=dates.map(minsOfDay);
-
-    // Arranque: 06:00 hasta la primera línea.
-    const startDead=first?Math.max(0,minsOfDay(first)-360):null;
-
-    // Desayuno: última línea hasta 07:50 y primera línea desde 08:00 en adelante.
-    // Esto reproduce la lectura operativa del cuadro de referencia y evita tomar picks dentro de la pausa como bordes arbitrarios.
-    const beforeBreakfastDates=dates.filter(d=>minsOfDay(d)<=470); // 07:50
-    const afterBreakfastDates=dates.filter(d=>minsOfDay(d)>=480);  // 08:00
-    const beforeBreakfast=beforeBreakfastDates.length?beforeBreakfastDates[beforeBreakfastDates.length-1]:null;
-    const afterBreakfast=afterBreakfastDates.length?afterBreakfastDates[0]:null;
-    const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;
-
-    // Almuerzo/cierre: última línea preparada antes de las 14:00 hasta la hora de salida 14:00.
-    const beforeLunch=dates.length?dates[dates.length-1]:null;
-    const lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null;
-
-    const total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;
-
-    const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;
-    return '<tr>'+ 
-      '<td><b>'+esc(p.name)+'</b></td>'+ 
-      '<td>06:00</td>'+ 
-      '<td>'+fmtClock(first)+'</td>'+ 
-      tmCell(startDead)+ 
-      '<td>'+fmtClock(beforeBreakfast)+'</td>'+ 
-      '<td>'+fmtClock(afterBreakfast)+'</td>'+ 
-      tmCell(breakfast)+ 
-      '<td>'+fmtClock(beforeLunch)+'</td>'+ 
-      '<td>14:00</td>'+ 
-      tmCell(lunch)+ 
-      `<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td>`+
-      '</tr>';
-  }).join('');
+  const deadRows=pickers.map(p=>{const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b),first=dates[0]||null;const startDead=first?Math.max(0,minsOfDay(first)-360):null;const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);const beforeBreakfast=bd.length?bd[bd.length-1]:null,afterBreakfast=ad.length?ad[0]:null;const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;const beforeLunch=dates.length?dates[dates.length-1]:null,lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null,total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;return{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total};});
+  const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
+  deadRows.sort((a,b)=>{const av=getVal(a),bv=getVal(b);if(av==null&&bv==null)return a.p.name.localeCompare(b.p.name,'es');if(av==null)return 1;if(bv==null)return-1;if(typeof av==='string')return av.localeCompare(bv,'es')*d;return(av-bv)*d;});
+  document.querySelectorAll('[data-time-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeSort===k?(d===1?'↑':'↓'):'↕';});
+  $('timeDeadBody').innerHTML=deadRows.map(x=>{const{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total}=x;const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;return '<tr><td><b>'+esc(p.name)+'</b></td><td>06:00</td><td>'+fmtClock(first)+'</td>'+tmCell(startDead)+'<td>'+fmtClock(beforeBreakfast)+'</td><td>'+fmtClock(afterBreakfast)+'</td>'+tmCell(breakfast)+'<td>'+fmtClock(beforeLunch)+'</td><td>14:00</td>'+tmCell(lunch)+`<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td></tr>`;}).join('');
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
+
 async function buildTimesPanel(force=false){
   const st=$('timeStatus');
   if(TIME_LOADED&&!force){renderTimes();return;}
@@ -4792,6 +4754,7 @@ $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('timesModeBtn').onclick=()=>setDisplayMode('times');
 $('timeSearch').oninput=()=>renderTimes();
+document.querySelectorAll('[data-time-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeSort;if(TIME_DEAD_SORT.key===k)TIME_DEAD_SORT.dir*=-1;else TIME_DEAD_SORT={key:k,dir:1};renderTimes();};});
 $('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
 $('negSearch').oninput=()=>renderNegations();
 $('negProcessFilter').onchange=()=>renderNegations();
