@@ -1085,6 +1085,7 @@ jobs:
                           "Ubicacion": sval(ln,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion") if ln else "",
                           "Zona": nkey(zone),
                           "EstadoDeLinea": "Negada",
+                          "Proceso": (sval(ln,"Proceso","proceso","TipoProceso","tipoProceso") if ln else "") or sval(pr,"Proceso","proceso","TipoProceso","tipoProceso"),
                           "Picker": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
                           "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                           "Caja": sval(pr,"Caja","caja"),
