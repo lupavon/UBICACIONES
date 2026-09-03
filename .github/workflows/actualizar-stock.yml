@@ -1141,15 +1141,15 @@ jobs:
 
                   time_rows = []
                   for pr in prod_rows:
+                      # ProductividadPIK ya devuelve una fila por línea trabajada.
+                      # Para Tiempos contamos toda línea del proceso Picking, tanto Confirmada como Negada.
                       proc = nkey(prod_process(pr))
                       if proc and "PICK" not in proc:
-                          continue
-                      state = prod_state(pr)
-                      if state not in ("Confirmada","Negada"):
                           continue
                       hh = prod_hour(pr)
                       if hh < 6 or hh >= 14:
                           continue
+                      state = prod_state(pr) or sval(pr,"EstadoLineaEtsscc","EstadoDeLinea","EstadoLinea","Estado")
                       time_rows.append({
                           "Empleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                           "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
