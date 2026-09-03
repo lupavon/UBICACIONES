@@ -2028,13 +2028,8 @@ body.heatSplit .layoutHeatGrid{
 </div>
 <div id="timesView" style="display:none">
   <div class="viewtitle">⏱ Tiempos · Turno mañana</div>
-  <div class="authNotice">Productividad del día · Proceso Picking · líneas Confirmadas + Negadas · 06:00 a 14:00. Referencia operativa actual: 6 h 30 min.</div>
-  <div class="receiptKpis" style="margin-top:14px">
-    <div class="receiptKpi"><small>LÍNEAS</small><b id="timeLines">0</b><span>procesadas 06–14</span></div>
-    <div class="receiptKpi"><small>PICKERS</small><b id="timePickers">0</b><span>con actividad</span></div>
-    <div class="receiptKpi"><small>PROMEDIO</small><b id="timeAvg">0</b><span>líneas / picker / hora</span></div>
-    <div class="receiptKpi"><small>REFERENCIA</small><b>6:30</b><span>tiempo computable objetivo</span></div>
-  </div>
+  <div class="authNotice">Productividad del día · Picking · Confirmadas + Negadas · Turno 06:00 a 14:00 · Referencia operativa actual: 6 h 30 min.</div>
+
   <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
     <div class="receiptSupplierWrap" style="overflow:auto">
@@ -2044,16 +2039,33 @@ body.heatSplit .layoutHeatGrid{
       </table>
     </div>
   </div>
+
   <div class="receiptSupplierCard" style="margin-top:14px">
-    <div class="receiptSupplierHead"><div><b>Tiempos muertos estimados</b><small>Inicio, desayuno y bloque 12–14</small></div><small>Gap mínimo: 5 min</small></div>
+    <div class="receiptSupplierHead">
+      <div><b>Control de tiempos</b><small>Arranque, desayuno y cierre previo al almuerzo</small></div>
+      <small>Ingreso 06:00 · Salida 14:00</small>
+    </div>
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
-        <thead><tr><th>Picker</th><th>1ª línea</th><th>Última línea</th><th>Inicio muerto</th><th>Desayuno</th><th>Muerto 12–14</th><th>Muerto medido</th><th>Tiempo computable</th><th>vs 6:30</th></tr></thead>
+        <thead><tr>
+          <th>Picker</th>
+          <th>Hora ingreso</th>
+          <th>Hora inicio</th>
+          <th>TM arranque</th>
+          <th>Antes del desayuno</th>
+          <th>Después del desayuno</th>
+          <th>TM desayuno</th>
+          <th>Antes del almuerzo</th>
+          <th>Hora salida</th>
+          <th>TM almuerzo</th>
+          <th>Tiempo muerto total</th>
+        </tr></thead>
         <tbody id="timeDeadBody"></tbody>
       </table>
       <div id="timeEmpty" class="receiptSupplierEmpty" style="display:none">Todavía no hay líneas de Picking entre las 06:00 y las 14:00.</div>
     </div>
   </div>
+
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="timeSearch" placeholder="Buscar picker..."/>
     <button class="btn" id="timeRefreshBtn">↻ Actualizar</button>
@@ -4666,34 +4678,22 @@ async function buildNegationsPanel(force=false){
 // ===== TIEMPOS · Productividad Picking · Turno mañana =====
 let TIME_ROWS=[];
 let TIME_LOADED=false;
-const TIME_GAP_MIN=5;
 function timeDate(v){
   if(!v)return null;
-  let x=String(v).trim().replace(' ','T');
-  let d=new Date(x);
-  if(!isNaN(d))return d;
-  return null;
+  let x=String(v).trim();
+  // Copérnico suele devolver YYYY-MM-DD HH:mm:ss; forzamos hora local, sin conversión UTC.
+  const m=x.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]||0));
+  const d=new Date(x);
+  return isNaN(d)?null:d;
 }
 function minsOfDay(d){return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;}
-function fmtHM(mins){
-  mins=Math.max(0,Math.round(Number(mins)||0));
-  const h=Math.floor(mins/60),m=mins%60;
-  return h?`${h}h ${String(m).padStart(2,'0')}m`:`${m}m`;
-}
-function fmtClock(d){return d?d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';}
-function overlapGap(a,b,lo,hi){
-  const x=Math.max(a,lo),y=Math.min(b,hi);
-  return Math.max(0,y-x);
-}
-function deadInWindow(times,lo,hi){
-  if(!times.length)return hi-lo;
-  const pts=[lo,...times.filter(x=>x>lo&&x<hi),hi];
-  let total=0;
-  for(let i=1;i<pts.length;i++){
-    const gap=pts[i]-pts[i-1];
-    if(gap>TIME_GAP_MIN)total+=gap;
-  }
-  return total;
+function fmtClock(d){return d?`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`:'—';}
+function fmtDur(mins){
+  if(mins===null||mins===undefined||!isFinite(mins))return '—';
+  const sec=Math.max(0,Math.round(mins*60));
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 function timeFiltered(){
   const q=String($('timeSearch')?.value||'').trim().toLowerCase();
@@ -4709,26 +4709,46 @@ function renderTimes(){
     const h=Number(r.Hora);
     if(h>=6&&h<14)by[name].hours[h-6]++;
   });
-  const pickers=Object.values(by).sort((a,b)=>b.rows.length-a.rows.length||a.name.localeCompare(b.name));
-  $('timeLines').textContent=rows.length.toLocaleString('es-AR');
-  $('timePickers').textContent=pickers.length.toLocaleString('es-AR');
-  $('timeAvg').textContent=pickers.length?(rows.length/(pickers.length*8)).toLocaleString('es-AR',{maximumFractionDigits:1}):'0';
+  const pickers=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+
   $('timeHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');
+
   $('timeDeadBody').innerHTML=pickers.map(p=>{
     const dates=p.rows.map(r=>timeDate(r.FechaRegistro)).filter(Boolean).sort((a,b)=>a-b);
+    const first=dates[0]||null;
     const mins=dates.map(minsOfDay);
-    const first=dates[0]||null,last=dates[dates.length-1]||null;
-    const firstMin=first?mins[0]:840;
-    const startDead=Math.max(0,firstMin-360);
-    // Desayuno: inactividad dentro de la ventana operativa aproximada 07:50–08:30.
-    const breakfast=deadInWindow(mins,470,510);
-    // Bloque 12–14: gaps >5 min, incluyendo bordes 12:00 y 14:00.
-    const aft=deadInWindow(mins,720,840);
-    const dead=startDead+breakfast+aft;
-    const computable=Math.max(0,480-dead);
-    const delta=computable-390;
-    const badge=delta>=0?'<span style="color:#55d98b">+'+fmtHM(delta)+'</span>':'<span style="color:#ff7b86">−'+fmtHM(-delta)+'</span>';
-    return '<tr><td><b>'+esc(p.name)+'</b></td><td>'+fmtClock(first)+'</td><td>'+fmtClock(last)+'</td><td>'+fmtHM(startDead)+'</td><td>'+fmtHM(breakfast)+'</td><td>'+fmtHM(aft)+'</td><td><b>'+fmtHM(dead)+'</b></td><td><b>'+fmtHM(computable)+'</b></td><td>'+badge+'</td></tr>';
+
+    // Arranque: 06:00 hasta la primera línea.
+    const startDead=first?Math.max(0,minsOfDay(first)-360):null;
+
+    // Desayuno: última línea hasta 07:50 y primera línea desde 08:00 en adelante.
+    // Esto reproduce la lectura operativa del cuadro de referencia y evita tomar picks dentro de la pausa como bordes arbitrarios.
+    const beforeBreakfastDates=dates.filter(d=>minsOfDay(d)<=470); // 07:50
+    const afterBreakfastDates=dates.filter(d=>minsOfDay(d)>=480);  // 08:00
+    const beforeBreakfast=beforeBreakfastDates.length?beforeBreakfastDates[beforeBreakfastDates.length-1]:null;
+    const afterBreakfast=afterBreakfastDates.length?afterBreakfastDates[0]:null;
+    const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;
+
+    // Almuerzo/cierre: última línea preparada antes de las 14:00 hasta la hora de salida 14:00.
+    const beforeLunch=dates.length?dates[dates.length-1]:null;
+    const lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null;
+
+    const total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;
+
+    const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;
+    return '<tr>'+ 
+      '<td><b>'+esc(p.name)+'</b></td>'+ 
+      '<td>06:00</td>'+ 
+      '<td>'+fmtClock(first)+'</td>'+ 
+      tmCell(startDead)+ 
+      '<td>'+fmtClock(beforeBreakfast)+'</td>'+ 
+      '<td>'+fmtClock(afterBreakfast)+'</td>'+ 
+      tmCell(breakfast)+ 
+      '<td>'+fmtClock(beforeLunch)+'</td>'+ 
+      '<td>14:00</td>'+ 
+      tmCell(lunch)+ 
+      `<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td>`+
+      '</tr>';
   }).join('');
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
