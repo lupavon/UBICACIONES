@@ -1156,6 +1156,7 @@ jobs:
                           "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
                           "Hora": hh,
                           "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro","fechaRegistro"),
+                          "HoraRegistro": sval(pr,"horaregistro","HoraRegistro","horaRegistro"),
                           "Estado": state,
                           "Proceso": prod_process(pr) or "Picking",
                           "Picking": sval(pr,"Picking","picking","NumPicking"),
