@@ -4556,7 +4556,9 @@ function negProcess(r){
   const proceso=String(negVal(r,'proceso')||'').trim().toUpperCase();
   if(proceso.includes('ADUANA'))return 'ADUANA';
   if(proceso.includes('PICK'))return 'PICKING';
-  return 'SIN_PROCESO';
+  // Compatibilidad temporal con negaciones.json anterior, que no traía Proceso.
+  // Una vez que el workflow nuevo regenere el JSON, todas las filas tendrán Proceso real.
+  return 'LEGACY';
 }
 function renderNegations(){
   // Formatter local: no depender de los `fmt` declarados dentro de otros módulos.
@@ -4570,7 +4572,10 @@ function renderNegations(){
   const process=String($('negProcessFilter')?.value||'PICKING').trim().toUpperCase();
   // Default: solo negaciones cuyo Proceso de la línea es Picking.
   // No se usa el perfil del empleado para clasificar.
-  if(process && process!=='__ALL__')rows=rows.filter(r=>negProcess(r)===process);
+  if(process && process!=='__ALL__')rows=rows.filter(r=>{
+    const p=negProcess(r);
+    return p===process || (p==='LEGACY' && process==='PICKING');
+  });
   // Todas las zonas no debe filtrar nada. Solo filtrar cuando el usuario elige una zona concreta.
   if(zone && zone!=='__ALL__')rows=rows.filter(r=>String(negVal(r,'zona')||'').trim().toUpperCase()===zone);
   if(q)rows=rows.filter(r=>Object.keys(r||{}).some(k=>String(r[k]??'').toLowerCase().includes(q)));
