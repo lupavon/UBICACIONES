@@ -1649,6 +1649,7 @@ body.heatSplit .layoutHeatGrid{
 <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
 <button class="btn" id="receiptModeBtn">📥 En recibo</button>
 <button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
+<button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn adminOnly" id="usersModeBtn">👥 Usuarios</button>
 </div>
 <div id="usersView" class="usersPanel"><div class="viewtitle">Usuarios</div><div class="authNotice">Administración de cuentas, perfiles y sesiones desde UBICACIONES. Solo visible para lpavon.</div><div class="usersToolbar"><div><b id="usersCount">0</b> usuarios</div><button class="btn" id="newUserBtn" type="button">+ Nuevo usuario</button></div><div style="overflow:auto"><table class="usersTable"><thead><tr><th>Usuario</th><th>Nombre</th><th>Perfil</th><th>Estado</th><th>Sesiones</th><th>Acciones</th></tr></thead><tbody id="usersTbody"></tbody></table></div><div class="viewtitle" style="font-size:17px;margin-top:22px">Sesiones activas</div><div class="authNotice">Podés cerrar una sesión puntual sin afectar las demás.</div><div style="overflow:auto"><table class="usersTable"><thead><tr><th>Usuario</th><th>Nombre</th><th>Perfil</th><th>Inicio</th><th>Última actividad</th><th>Vence</th><th>Acción</th></tr></thead><tbody id="sessionsTbody"><tr><td colspan="7">Cargando…</td></tr></tbody></table></div></div>
@@ -2024,6 +2025,40 @@ body.heatSplit .layoutHeatGrid{
     </table>
     <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones para el filtro seleccionado.</div>
   </div>
+</div>
+<div id="timesView" style="display:none">
+  <div class="viewtitle">⏱ Tiempos · Turno mañana</div>
+  <div class="authNotice">Productividad del día · Proceso Picking · líneas Confirmadas + Negadas · 06:00 a 14:00. Referencia operativa actual: 6 h 30 min.</div>
+  <div class="receiptKpis" style="margin-top:14px">
+    <div class="receiptKpi"><small>LÍNEAS</small><b id="timeLines">0</b><span>procesadas 06–14</span></div>
+    <div class="receiptKpi"><small>PICKERS</small><b id="timePickers">0</b><span>con actividad</span></div>
+    <div class="receiptKpi"><small>PROMEDIO</small><b id="timeAvg">0</b><span>líneas / picker / hora</span></div>
+    <div class="receiptKpi"><small>REFERENCIA</small><b>6:30</b><span>tiempo computable objetivo</span></div>
+  </div>
+  <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
+    <div class="receiptSupplierWrap" style="overflow:auto">
+      <table class="receiptSupplierTable">
+        <thead><tr><th>Picker</th><th>06–07</th><th>07–08</th><th>08–09</th><th>09–10</th><th>10–11</th><th>11–12</th><th>12–13</th><th>13–14</th><th>Total</th></tr></thead>
+        <tbody id="timeHourlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead"><div><b>Tiempos muertos estimados</b><small>Inicio, desayuno y bloque 12–14</small></div><small>Gap mínimo: 5 min</small></div>
+    <div class="receiptSupplierWrap" style="overflow:auto">
+      <table class="receiptSupplierTable">
+        <thead><tr><th>Picker</th><th>1ª línea</th><th>Última línea</th><th>Inicio muerto</th><th>Desayuno</th><th>Muerto 12–14</th><th>Muerto medido</th><th>Tiempo computable</th><th>vs 6:30</th></tr></thead>
+        <tbody id="timeDeadBody"></tbody>
+      </table>
+      <div id="timeEmpty" class="receiptSupplierEmpty" style="display:none">Todavía no hay líneas de Picking entre las 06:00 y las 14:00.</div>
+    </div>
+  </div>
+  <div class="receiptToolbar" style="margin-top:14px">
+    <input id="timeSearch" placeholder="Buscar picker..."/>
+    <button class="btn" id="timeRefreshBtn">↻ Actualizar</button>
+  </div>
+  <div class="processStatus" id="timeStatus">Cargando tiempos del día…</div>
 </div>
 </main>
 </div>
@@ -2819,6 +2854,7 @@ function setDisplayMode(mode){
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
   $('receiptView').style.display=mode==='receipt'?'block':'none';
   $('negationsView').style.display=mode==='negations'?'block':'none';
+  $('timesView').style.display=mode==='times'?'block':'none';
 
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -2828,6 +2864,7 @@ function setDisplayMode(mode){
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
   $('negationsModeBtn').classList.toggle('active',mode==='negations');
+  $('timesModeBtn').classList.toggle('active',mode==='times');
 
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
@@ -2836,6 +2873,7 @@ function setDisplayMode(mode){
   if(mode==='process') buildPalletsProcessPanel();
   if(mode==='receipt') buildReceiptPanel();
   if(mode==='negations') buildNegationsPanel();
+  if(mode==='times') buildTimesPanel();
 }
 
 
@@ -4624,8 +4662,100 @@ async function buildNegationsPanel(force=false){
   }
 }
 
+
+// ===== TIEMPOS · Productividad Picking · Turno mañana =====
+let TIME_ROWS=[];
+let TIME_LOADED=false;
+const TIME_GAP_MIN=5;
+function timeDate(v){
+  if(!v)return null;
+  let x=String(v).trim().replace(' ','T');
+  let d=new Date(x);
+  if(!isNaN(d))return d;
+  return null;
+}
+function minsOfDay(d){return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;}
+function fmtHM(mins){
+  mins=Math.max(0,Math.round(Number(mins)||0));
+  const h=Math.floor(mins/60),m=mins%60;
+  return h?`${h}h ${String(m).padStart(2,'0')}m`:`${m}m`;
+}
+function fmtClock(d){return d?d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';}
+function overlapGap(a,b,lo,hi){
+  const x=Math.max(a,lo),y=Math.min(b,hi);
+  return Math.max(0,y-x);
+}
+function deadInWindow(times,lo,hi){
+  if(!times.length)return hi-lo;
+  const pts=[lo,...times.filter(x=>x>lo&&x<hi),hi];
+  let total=0;
+  for(let i=1;i<pts.length;i++){
+    const gap=pts[i]-pts[i-1];
+    if(gap>TIME_GAP_MIN)total+=gap;
+  }
+  return total;
+}
+function timeFiltered(){
+  const q=String($('timeSearch')?.value||'').trim().toLowerCase();
+  return TIME_ROWS.filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
+}
+function renderTimes(){
+  const rows=timeFiltered();
+  const by={};
+  rows.forEach(r=>{
+    const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();
+    if(!by[name])by[name]={name,id:r.Empleado||'',rows:[],hours:Array(8).fill(0)};
+    by[name].rows.push(r);
+    const h=Number(r.Hora);
+    if(h>=6&&h<14)by[name].hours[h-6]++;
+  });
+  const pickers=Object.values(by).sort((a,b)=>b.rows.length-a.rows.length||a.name.localeCompare(b.name));
+  $('timeLines').textContent=rows.length.toLocaleString('es-AR');
+  $('timePickers').textContent=pickers.length.toLocaleString('es-AR');
+  $('timeAvg').textContent=pickers.length?(rows.length/(pickers.length*8)).toLocaleString('es-AR',{maximumFractionDigits:1}):'0';
+  $('timeHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');
+  $('timeDeadBody').innerHTML=pickers.map(p=>{
+    const dates=p.rows.map(r=>timeDate(r.FechaRegistro)).filter(Boolean).sort((a,b)=>a-b);
+    const mins=dates.map(minsOfDay);
+    const first=dates[0]||null,last=dates[dates.length-1]||null;
+    const firstMin=first?mins[0]:840;
+    const startDead=Math.max(0,firstMin-360);
+    // Desayuno: inactividad dentro de la ventana operativa aproximada 07:50–08:30.
+    const breakfast=deadInWindow(mins,470,510);
+    // Bloque 12–14: gaps >5 min, incluyendo bordes 12:00 y 14:00.
+    const aft=deadInWindow(mins,720,840);
+    const dead=startDead+breakfast+aft;
+    const computable=Math.max(0,480-dead);
+    const delta=computable-390;
+    const badge=delta>=0?'<span style="color:#55d98b">+'+fmtHM(delta)+'</span>':'<span style="color:#ff7b86">−'+fmtHM(-delta)+'</span>';
+    return '<tr><td><b>'+esc(p.name)+'</b></td><td>'+fmtClock(first)+'</td><td>'+fmtClock(last)+'</td><td>'+fmtHM(startDead)+'</td><td>'+fmtHM(breakfast)+'</td><td>'+fmtHM(aft)+'</td><td><b>'+fmtHM(dead)+'</b></td><td><b>'+fmtHM(computable)+'</b></td><td>'+badge+'</td></tr>';
+  }).join('');
+  $('timeEmpty').style.display=pickers.length?'none':'block';
+}
+async function buildTimesPanel(force=false){
+  const st=$('timeStatus');
+  if(TIME_LOADED&&!force){renderTimes();return;}
+  try{
+    if(st){st.className='processStatus';st.textContent='Cargando Productividad del turno mañana…';}
+    const res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    TIME_ROWS=Array.isArray(payload)?payload:(payload.rows||[]);
+    TIME_LOADED=true;
+    $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):'';
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14';}
+    renderTimes();
+  }catch(err){
+    console.error('Tiempos',err);TIME_LOADED=false;
+    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar tiempos.json: '+String(err.message||err);}
+  }
+}
+
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
+$('timesModeBtn').onclick=()=>setDisplayMode('times');
+$('timeSearch').oninput=()=>renderTimes();
+$('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
 $('negSearch').oninput=()=>renderNegations();
 $('negProcessFilter').onchange=()=>renderNegations();
 $('negZoneFilter').onchange=()=>renderNegations();
