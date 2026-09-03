@@ -4683,14 +4683,26 @@ async function buildNegationsPanel(force=false){
 // ===== TIEMPOS · Productividad Picking · Turno mañana =====
 let TIME_ROWS=[];
 let TIME_LOADED=false;
-function timeDate(v){
-  if(!v)return null;
-  let x=String(v).trim();
-  // Copérnico suele devolver YYYY-MM-DD HH:mm:ss; forzamos hora local, sin conversión UTC.
+function timeDate(row){
+  if(!row)return null;
+  // Productividad trae la fecha y la hora real en campos separados.
+  // NO convertir con UTC: horaregistro ya es la hora operativa de Copérnico.
+  const hr=String(row.HoraRegistro||row.horaregistro||row.horaRegistro||'').trim();
+  const hm=hr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(hm){
+    const fd=String(row.FechaRegistro||row.fecharegistro||row.fechaRegistro||'').trim();
+    const dm=fd.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const now=new Date();
+    const y=dm?Number(dm[1]):now.getFullYear();
+    const mo=dm?Number(dm[2])-1:now.getMonth();
+    const da=dm?Number(dm[3]):now.getDate();
+    return new Date(y,mo,da,Number(hm[1]),Number(hm[2]),Number(hm[3]||0));
+  }
+  // Compatibilidad con un tiempos.json anterior que pudiera traer timestamp completo.
+  const x=String(row.FechaRegistro||row.fecharegistro||row.fechaRegistro||'').trim();
   const m=x.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
   if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),Number(m[6]||0));
-  const d=new Date(x);
-  return isNaN(d)?null:d;
+  return null;
 }
 function minsOfDay(d){return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;}
 function fmtClock(d){return d?`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`:'—';}
@@ -4719,7 +4731,7 @@ function renderTimes(){
   $('timeHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');
 
   $('timeDeadBody').innerHTML=pickers.map(p=>{
-    const dates=p.rows.map(r=>timeDate(r.FechaRegistro)).filter(Boolean).sort((a,b)=>a-b);
+    const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
     const first=dates[0]||null;
     const mins=dates.map(minsOfDay);
 
