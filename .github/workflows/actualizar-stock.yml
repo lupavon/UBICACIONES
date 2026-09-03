@@ -55,6 +55,7 @@ jobs:
           TRACE_FILE = Path("trazabilidad-cajas.json")
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
+          TIMES_FILE = Path("tiempos.json")
 
           # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
           GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
@@ -1088,7 +1089,6 @@ jobs:
                           "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                           "Caja": sval(pr,"Caja","caja"),
                           "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro"),
-                          "Proceso": (sval(ln,"Proceso","proceso","TipoProceso","tipoProceso") if ln else "") or sval(pr,"Proceso","proceso","TipoProceso","tipoProceso"),
                           "Cruce": match_type
                       }
                       neg_rows.append(row)
@@ -1111,6 +1111,70 @@ jobs:
                   print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
                   print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("negaciones.json generado correctamente")
+
+                  # TIEMPOS · Turno mañana 06:00-14:00 · solo Picking.
+                  # Una línea procesada cuenta tanto si terminó Confirmada como Negada.
+                  def prod_state(pr):
+                      candidates = (
+                          "EstadoLineaEtsscc","estadoLineaEtsscc","EstadoLineaETSSCC",
+                          "EstadoDeLinea","estadoDeLinea","EstadoLinea","estadolinea",
+                          "ConfirmacionLinea","confirmacionLinea","ConfirmacionDeLinea",
+                          "Estado","estado"
+                      )
+                      for nm in candidates:
+                          vv = sval(pr,nm)
+                          uv = nkey(vv)
+                          if "NEGAD" in uv: return "Negada"
+                          if "CONFIRM" in uv: return "Confirmada"
+                      return ""
+
+                  def prod_process(pr):
+                      return sval(pr,"Proceso","proceso","TipoProceso","tipoProceso")
+
+                  def prod_hour(pr):
+                      raw = field(pr,"hora","Hora")
+                      try: return int(float(raw))
+                      except Exception: pass
+                      ts = sval(pr,"fecharegistro","FechaRegistro","fechaRegistro")
+                      try: return int(ts[11:13])
+                      except Exception: return -1
+
+                  time_rows = []
+                  for pr in prod_rows:
+                      proc = nkey(prod_process(pr))
+                      if proc and "PICK" not in proc:
+                          continue
+                      state = prod_state(pr)
+                      if state not in ("Confirmada","Negada"):
+                          continue
+                      hh = prod_hour(pr)
+                      if hh < 6 or hh >= 14:
+                          continue
+                      time_rows.append({
+                          "Empleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
+                          "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
+                          "Hora": hh,
+                          "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro","fechaRegistro"),
+                          "Estado": state,
+                          "Proceso": prod_process(pr) or "Picking",
+                          "Picking": sval(pr,"Picking","picking","NumPicking"),
+                          "Pedido": sval(pr,"NumPedido","Pedido","pedido"),
+                          "SKU": sval(pr,"ean","EAN","ref","Ref","barcode","Barcode")
+                      })
+
+                  times_payload = {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico ProductividadPIK · Picking · Confirmadas + Negadas",
+                      "turno": "Mañana",
+                      "desde": "06:00",
+                      "hasta": "14:00",
+                      "referencia_minutos": 390,
+                      "rows": time_rows
+                  }
+                  save_json_file(TIMES_FILE, times_payload)
+                  print("tiempos.json generado · líneas 06-14:", len(time_rows))
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
 
@@ -1874,7 +1938,7 @@ jobs:
 
           mkdir -p /tmp/ubicaciones-sync
 
-          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
@@ -1883,13 +1947,13 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "/tmp/ubicaciones-sync/$f" ]; then
               cp "/tmp/ubicaciones-sync/$f" "$f"
             fi
           done
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
