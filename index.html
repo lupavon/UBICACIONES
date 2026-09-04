@@ -2051,7 +2051,7 @@ body.heatSplit .layoutHeatGrid{
     <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
-        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th></tr></thead>
+        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th><th data-time-hour-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
         <tbody id="timeHourlyBody"></tbody>
       </table>
     </div>
@@ -4732,6 +4732,22 @@ function fmtDur(mins){
 }
 function timeNormName(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
 function timeIsExcluded(r){return timeNormName(r?.Nombres)==='nestor diaz';}
+function timeZoneCategory(v){
+  const z=String(v||'').trim().toUpperCase();
+  if(['MFCA','MFCB','MFCC','AR','BR'].includes(z))return 'MFCS';
+  if(['MFCD','MFCE','MFCF','MFCG'].includes(z))return 'MFCQ';
+  if(['AL','BL','CL','CR','DL','DR','EL','ER','FL','FR','GL','GR','HL','HR'].includes(z))return 'Masterbox';
+  if(['PM','PML','PMR'].includes(z))return 'PM';
+  if(['CIG','CIGL','CIGR','CSGR'].includes(z))return 'Cigarrillos';
+  if(['REF','REFL','REFR','RMFCL','RMFCR'].includes(z))return 'Refrigerados';
+  if(['CON','CONL','CONR','CMFCL','CMCFR'].includes(z))return 'Congelados';
+  return '';
+}
+function timePickerZones(rows){
+  const order=['MFCS','MFCQ','Masterbox','PM','Cigarrillos','Refrigerados','Congelados'];
+  const found=new Set(rows.map(r=>timeZoneCategory(r.ZonaPiso||r.zonapiso||r.Zona||r.zona)).filter(Boolean));
+  return order.filter(x=>found.has(x)).join(' / ') || '—';
+}
 function timeFiltered(){
   const q=String($('timeSearch')?.value||'').trim().toLowerCase();
   return TIME_ROWS.filter(r=>!timeIsExcluded(r)).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
@@ -4745,13 +4761,13 @@ function renderTimes(){
   const pickers=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   const hk=TIME_HOURLY_SORT.key,hd=TIME_HOURLY_SORT.dir;
   const hourlyPickers=pickers.slice().sort((a,b)=>{
-    const hourlyVal=p=>hk==='name'?p.name.toLowerCase():hk==='total'?p.rows.length:hk==='avg'?p.rows.length/6.5:p.hours[Number(hk.slice(1))]||0;
+    const hourlyVal=p=>hk==='name'?p.name.toLowerCase():hk==='total'?p.rows.length:hk==='avg'?p.rows.length/6.5:hk==='zone'?timePickerZones(p.rows).toLowerCase():p.hours[Number(hk.slice(1))]||0;
     const av=hourlyVal(a),bv=hourlyVal(b);
     if(typeof av==='string')return av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'})*hd;
     return (av-bv)*hd || a.name.localeCompare(b.name,'es');
   });
   document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeHourSort===hk?(hd===1?'↑':'↓'):'↕';});
-  $('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td></tr>').join('');
+  $('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td><td><b>'+esc(timePickerZones(p.rows))+'</b></td></tr>').join('');
   const deadRows=pickers.map(p=>{const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b),first=dates[0]||null;const startDead=first?Math.max(0,minsOfDay(first)-360):null;const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);const beforeBreakfast=bd.length?bd[bd.length-1]:null,afterBreakfast=ad.length?ad[0]:null;const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;const beforeLunch=dates.length?dates[dates.length-1]:null,lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null,total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;return{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total};});
   const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
   deadRows.sort((a,b)=>{const av=getVal(a),bv=getVal(b);if(av==null&&bv==null)return a.p.name.localeCompare(b.p.name,'es');if(av==null)return 1;if(bv==null)return-1;if(typeof av==='string')return av.localeCompare(bv,'es')*d;return(av-bv)*d;});
