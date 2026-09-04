@@ -2027,8 +2027,21 @@ body.heatSplit .layoutHeatGrid{
   </div>
 </div>
 <div id="timesView" style="display:none">
-  <div class="viewtitle">⏱ Tiempos · Turno mañana</div>
-  <div class="authNotice">Productividad del día · Picking · Confirmadas + Negadas · Turno 06:00 a 14:00 · Referencia operativa actual: 6 h 30 min. · Personal TT excluido.</div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="viewtitle">⏱ Tiempos · Turno mañana</div>
+      <div class="authNotice">Histórico de Productividad · Picking · Confirmadas + Negadas · Turno 06:00 a 14:00 · Referencia operativa actual: 6 h 30 min. · Personal TT excluido.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+      <button class="btn" id="timePrevDay" title="Día anterior">←</button>
+      <label style="font-size:11px;color:#9fb0c3">Fecha analizada
+        <input id="timeDateFilter" type="date" style="display:block;margin-top:3px;background:#0b1118;color:#eef5ff;border:1px solid #344152;border-radius:6px;padding:7px 9px;font:inherit;color-scheme:dark">
+      </label>
+      <button class="btn" id="timeNextDay" title="Día siguiente">→</button>
+      <button class="btn" id="timeYesterdayBtn">Ayer</button>
+      <button class="btn" id="timeTodayBtn">Hoy</button>
+    </div>
+  </div>
 
   <div class="processKpis" style="grid-template-columns:minmax(260px,360px);margin-top:14px;margin-bottom:0">
     <div class="processKpi"><small>PROMEDIO TIEMPO MUERTO</small><b id="timeAvgDead">—</b><span id="timeAvgDeadSub">promedio de pickers del turno mañana</span></div>
@@ -4687,6 +4700,7 @@ async function buildNegationsPanel(force=false){
 // ===== TIEMPOS · Productividad Picking · Turno mañana =====
 let TIME_ROWS=[];
 let TIME_LOADED=false;
+let TIME_SELECTED_DATE='';
 function timeDate(row){
   if(!row)return null;
   // Productividad trae la fecha y la hora real en campos separados.
@@ -4741,22 +4755,50 @@ function renderTimes(){
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
 
+function timeLocalISO(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+}
+function timeYesterdayISO(){const d=new Date();d.setDate(d.getDate()-1);return timeLocalISO(d);}
+function timeTodayISO(){return timeLocalISO(new Date());}
+function timeInitDate(){
+  const inp=$('timeDateFilter'); if(!inp)return;
+  inp.max=timeTodayISO();
+  if(!inp.value)inp.value=timeYesterdayISO();
+}
+function timeFileForDate(iso){return './datos/tiempos/'+String(iso||'').replaceAll('-','')+'.json';}
+function timeShiftDate(days){
+  const inp=$('timeDateFilter'); if(!inp)return;
+  timeInitDate();
+  const [y,m,d]=inp.value.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+days);
+  const next=timeLocalISO(dt); if(next>timeTodayISO())return;
+  inp.value=next; TIME_LOADED=false; buildTimesPanel(true);
+}
 async function buildTimesPanel(force=false){
   const st=$('timeStatus');
-  if(TIME_LOADED&&!force){renderTimes();return;}
+  timeInitDate();
+  const selected=$('timeDateFilter')?.value||timeYesterdayISO();
+  if(TIME_LOADED&&!force&&TIME_SELECTED_DATE===selected){renderTimes();return;}
   try{
-    if(st){st.className='processStatus';st.textContent='Cargando Productividad del turno mañana…';}
-    const res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
+    if(st){st.className='processStatus';st.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';}
+    let url=timeFileForDate(selected)+'?ts='+Date.now();
+    let res=await fetch(url,{cache:'no-store'});
+    // Compatibilidad: para hoy, si todavía no existe el histórico fechado, usar tiempos.json.
+    if(!res.ok && selected===timeTodayISO())res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
+    if(!res.ok){
+      if(res.status===404)throw new Error('Todavía no hay histórico guardado para esta fecha');
+      throw new Error('HTTP '+res.status);
+    }
     const payload=await res.json();
     TIME_ROWS=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
-    TIME_LOADED=true;
-    $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):'';
-    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14';}
+    TIME_LOADED=true; TIME_SELECTED_DATE=selected;
+    $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+selected.split('-').reverse().join('/'));
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · histórico '+selected.split('-').reverse().join('/');}
     renderTimes();
   }catch(err){
-    console.error('Tiempos',err);TIME_LOADED=false;
-    if(st){st.className='processStatus bad';st.textContent='No se pudo cargar tiempos.json: '+String(err.message||err);}
+    console.error('Tiempos',err);TIME_LOADED=false;TIME_ROWS=[];
+    renderTimes();
+    if(st){st.className='processStatus bad';st.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);}
   }
 }
 
@@ -4766,6 +4808,11 @@ $('timesModeBtn').onclick=()=>setDisplayMode('times');
 $('timeSearch').oninput=()=>renderTimes();
 document.querySelectorAll('[data-time-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeSort;if(TIME_DEAD_SORT.key===k)TIME_DEAD_SORT.dir*=-1;else TIME_DEAD_SORT={key:k,dir:1};renderTimes();};});
 $('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
+$('timeDateFilter').onchange=()=>{TIME_LOADED=false;buildTimesPanel(true);};
+$('timePrevDay').onclick=()=>timeShiftDate(-1);
+$('timeNextDay').onclick=()=>timeShiftDate(1);
+$('timeYesterdayBtn').onclick=()=>{$('timeDateFilter').value=timeYesterdayISO();TIME_LOADED=false;buildTimesPanel(true);};
+$('timeTodayBtn').onclick=()=>{$('timeDateFilter').value=timeTodayISO();TIME_LOADED=false;buildTimesPanel(true);};
 $('negSearch').oninput=()=>renderNegations();
 $('negProcessFilter').onchange=()=>renderNegations();
 $('negZoneFilter').onchange=()=>renderNegations();
