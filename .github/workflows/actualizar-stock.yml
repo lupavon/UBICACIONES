@@ -56,6 +56,7 @@ jobs:
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
           TIMES_FILE = Path("tiempos.json")
+          TIMES_HISTORY_DIR = Path("datos/tiempos")
 
           # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
           GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
@@ -1176,7 +1177,13 @@ jobs:
                       "rows": time_rows
                   }
                   save_json_file(TIMES_FILE, times_payload)
+                  # Guardar también una foto fechada. Así mañana se consulta el día vencido
+                  # sin depender de que Copérnico siga devolviendo exactamente el mismo resultado.
+                  TIMES_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+                  history_file = TIMES_HISTORY_DIR / f"{day}.json"
+                  save_json_file(history_file, times_payload)
                   print("tiempos.json generado · líneas 06-14:", len(time_rows))
+                  print("Histórico Tiempos guardado:", history_file)
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
 
@@ -1939,12 +1946,17 @@ jobs:
           git config user.email "actions@github.com"
 
           mkdir -p /tmp/ubicaciones-sync
+          mkdir -p /tmp/ubicaciones-sync/datos/tiempos
 
           for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
           done
+
+          if [ -d "datos/tiempos" ]; then
+            cp -a datos/tiempos/. /tmp/ubicaciones-sync/datos/tiempos/
+          fi
 
           git fetch origin main
           git reset --hard origin/main
@@ -1955,7 +1967,12 @@ jobs:
             fi
           done
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          if [ -d "/tmp/ubicaciones-sync/datos/tiempos" ]; then
+            mkdir -p datos/tiempos
+            cp -a /tmp/ubicaciones-sync/datos/tiempos/. datos/tiempos/
+          fi
+
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json datos/tiempos trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
