@@ -1199,11 +1199,15 @@ jobs:
                   prev_history_file = TIMES_HISTORY_DIR / f"{prev_day}.json"
                   prev_existing = load_json_file(prev_history_file, {})
                   prev_rows_existing = prev_existing.get("rows", []) if isinstance(prev_existing, dict) else []
+                  # Reconsultar ayer si falta Zona en alguna fila o si quedó vacía.
+                  # La versión anterior solo detectaba la ausencia de la clave, por eso
+                  # algunos pickers podían conservar Zona="" y aparecer con guion en el dashboard.
                   needs_prev_backfill = (
                       not prev_history_file.exists()
                       or not prev_rows_existing
                       or any(
-                          isinstance(r, dict) and "Zona" not in r
+                          isinstance(r, dict)
+                          and not str(r.get("Zona", "")).strip()
                           for r in prev_rows_existing
                       )
                   )
