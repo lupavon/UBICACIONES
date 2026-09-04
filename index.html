@@ -2028,7 +2028,11 @@ body.heatSplit .layoutHeatGrid{
 </div>
 <div id="timesView" style="display:none">
   <div class="viewtitle">⏱ Tiempos · Turno mañana</div>
-  <div class="authNotice">Productividad del día · Picking · Confirmadas + Negadas · Turno 06:00 a 14:00 · Referencia operativa actual: 6 h 30 min.</div>
+  <div class="authNotice">Productividad del día · Picking · Confirmadas + Negadas · Turno 06:00 a 14:00 · Referencia operativa actual: 6 h 30 min. · Personal TT excluido.</div>
+
+  <div class="processKpis" style="grid-template-columns:minmax(260px,360px);margin-top:14px;margin-bottom:0">
+    <div class="processKpi"><small>PROMEDIO TIEMPO MUERTO</small><b id="timeAvgDead">—</b><span id="timeAvgDeadSub">promedio de pickers del turno mañana</span></div>
+  </div>
 
   <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
@@ -4712,9 +4716,11 @@ function fmtDur(mins){
   const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
+function timeNormName(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
+function timeIsExcluded(r){return timeNormName(r?.Nombres)==='nestor diaz';}
 function timeFiltered(){
   const q=String($('timeSearch')?.value||'').trim().toLowerCase();
-  return TIME_ROWS.filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
+  return TIME_ROWS.filter(r=>!timeIsExcluded(r)).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
 }
 let TIME_DEAD_SORT={key:'name',dir:1};
 function timeSortValue(v){if(v==null)return null;if(v instanceof Date)return v.getHours()*3600+v.getMinutes()*60+v.getSeconds();return v;}
@@ -4727,6 +4733,10 @@ function renderTimes(){
   const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
   deadRows.sort((a,b)=>{const av=getVal(a),bv=getVal(b);if(av==null&&bv==null)return a.p.name.localeCompare(b.p.name,'es');if(av==null)return 1;if(bv==null)return-1;if(typeof av==='string')return av.localeCompare(bv,'es')*d;return(av-bv)*d;});
   document.querySelectorAll('[data-time-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeSort===k?(d===1?'↑':'↓'):'↕';});
+  const validTotals=deadRows.map(x=>x.total).filter(v=>v!==null&&isFinite(v));
+  const avgDead=validTotals.length?validTotals.reduce((a,b)=>a+b,0)/validTotals.length:null;
+  if($('timeAvgDead'))$('timeAvgDead').textContent=fmtDur(avgDead);
+  if($('timeAvgDeadSub'))$('timeAvgDeadSub').textContent=validTotals.length?('promedio de '+validTotals.length+' pickers · TT excluido'):'sin pickers con jornada completa';
   $('timeDeadBody').innerHTML=deadRows.map(x=>{const{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total}=x;const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;return '<tr><td><b>'+esc(p.name)+'</b></td><td>06:00</td><td>'+fmtClock(first)+'</td>'+tmCell(startDead)+'<td>'+fmtClock(beforeBreakfast)+'</td><td>'+fmtClock(afterBreakfast)+'</td>'+tmCell(breakfast)+'<td>'+fmtClock(beforeLunch)+'</td><td>14:00</td>'+tmCell(lunch)+`<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td></tr>`;}).join('');
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
@@ -4739,7 +4749,7 @@ async function buildTimesPanel(force=false){
     const res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json();
-    TIME_ROWS=Array.isArray(payload)?payload:(payload.rows||[]);
+    TIME_ROWS=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
     TIME_LOADED=true;
     $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):'';
     if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14';}
