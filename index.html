@@ -2051,7 +2051,7 @@ body.heatSplit .layoutHeatGrid{
     <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
-        <thead><tr><th>Picker</th><th>06–07</th><th>07–08</th><th>08–09</th><th>09–10</th><th>10–11</th><th>11–12</th><th>12–13</th><th>13–14</th><th>Total</th></tr></thead>
+        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th></tr></thead>
         <tbody id="timeHourlyBody"></tbody>
       </table>
     </div>
@@ -4736,13 +4736,22 @@ function timeFiltered(){
   const q=String($('timeSearch')?.value||'').trim().toLowerCase();
   return TIME_ROWS.filter(r=>!timeIsExcluded(r)).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
 }
+let TIME_HOURLY_SORT={key:'name',dir:1};
 let TIME_DEAD_SORT={key:'name',dir:1};
 function timeSortValue(v){if(v==null)return null;if(v instanceof Date)return v.getHours()*3600+v.getMinutes()*60+v.getSeconds();return v;}
 function renderTimes(){
   const rows=timeFiltered(),by={};
   rows.forEach(r=>{const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();if(!by[name])by[name]={name,id:r.Empleado||'',rows:[],hours:Array(8).fill(0)};by[name].rows.push(r);const h=Number(r.Hora);if(h>=6&&h<14)by[name].hours[h-6]++;});
   const pickers=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name,'es'));
-  $('timeHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');
+  const hk=TIME_HOURLY_SORT.key,hd=TIME_HOURLY_SORT.dir;
+  const hourlyPickers=pickers.slice().sort((a,b)=>{
+    const hourlyVal=p=>hk==='name'?p.name.toLowerCase():hk==='total'?p.rows.length:hk==='avg'?p.rows.length/6.5:p.hours[Number(hk.slice(1))]||0;
+    const av=hourlyVal(a),bv=hourlyVal(b);
+    if(typeof av==='string')return av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'})*hd;
+    return (av-bv)*hd || a.name.localeCompare(b.name,'es');
+  });
+  document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeHourSort===hk?(hd===1?'↑':'↓'):'↕';});
+  $('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td></tr>').join('');
   const deadRows=pickers.map(p=>{const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b),first=dates[0]||null;const startDead=first?Math.max(0,minsOfDay(first)-360):null;const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);const beforeBreakfast=bd.length?bd[bd.length-1]:null,afterBreakfast=ad.length?ad[0]:null;const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;const beforeLunch=dates.length?dates[dates.length-1]:null,lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null,total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;return{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total};});
   const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
   deadRows.sort((a,b)=>{const av=getVal(a),bv=getVal(b);if(av==null&&bv==null)return a.p.name.localeCompare(b.p.name,'es');if(av==null)return 1;if(bv==null)return-1;if(typeof av==='string')return av.localeCompare(bv,'es')*d;return(av-bv)*d;});
@@ -4806,6 +4815,7 @@ $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('timesModeBtn').onclick=()=>setDisplayMode('times');
 $('timeSearch').oninput=()=>renderTimes();
+document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeHourSort;if(TIME_HOURLY_SORT.key===k)TIME_HOURLY_SORT.dir*=-1;else TIME_HOURLY_SORT={key:k,dir:1};renderTimes();};});
 document.querySelectorAll('[data-time-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeSort;if(TIME_DEAD_SORT.key===k)TIME_DEAD_SORT.dir*=-1;else TIME_DEAD_SORT={key:k,dir:1};renderTimes();};});
 $('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
 $('timeDateFilter').onchange=()=>{TIME_LOADED=false;buildTimesPanel(true);};
