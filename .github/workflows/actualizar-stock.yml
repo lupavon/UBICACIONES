@@ -1137,53 +1137,101 @@ jobs:
                       raw = field(pr,"hora","Hora")
                       try: return int(float(raw))
                       except Exception: pass
-                      ts = sval(pr,"fecharegistro","FechaRegistro","fechaRegistro")
-                      try: return int(ts[11:13])
+                      hr = sval(pr,"horaregistro","HoraRegistro","horaRegistro")
+                      try: return int(hr[0:2])
                       except Exception: return -1
 
-                  time_rows = []
-                  for pr in prod_rows:
-                      # ProductividadPIK ya devuelve una fila por línea trabajada.
-                      # Para Tiempos contamos toda línea del proceso Picking, tanto Confirmada como Negada.
-                      proc = nkey(prod_process(pr))
-                      if proc and "PICK" not in proc:
-                          continue
-                      hh = prod_hour(pr)
-                      if hh < 6 or hh >= 14:
-                          continue
-                      state = prod_state(pr) or sval(pr,"EstadoLineaEtsscc","EstadoDeLinea","EstadoLinea","Estado")
-                      time_rows.append({
-                          "Empleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
-                          "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
-                          "Hora": hh,
-                          "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro","fechaRegistro"),
-                          "HoraRegistro": sval(pr,"horaregistro","HoraRegistro","horaRegistro"),
-                          "Estado": state,
-                          "Proceso": prod_process(pr) or "Picking",
-                          "Picking": sval(pr,"Picking","picking","NumPicking"),
-                          "Pedido": sval(pr,"NumPedido","Pedido","pedido"),
-                          "SKU": sval(pr,"ean","EAN","ref","Ref","barcode","Barcode")
-                      })
+                  def build_time_rows(source_rows):
+                      result = []
+                      for pr in source_rows:
+                          # ProductividadPIK ya devuelve una fila por línea trabajada.
+                          # Para Tiempos contamos toda línea del proceso Picking, tanto Confirmada como Negada.
+                          proc = nkey(prod_process(pr))
+                          if proc and "PICK" not in proc:
+                              continue
+                          hh = prod_hour(pr)
+                          if hh < 6 or hh >= 14:
+                              continue
+                          state = prod_state(pr) or sval(pr,"EstadoLineaEtsscc","EstadoDeLinea","EstadoLinea","Estado")
+                          result.append({
+                              "Empleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
+                              "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
+                              "Hora": hh,
+                              "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro","fechaRegistro"),
+                              "HoraRegistro": sval(pr,"horaregistro","HoraRegistro","horaRegistro"),
+                              "Estado": state,
+                              "Proceso": prod_process(pr) or "Picking",
+                              "Picking": sval(pr,"Picking","picking","NumPicking"),
+                              "Pedido": sval(pr,"NumPedido","Pedido","pedido"),
+                              "SKU": sval(pr,"ean","EAN","ref","Ref","barcode","Barcode"),
+                              "Zona": nkey(sval(pr,"ZonaPiso","zonapiso","Zona","zona"))
+                          })
+                      return result
 
-                  times_payload = {
-                      "updated_at": now_iso,
-                      "fecha": day_label,
-                      "fecha_query": day,
-                      "source": "Copernico ProductividadPIK · Picking · Confirmadas + Negadas",
-                      "turno": "Mañana",
-                      "desde": "06:00",
-                      "hasta": "14:00",
-                      "referencia_minutos": 390,
-                      "rows": time_rows
-                  }
+                  def make_times_payload(source_rows, query_day, label_day, updated_at):
+                      rows_for_day = build_time_rows(source_rows)
+                      return {
+                          "updated_at": updated_at,
+                          "fecha": label_day,
+                          "fecha_query": query_day,
+                          "source": "Copernico ProductividadPIK · Picking · Confirmadas + Negadas",
+                          "turno": "Mañana",
+                          "desde": "06:00",
+                          "hasta": "14:00",
+                          "referencia_minutos": 390,
+                          "rows": rows_for_day
+                      }
+
+                  # Día actual.
+                  times_payload = make_times_payload(prod_rows, day, day_label, now_iso)
                   save_json_file(TIMES_FILE, times_payload)
-                  # Guardar también una foto fechada. Así mañana se consulta el día vencido
-                  # sin depender de que Copérnico siga devolviendo exactamente el mismo resultado.
                   TIMES_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
                   history_file = TIMES_HISTORY_DIR / f"{day}.json"
                   save_json_file(history_file, times_payload)
-                  print("tiempos.json generado · líneas 06-14:", len(time_rows))
+                  print("tiempos.json generado · líneas 06-14:", len(times_payload["rows"]))
                   print("Histórico Tiempos guardado:", history_file)
+
+                  # Backfill automático del día anterior cuando el histórico todavía no tiene Zona.
+                  # Esto permite completar archivos creados antes de incorporar ZonaPiso.
+                  yesterday_dt = datetime.now(ar_tz) - timedelta(days=1)
+                  prev_day = yesterday_dt.strftime("%Y%m%d")
+                  prev_label = yesterday_dt.strftime("%d/%m/%Y")
+                  prev_history_file = TIMES_HISTORY_DIR / f"{prev_day}.json"
+                  prev_existing = load_json_file(prev_history_file, {})
+                  prev_rows_existing = prev_existing.get("rows", []) if isinstance(prev_existing, dict) else []
+                  needs_prev_backfill = (
+                      not prev_history_file.exists()
+                      or not prev_rows_existing
+                      or any(
+                          isinstance(r, dict) and "Zona" not in r
+                          for r in prev_rows_existing
+                      )
+                  )
+
+                  if needs_prev_backfill:
+                      try:
+                          prev_prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
+                              "fecha": prev_day,
+                              "tipo_productividad": "ProductividadPIK"
+                          })
+                          prev_prod_response, prev_prod_http, _ = request_json(
+                              prev_prod_url, jwt=jwt, timeout=180
+                          )
+                          prev_prod_rows = extract_rows(prev_prod_response)
+                          prev_payload = make_times_payload(
+                              prev_prod_rows, prev_day, prev_label, now_iso
+                          )
+                          save_json_file(prev_history_file, prev_payload)
+                          print(
+                              "Backfill Tiempos día anterior:", prev_history_file,
+                              "· HTTP:", prev_prod_http,
+                              "· líneas:", len(prev_payload["rows"])
+                          )
+                      except Exception as e:
+                          print(
+                              "AVISO: no se pudo completar el histórico del día anterior; "
+                              "se conserva el archivo existente:", str(e)
+                          )
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
 
