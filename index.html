@@ -1619,6 +1619,40 @@ body.heatSplit .layoutHeatGrid{
 .receiptQuickNote{margin-top:10px;padding-top:8px;border-top:1px solid #273340;color:#7f8b98;font-size:8px;line-height:1.4}
 @media(max-width:900px){.receiptQuick{grid-template-columns:1fr}.receiptQuickBody{justify-content:flex-start}}
 </style>
+
+<style>
+/* ===== Dashboard operativo MAIN ===== */
+.opsDash{display:none}
+.opsDash.active{display:block}
+.opsHero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:4px 0 14px}
+.opsHero h2{font-size:18px;margin:0;color:#f4f8fc}
+.opsHero p{margin:4px 0 0;color:#8fa0b2;font-size:10px}
+.opsDashGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.opsCard{background:#111820;border:1px solid #303a47;border-radius:10px;padding:13px;min-height:105px;cursor:pointer;transition:.15s}
+.opsCard:hover{border-color:#596779;transform:translateY(-1px)}
+.opsCard small{display:block;color:#8d98a5;font-size:9px;font-weight:900;letter-spacing:.35px;text-transform:uppercase}
+.opsCard b{display:block;font-size:27px;line-height:1.05;margin-top:7px;color:#f5f8fb}
+.opsCard span{display:block;color:#8d98a5;font-size:9px;margin-top:5px}
+.opsCard .opsMini{font-size:11px;margin-top:7px;color:#c7d2de}
+.opsCard.good{box-shadow:inset 3px 0 0 #3fcf8e}.opsCard.warn{box-shadow:inset 3px 0 0 #e6b64b}.opsCard.bad{box-shadow:inset 3px 0 0 #e05b67}.opsCard.info{box-shadow:inset 3px 0 0 #59b7ff}
+.opsSectionGrid{display:grid;grid-template-columns:1.25fr .75fr;gap:12px;margin-top:12px}
+.opsPanel{background:#0f151d;border:1px solid #303a47;border-radius:10px;padding:13px;min-height:200px}
+.opsPanelHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.opsPanelHead b{font-size:12px}.opsPanelHead small{font-size:9px;color:#8d98a5}
+.opsTable{width:100%;border-collapse:collapse;font-size:10px}
+.opsTable th{color:#95a5b7;text-align:left;font-size:9px;padding:7px;border-bottom:1px solid #303a47}
+.opsTable td{padding:8px 7px;border-bottom:1px solid #222d38}
+.opsTable td.num,.opsTable th.num{text-align:right}
+.opsAlert{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid #222d38}
+.opsAlert:last-child{border-bottom:0}
+.opsAlert strong{font-size:10px}.opsAlert span{font-size:9px;color:#8d98a5}
+.opsBadge{display:inline-block;border:1px solid #3a4655;border-radius:999px;padding:3px 7px;font-size:8px;font-weight:900}
+.opsBadge.bad{color:#ff8e98;border-color:#71333a}.opsBadge.warn{color:#f5c96c;border-color:#6b5830}.opsBadge.good{color:#78dfaa;border-color:#315c48}
+.opsDashStatus{font-size:9px;color:#8d98a5}
+@media(max-width:1150px){.opsDashGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.opsSectionGrid{grid-template-columns:1fr}}
+@media(max-width:680px){.opsDashGrid{grid-template-columns:1fr}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -1641,7 +1675,8 @@ body.heatSplit .layoutHeatGrid{
 <div class="layout">
 <main class="main">
 <div class="modebar">
-<button class="btn active" id="rackModeBtn">Vista racks</button>
+<button class="btn active" id="dashboardModeBtn">🏠 Operación</button>
+<button class="btn" id="rackModeBtn">Vista racks</button>
 <button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
 <button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
 <button class="btn" id="kpiModeBtn">📊 KPIs</button>
@@ -1652,6 +1687,76 @@ body.heatSplit .layoutHeatGrid{
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn adminOnly" id="usersModeBtn">👥 Usuarios</button>
 </div>
+
+<div id="dashboardView" class="opsDash active">
+  <div class="opsHero">
+    <div>
+      <h2>Dashboard operativo</h2>
+      <p>Resumen de preparación, recibo, pallets en proceso y desvíos del depósito.</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="opsDashStatus" id="opsDashUpdated">Cargando operación…</span>
+      <button class="btn" id="opsDashRefreshBtn" type="button">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="opsDashGrid">
+    <div class="opsCard info" data-ops-open="times">
+      <small>Preparación · hoy</small><b id="opsPrepLines">—</b>
+      <span>líneas Picking confirmadas + negadas</span>
+      <div class="opsMini"><b style="display:inline;font-size:11px" id="opsPrepPickers">—</b> pickers activos · <b style="display:inline;font-size:11px" id="opsPrepAvg">—</b> lín/h promedio</div>
+    </div>
+    <div class="opsCard warn" data-ops-open="receipt">
+      <small>Recepción pendiente</small><b id="opsReceiptBoxes">—</b>
+      <span>cajas ingresadas hasta ayer</span>
+      <div class="opsMini"><b style="display:inline;font-size:11px" id="opsReceiptUnits">—</b> unidades pendientes</div>
+    </div>
+    <div class="opsCard good" data-ops-open="process">
+      <small>Pallets en proceso</small><b id="opsProcessPallets">—</b>
+      <span>cajas actualmente en EN_PROCESO</span>
+      <div class="opsMini"><b style="display:inline;font-size:11px" id="opsProcessLines">—</b> líneas de inventario</div>
+    </div>
+    <div class="opsCard bad" data-ops-open="negations">
+      <small>Negaciones Picking · hoy</small><b id="opsNegCount">—</b>
+      <span>líneas negadas</span>
+      <div class="opsMini"><b style="display:inline;font-size:11px" id="opsNegOrders">—</b> pedidos afectados</div>
+    </div>
+
+    <div class="opsCard warn" data-ops-open="rack">
+      <small>Mal ubicadas</small><b id="opsBadLocations">0</b>
+      <span>posiciones con desvío de grupo</span>
+    </div>
+    <div class="opsCard bad" data-ops-open="heat">
+      <small>Mezcla SKU</small><b id="opsMixedLocations">0</b>
+      <span>posiciones con más de un SKU</span>
+    </div>
+    <div class="opsCard info" data-ops-open="times">
+      <small>Promedio TM · ayer</small><b id="opsAvgDead">—</b>
+      <span>turno mañana · TT excluido</span>
+    </div>
+    <div class="opsCard" data-ops-open="receipt">
+      <small>Recepción vieja</small><b id="opsReceiptOld">—</b>
+      <span>cajas anteriores a ayer</span>
+    </div>
+  </div>
+
+  <div class="opsSectionGrid">
+    <div class="opsPanel">
+      <div class="opsPanelHead"><b>Preparación · ranking del día</b><small>Turno mañana · líneas procesadas</small></div>
+      <div style="overflow:auto">
+        <table class="opsTable">
+          <thead><tr><th>Picker</th><th class="num">Líneas</th><th class="num">Prom. / h</th><th>Zona</th></tr></thead>
+          <tbody id="opsPrepBody"><tr><td colspan="4">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="opsPanel">
+      <div class="opsPanelHead"><b>Alertas operativas</b><small>Prioridades rápidas</small></div>
+      <div id="opsAlerts"><div class="opsAlert"><strong>Cargando estado operativo…</strong></div></div>
+    </div>
+  </div>
+</div>
+
 <div id="usersView" class="usersPanel"><div class="viewtitle">Usuarios</div><div class="authNotice">Administración de cuentas, perfiles y sesiones desde UBICACIONES. Solo visible para lpavon.</div><div class="usersToolbar"><div><b id="usersCount">0</b> usuarios</div><button class="btn" id="newUserBtn" type="button">+ Nuevo usuario</button></div><div style="overflow:auto"><table class="usersTable"><thead><tr><th>Usuario</th><th>Nombre</th><th>Perfil</th><th>Estado</th><th>Sesiones</th><th>Acciones</th></tr></thead><tbody id="usersTbody"></tbody></table></div><div class="viewtitle" style="font-size:17px;margin-top:22px">Sesiones activas</div><div class="authNotice">Podés cerrar una sesión puntual sin afectar las demás.</div><div style="overflow:auto"><table class="usersTable"><thead><tr><th>Usuario</th><th>Nombre</th><th>Perfil</th><th>Inicio</th><th>Última actividad</th><th>Vence</th><th>Acción</th></tr></thead><tbody id="sessionsTbody"><tr><td colspan="7">Cargando…</td></tr></tbody></table></div></div>
 <div class="modalAuth" id="userModal"><form class="modalCard" id="userForm"><h3 id="userModalTitle">Usuario</h3><input id="editOriginalUser" type="hidden"><label class="authField"><span>Usuario</span><input id="editUsername" required></label><label class="authField"><span>Nombre completo</span><input id="editName" required></label><label class="authField"><span>Perfil</span><select id="editRole"><option value="operativo">Operativo</option><option value="administrador">Administrador</option></select></label><label class="authField"><span>Nueva contraseña</span><input id="editPassword" type="password" placeholder="Dejar vacío para conservar la actual"></label><label class="authField"><span><input id="editActive" type="checkbox" checked style="width:auto;margin-right:6px">Usuario activo</span></label><div class="authError" id="userFormError"></div><div class="modalActions"><button class="btn" id="cancelUserBtn" type="button">Cancelar</button><button class="btn" type="submit">Guardar</button></div></form></div>
 <div id="rackView">
@@ -2838,7 +2943,7 @@ $('fileInput').onchange=async e=>{
  }catch(err){alert(err.message||String(err))}
 };
 
-let displayMode='rack';
+let displayMode='dashboard';
 
 
 function placeDetailForMode(mode){
@@ -2875,6 +2980,8 @@ function setDisplayMode(mode){
   if(usersBtn) usersBtn.classList.remove('active');
   placeDetailForMode(mode);
 
+  $('dashboardView').style.display=mode==='dashboard'?'block':'none';
+  $('dashboardView').classList.toggle('active',mode==='dashboard');
   $('rackView').style.display=mode==='rack'?'block':'none';
   $('heatmapView').style.display=mode==='heat'?'block':'none';
   $('occupancyView').style.display=mode==='occupancy'?'block':'none';
@@ -2885,6 +2992,7 @@ function setDisplayMode(mode){
   $('negationsView').style.display=mode==='negations'?'block':'none';
   $('timesView').style.display=mode==='times'?'block':'none';
 
+  $('dashboardModeBtn').classList.toggle('active',mode==='dashboard');
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
   $('occupancyModeBtn').classList.toggle('active',mode==='occupancy');
@@ -2895,6 +3003,7 @@ function setDisplayMode(mode){
   $('negationsModeBtn').classList.toggle('active',mode==='negations');
   $('timesModeBtn').classList.toggle('active',mode==='times');
 
+  if(mode==='dashboard') buildOperationalDashboard();
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
@@ -4541,6 +4650,7 @@ function buildMbMfcPanel(){
   $('mbMfcEmpty').style.display=rows.length?'none':'block';
 }
 
+$('dashboardModeBtn').onclick=()=>setDisplayMode('dashboard');
 $('rackModeBtn').onclick=()=>setDisplayMode('rack');
 $('heatModeBtn').onclick=()=>setDisplayMode('heat');
 $('occupancyModeBtn').onclick=()=>setDisplayMode('occupancy');
@@ -4849,6 +4959,141 @@ async function buildTimesPanel(force=false){
   }
 }
 
+
+// ===== Dashboard operativo MAIN =====
+let OPS_DASH_LOADING=false;
+function opsFmt(n){return Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:1})}
+function refreshOperationalStockKpis(){
+  const bad=document.getElementById('kBad')?.textContent||'0';
+  const mix=document.getElementById('kMulti')?.textContent||'0';
+  if($('opsBadLocations'))$('opsBadLocations').textContent=bad;
+  if($('opsMixedLocations'))$('opsMixedLocations').textContent=mix;
+}
+function opsTimeCategory(v){
+  if(typeof timeZoneCategory==='function')return timeZoneCategory(v);
+  return '';
+}
+function opsPickerZone(rows){
+  if(typeof timePickerZones==='function')return timePickerZones(rows);
+  const cats={};
+  rows.forEach(r=>{const c=opsTimeCategory(r.Zona||r.ZonaPiso||r.zona||'');if(c)cats[c]=(cats[c]||0)+1;});
+  const top=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+  return top?top[0]:'—';
+}
+async function opsLoadPreparation(){
+  try{
+    const res=await fetch('./tiempos.json?ops='+Date.now(),{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    const rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!(typeof timeIsExcluded==='function'&&timeIsExcluded(r)));
+    const by={};
+    rows.forEach(r=>{
+      const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();
+      if(!by[name])by[name]={name,rows:[]};
+      by[name].rows.push(r);
+    });
+    const pickers=Object.values(by);
+    const total=rows.length;
+    const avg=pickers.length?total/(pickers.length*6.5):0;
+    $('opsPrepLines').textContent=opsFmt(total);
+    $('opsPrepPickers').textContent=opsFmt(pickers.length);
+    $('opsPrepAvg').textContent=avg.toFixed(1);
+    const ranked=pickers.map(p=>({name:p.name,total:p.rows.length,avg:p.rows.length/6.5,zone:opsPickerZone(p.rows)}))
+      .sort((a,b)=>b.total-a.total).slice(0,8);
+    $('opsPrepBody').innerHTML=ranked.length?ranked.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td class="num">'+opsFmt(x.total)+'</td><td class="num">'+x.avg.toFixed(1)+'</td><td>'+esc(x.zone)+'</td></tr>').join(''):'<tr><td colspan="4">Sin líneas de preparación todavía.</td></tr>';
+    return {total,pickers:pickers.length,avg};
+  }catch(e){
+    $('opsPrepBody').innerHTML='<tr><td colspan="4">No se pudo cargar preparación.</td></tr>';
+    $('opsPrepLines').textContent='—';$('opsPrepPickers').textContent='—';$('opsPrepAvg').textContent='—';
+    return null;
+  }
+}
+async function opsLoadYesterdayDead(){
+  try{
+    const iso=timeYesterdayISO(),res=await fetch(timeFileForDate(iso)+'?ops='+Date.now(),{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json(),rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
+    const by={};
+    rows.forEach(r=>{const n=String(r.Nombres||r.Empleado||'').trim();if(!n)return;(by[n]||(by[n]=[])).push(r);});
+    const totals=[];
+    Object.values(by).forEach(pr=>{
+      const dates=pr.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
+      const first=dates[0]||null,startDead=first?Math.max(0,minsOfDay(first)-360):null;
+      const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);
+      const before=bd.length?bd[bd.length-1]:null,after=ad.length?ad[0]:null,breakfast=(before&&after)?Math.max(0,(after-before)/60000):null;
+      const last=dates.length?dates[dates.length-1]:null,lunch=last?Math.max(0,840-minsOfDay(last)):null;
+      if([startDead,breakfast,lunch].every(v=>v!==null))totals.push(startDead+breakfast+lunch);
+    });
+    const avg=totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null;
+    $('opsAvgDead').textContent=fmtDur(avg);
+    return avg;
+  }catch(e){$('opsAvgDead').textContent='—';return null;}
+}
+async function opsLoadNegations(){
+  try{
+    const res=await fetch('./negaciones.json?ops='+Date.now(),{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json(),all=Array.isArray(payload)?payload:(payload.rows||[]);
+    const rows=all.filter(r=>{const p=negProcess(r);return p==='PICKING'||p==='LEGACY';});
+    $('opsNegCount').textContent=opsFmt(rows.length);
+    $('opsNegOrders').textContent=opsFmt(new Set(rows.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
+    return rows.length;
+  }catch(e){$('opsNegCount').textContent='—';$('opsNegOrders').textContent='—';return null;}
+}
+async function opsLoadProcess(){
+  try{
+    await buildPalletsProcessPanel(false);
+    const pallets=new Set(PROCESS_ROWS.map(r=>String(processVal(r,['Caja','caja'])||'')).filter(Boolean));
+    $('opsProcessPallets').textContent=opsFmt(pallets.size);
+    $('opsProcessLines').textContent=opsFmt(PROCESS_ROWS.length);
+    return pallets.size;
+  }catch(e){$('opsProcessPallets').textContent='—';$('opsProcessLines').textContent='—';return null;}
+}
+async function opsLoadReceipt(){
+  try{
+    if(!DATA.length)await loadPublishedStock({silent:true});
+    await buildReceiptPanel(false);
+    const pending=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,'exclude_today'));
+    const old=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,'old'));
+    const boxes=new Set(pending.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
+    const oldBoxes=new Set(old.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
+    const units=pending.reduce((s,r)=>s+(Number(String(receiptField(r,'saldo')||0).replace(',','.'))||0),0);
+    $('opsReceiptBoxes').textContent=opsFmt(boxes.size);
+    $('opsReceiptUnits').textContent=opsFmt(units);
+    $('opsReceiptOld').textContent=opsFmt(oldBoxes.size);
+    return {boxes:boxes.size,units,old:oldBoxes.size};
+  }catch(e){
+    $('opsReceiptBoxes').textContent='—';$('opsReceiptUnits').textContent='—';$('opsReceiptOld').textContent='—';
+    return null;
+  }
+}
+function opsRenderAlerts(state){
+  const alerts=[];
+  const bad=Number(String($('kBad')?.textContent||'0').replace(/\D/g,''))||0;
+  const mix=Number(String($('kMulti')?.textContent||'0').replace(/\D/g,''))||0;
+  if(state.receipt?.old>0)alerts.push({t:'Recepción vieja',d:state.receipt.old+' cajas anteriores a ayer',c:'bad',b:'ATENDER'});
+  if((state.neg||0)>0)alerts.push({t:'Negaciones Picking',d:state.neg+' líneas negadas hoy',c:'warn',b:'REVISAR'});
+  if(bad>0)alerts.push({t:'Mal ubicadas',d:bad+' posiciones fuera de grupo',c:'warn',b:'SANEAMIENTO'});
+  if(mix>0)alerts.push({t:'Mezcla SKU',d:mix+' posiciones con mezcla',c:'bad',b:'DESVÍO'});
+  if(!alerts.length)alerts.push({t:'Sin alertas críticas',d:'No hay desvíos destacados con los datos actuales.',c:'good',b:'OK'});
+  $('opsAlerts').innerHTML=alerts.slice(0,6).map(a=>'<div class="opsAlert"><div><strong>'+esc(a.t)+'</strong><br><span>'+esc(a.d)+'</span></div><span class="opsBadge '+a.c+'">'+esc(a.b)+'</span></div>').join('');
+}
+async function buildOperationalDashboard(force=false){
+  if(OPS_DASH_LOADING)return;
+  OPS_DASH_LOADING=true;
+  refreshOperationalStockKpis();
+  $('opsDashUpdated').textContent='Actualizando operación…';
+  try{
+    const [prep,receipt,process,neg,dead]=await Promise.all([
+      opsLoadPreparation(),opsLoadReceipt(),opsLoadProcess(),opsLoadNegations(),opsLoadYesterdayDead()
+    ]);
+    opsRenderAlerts({prep,receipt,process,neg,dead});
+    $('opsDashUpdated').textContent='Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  }finally{OPS_DASH_LOADING=false;}
+}
+$('opsDashRefreshBtn').onclick=()=>buildOperationalDashboard(true);
+document.querySelectorAll('[data-ops-open]').forEach(el=>el.onclick=()=>setDisplayMode(el.dataset.opsOpen));
+
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('timesModeBtn').onclick=()=>setDisplayMode('times');
@@ -4952,6 +5197,7 @@ function applyStockPayload(payload,{fromCache=false}={}){
   if(displayMode==='occupancy')buildOccupancyMap();
   if(displayMode==='kpi')buildKpiPanel();
   if(displayMode==='sanitation')buildSanitationPanel();
+  if(displayMode==='dashboard')refreshOperationalStockKpis();
 
   return updatedAt;
 }
@@ -5185,11 +5431,11 @@ const setAuthToken=(t)=>{if(t)sessionStorage.setItem(AUTH_TOKEN_KEY,t);else sess
 const authFetch=async(path,opts={})=>{const token=getAuthToken();const headers={'Content-Type':'application/json',...(opts.headers||{})};if(token)headers['Authorization']='Bearer '+token;return fetch(AUTH_API+path,{...opts,headers})};
 function showLogin(msg=''){document.getElementById('authGate').classList.remove('hidden');document.getElementById('loginError').textContent=msg;document.getElementById('userChip').style.display='none'}
 function applyAuthUser(u){AUTH_USER=u;document.getElementById('authGate').classList.add('hidden');document.getElementById('userChip').style.display='flex';document.getElementById('currentUserName').textContent=u.name||u.username;document.getElementById('currentUserRole').textContent=u.role==='administrador'?'Administrador':'Operativo';document.querySelectorAll('.adminOnly').forEach(el=>el.style.display=u.username==='lpavon'?'inline-block':'none')}
-async function authBoot(){try{const r=await authFetch('/session');if(!r.ok){setAuthToken('');return showLogin();}const d=await r.json();if(d?.user)applyAuthUser(d.user);else{setAuthToken('');showLogin();}}catch(e){showLogin('No se pudo conectar con el servicio de autenticación.')}}
-document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const er=document.getElementById('loginError');er.textContent='Validando…';try{const r=await authFetch('/login',{method:'POST',body:JSON.stringify({username:document.getElementById('loginUser').value.trim().toLowerCase(),password:document.getElementById('loginPass').value})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Usuario o contraseña incorrectos');if(d.token)setAuthToken(d.token);applyAuthUser(d.user);document.getElementById('loginPass').value='';er.textContent=''}catch(x){setAuthToken('');er.textContent=x.message}});
+async function authBoot(){try{const r=await authFetch('/session');if(!r.ok){setAuthToken('');return showLogin();}const d=await r.json();if(d?.user){applyAuthUser(d.user);setDisplayMode('dashboard');}else{setAuthToken('');showLogin();}}catch(e){showLogin('No se pudo conectar con el servicio de autenticación.')}}
+document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const er=document.getElementById('loginError');er.textContent='Validando…';try{const r=await authFetch('/login',{method:'POST',body:JSON.stringify({username:document.getElementById('loginUser').value.trim().toLowerCase(),password:document.getElementById('loginPass').value})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Usuario o contraseña incorrectos');if(d.token)setAuthToken(d.token);applyAuthUser(d.user);setDisplayMode('dashboard');document.getElementById('loginPass').value='';er.textContent=''}catch(x){setAuthToken('');er.textContent=x.message}});
 document.getElementById('logoutBtn').onclick=async()=>{try{await authFetch('/logout',{method:'POST'})}catch(e){} setAuthToken('');AUTH_USER=null;showLogin();};
 function closeUsersView(){const v=document.getElementById('usersView');if(v)v.classList.remove('active');const b=document.getElementById('usersModeBtn');if(b)b.classList.remove('active')}
-function openUsersView(){if(AUTH_USER?.username!=='lpavon')return;displayMode='users';placeDetailForMode('users');['rackView','heatmapView','occupancyView','kpiView','sanitationView','palletsProcessView','receiptView','negationsView'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});document.querySelectorAll('.modebar .btn').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('usersModeBtn');if(btn)btn.classList.add('active');const view=document.getElementById('usersView');if(view)view.classList.add('active');loadUsers();loadSessions();}
+function openUsersView(){if(AUTH_USER?.username!=='lpavon')return;displayMode='users';placeDetailForMode('users');['dashboardView','rackView','heatmapView','occupancyView','kpiView','sanitationView','palletsProcessView','receiptView','negationsView','timesView'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});document.querySelectorAll('.modebar .btn').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('usersModeBtn');if(btn)btn.classList.add('active');const view=document.getElementById('usersView');if(view)view.classList.add('active');loadUsers();loadSessions();}
 document.getElementById('usersModeBtn').onclick=openUsersView;
 async function loadUsers(){const tb=document.getElementById('usersTbody');tb.innerHTML='<tr><td colspan="6">Cargando…</td></tr>';try{const r=await authFetch('/admin/users');if(r.status===401||r.status===403)throw new Error('Sin permisos');const d=await r.json();const users=d.users||[];document.getElementById('usersCount').textContent=users.length;tb.innerHTML=users.map(u=>`<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.name||'')}</td><td><span class="pill">${u.role==='administrador'?'Administrador':'Operativo'}</span></td><td>${Number(u.active)===0?'Inactivo':'Activo'}</td><td>${u.sessions>0?'<span class="sessionDot"></span>':''}${u.sessions||0}</td><td><button class="btn" onclick="editAuthUser('${esc(u.username)}')">Editar</button> <button class="btn dangerBtn" onclick="disconnectAuthUser('${esc(u.username)}')">Desconectar</button></td></tr>`).join('')||'<tr><td colspan="6">Sin usuarios</td></tr>';window.__AUTH_USERS=users}catch(e){tb.innerHTML='<tr><td colspan="6">'+esc(e.message)+'</td></tr>'}}
 function fmtSessionDate(v){if(!v)return '-';try{return new Date(v.replace(' ','T')+'Z').toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}catch(e){return v}}
@@ -5200,6 +5446,7 @@ window.editAuthUser=(username)=>openUserModal((window.__AUTH_USERS||[]).find(u=>
 window.disconnectAuthUser=async(username)=>{if(username==='lpavon'&&!confirm('¿Desconectar tus otras sesiones?'))return;else if(username!=='lpavon'&&!confirm('¿Desconectar todas las sesiones de '+username+'?'))return;const r=await authFetch('/admin/users/'+encodeURIComponent(username)+'/disconnect',{method:'POST'});if(!r.ok){alert('No se pudo desconectar');return}loadUsers();loadSessions()};
 document.getElementById('newUserBtn').onclick=()=>openUserModal();document.getElementById('cancelUserBtn').onclick=()=>document.getElementById('userModal').classList.remove('open');
 document.getElementById('userForm').addEventListener('submit',async e=>{e.preventDefault();const orig=document.getElementById('editOriginalUser').value;const payload={username:document.getElementById('editUsername').value.trim().toLowerCase(),name:document.getElementById('editName').value.trim(),role:document.getElementById('editRole').value,password:document.getElementById('editPassword').value,active:document.getElementById('editActive').checked};if(orig==='lpavon'){payload.role='administrador';payload.active=true}const path=orig?'/admin/users/'+encodeURIComponent(orig):'/admin/users';const r=await authFetch(path,{method:orig?'PUT':'POST',body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok){document.getElementById('userFormError').textContent=d.error||'No se pudo guardar';return}document.getElementById('userModal').classList.remove('open');loadUsers();loadSessions()});
+setDisplayMode('dashboard');
 authBoot();
 
 </script>
