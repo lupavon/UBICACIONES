@@ -3009,7 +3009,7 @@ function setDisplayMode(mode){
   if(mode==='kpi') buildKpiPanel();
   if(mode==='sanitation') buildSanitationPanel();
   if(mode==='process') buildPalletsProcessPanel();
-  if(mode==='receipt') buildReceiptPanel();
+  if(mode==='receipt') buildReceiptPanel(true);
   if(mode==='negations') buildNegationsPanel();
   if(mode==='times') buildTimesPanel();
 }
@@ -5051,8 +5051,7 @@ async function opsLoadProcess(){
 }
 async function opsLoadReceipt(){
   try{
-    if(!DATA.length)await loadPublishedStock({silent:true});
-    await buildReceiptPanel(false);
+    await buildReceiptPanel(true);
     const pending=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,'exclude_today'));
     const old=RECEIPT_ROWS.filter(r=>receiptAgeMatches(r,'old'));
     const boxes=new Set(pending.map(r=>String(receiptField(r,'caja')||'')).filter(Boolean));
@@ -5081,9 +5080,12 @@ function opsRenderAlerts(state){
 async function buildOperationalDashboard(force=false){
   if(OPS_DASH_LOADING)return;
   OPS_DASH_LOADING=true;
-  refreshOperationalStockKpis();
   $('opsDashUpdated').textContent='Actualizando operación…';
   try{
+    if(!DATA.length){
+      try{ await loadPublishedStock({silent:true}); }catch(e){ console.warn('Dashboard: stock aún no disponible',e); }
+    }
+    refreshOperationalStockKpis();
     const [prep,receipt,process,neg,dead]=await Promise.all([
       opsLoadPreparation(),opsLoadReceipt(),opsLoadProcess(),opsLoadNegations(),opsLoadYesterdayDead()
     ]);
@@ -5197,7 +5199,7 @@ function applyStockPayload(payload,{fromCache=false}={}){
   if(displayMode==='occupancy')buildOccupancyMap();
   if(displayMode==='kpi')buildKpiPanel();
   if(displayMode==='sanitation')buildSanitationPanel();
-  if(displayMode==='dashboard')refreshOperationalStockKpis();
+  if(displayMode==='dashboard'){refreshOperationalStockKpis();}
 
   return updatedAt;
 }
