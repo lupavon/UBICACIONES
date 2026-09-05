@@ -1731,8 +1731,8 @@ body.heatSplit .layoutHeatGrid{
       <span>posiciones con más de un SKU</span>
     </div>
     <div class="opsCard info" data-ops-open="times">
-      <small>Promedio TM · ayer</small><b id="opsAvgDead">—</b>
-      <span>turno mañana · TT excluido</span>
+      <small>Promedio TM · último día operativo</small><b id="opsAvgDead">—</b>
+      <span id="opsAvgDeadDate">turno mañana · TT excluido</span>
     </div>
     <div class="opsCard" data-ops-open="receipt">
       <small>Recepción vieja</small><b id="opsReceiptOld">—</b>
@@ -4924,6 +4924,26 @@ function timeInitDate(){
   if(!inp.value)inp.value=timeYesterdayISO();
 }
 function timeFileForDate(iso){return './datos/tiempos/'+String(iso||'').replaceAll('-','')+'.json';}
+
+async function timeFindLastOperationalDate(startISO=null,maxDays=10){
+  const start=startISO||timeYesterdayISO();
+  const [y,m,d]=start.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  for(let i=0;i<maxDays;i++){
+    const iso=timeLocalISO(dt);
+    try{
+      const res=await fetch(timeFileForDate(iso)+'?lastop='+Date.now(),{cache:'no-store'});
+      if(res.ok){
+        const payload=await res.json();
+        const rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
+        if(rows.length)return {iso,payload,rows};
+      }
+    }catch(e){}
+    dt.setDate(dt.getDate()-1);
+  }
+  return null;
+}
+
 function timeShiftDate(days){
   const inp=$('timeDateFilter'); if(!inp)return;
   timeInitDate();
@@ -4943,7 +4963,21 @@ async function buildTimesPanel(force=false){
     // Compatibilidad: para hoy, si todavía no existe el histórico fechado, usar tiempos.json.
     if(!res.ok && selected===timeTodayISO())res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
     if(!res.ok){
-      if(res.status===404)throw new Error('Todavía no hay histórico guardado para esta fecha');
+      if(res.status===404){
+        const last=await timeFindLastOperationalDate(selected,10);
+        if(last && last.iso!==selected){
+          if($('timeDateFilter'))$('timeDateFilter').value=last.iso;
+          TIME_SELECTED_DATE=last.iso;
+          const payload=last.payload;
+          TIME_ROWS=last.rows;
+          TIME_LOADED=true;
+          $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+last.iso.split('-').reverse().join('/'));
+          if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · último día operativo '+last.iso.split('-').reverse().join('/');}
+          renderTimes();
+          return;
+        }
+        throw new Error('Todavía no hay histórico guardado para esta fecha');
+      }
       throw new Error('HTTP '+res.status);
     }
     const payload=await res.json();
@@ -5008,26 +5042,56 @@ async function opsLoadPreparation(){
     return null;
   }
 }
-async function opsLoadYesterdayDead(){
+async function opsLoadLastOperationalDead(){
   try{
-    const iso=timeYesterdayISO(),res=await fetch(timeFileForDate(iso)+'?ops='+Date.now(),{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json(),rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
-    const by={};
-    rows.forEach(r=>{const n=String(r.Nombres||r.Empleado||'').trim();if(!n)return;(by[n]||(by[n]=[])).push(r);});
-    const totals=[];
-    Object.values(by).forEach(pr=>{
-      const dates=pr.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
-      const first=dates[0]||null,startDead=first?Math.max(0,minsOfDay(first)-360):null;
-      const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);
-      const before=bd.length?bd[bd.length-1]:null,after=ad.length?ad[0]:null,breakfast=(before&&after)?Math.max(0,(after-before)/60000):null;
-      const last=dates.length?dates[dates.length-1]:null,lunch=last?Math.max(0,840-minsOfDay(last)):null;
-      if([startDead,breakfast,lunch].every(v=>v!==null))totals.push(startDead+breakfast+lunch);
+    const last=await timeFindLastOperationalDate(timeYesterdayISO(),10);
+    if(!last)throw new Error('Sin histórico operativo reciente');
+    const rows=last.rows,by={};
+    rows.forEach(r=>{
+      const n=String(r.Nombres||r.Empleado||'').trim();
+      if(!n)return;
+      (by[n]||(by[n]=[])).push(r);
     });
+
+    const records=[];
+    Object.entries(by).forEach(([name,pr])=>{
+      const dates=pr.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
+      const first=dates[0]||null;
+      const startDead=first?Math.max(0,minsOfDay(first)-360):null;
+      const bd=dates.filter(d=>minsOfDay(d)<=470);
+      const ad=dates.filter(d=>minsOfDay(d)>=480);
+      const before=bd.length?bd[bd.length-1]:null;
+      const after=ad.length?ad[0]:null;
+      const breakfast=(before&&after)?Math.max(0,(after-before)/60000):null;
+      const lastPick=dates.length?dates[dates.length-1]:null;
+      const lunch=lastPick?Math.max(0,840-minsOfDay(lastPick)):null;
+      const total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;
+      if(total!==null&&isFinite(total)){
+        const effective=Math.max(0,480-total);       // jornada teórica 8:00
+        const shortfall=Math.max(0,405-effective);  // objetivo 6:45
+        records.push({name,total,effective,shortfall});
+      }
+    });
+
+    const totals=records.map(x=>x.total);
     const avg=totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null;
     $('opsAvgDead').textContent=fmtDur(avg);
-    return avg;
-  }catch(e){$('opsAvgDead').textContent='—';return null;}
+    if($('opsAvgDeadDate'))$('opsAvgDeadDate').textContent='Día '+last.iso.split('-').reverse().join('/')+' · TT excluido';
+    if($('opsConnectionDate'))$('opsConnectionDate').textContent='Día '+last.iso.split('-').reverse().join('/')+' · jornada 8:00 · objetivo 6:45';
+
+    const offenders=records.filter(x=>x.shortfall>0).sort((a,b)=>b.shortfall-a.shortfall||a.name.localeCompare(b.name,'es'));
+    if($('opsConnectionBody')){
+      $('opsConnectionBody').innerHTML=offenders.length
+        ? offenders.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td class="num">'+fmtDur(x.total)+'</td><td class="num">'+fmtDur(x.effective)+'</td><td class="num"><span class="opsBadge bad">+'+Math.round(x.shortfall)+' min</span></td></tr>').join('')
+        : '<tr><td colspan="4">Todos los pickers medidos cumplen al menos 6:45 hs de conexión efectiva.</td></tr>';
+    }
+    return {avg,date:last.iso,records,offenders};
+  }catch(e){
+    $('opsAvgDead').textContent='—';
+    if($('opsAvgDeadDate'))$('opsAvgDeadDate').textContent='Sin histórico operativo';
+    if($('opsConnectionBody'))$('opsConnectionBody').innerHTML='<tr><td colspan="4">No se pudo cargar el último día operativo.</td></tr>';
+    return null;
+  }
 }
 async function opsLoadNegations(){
   try{
@@ -5087,7 +5151,7 @@ async function buildOperationalDashboard(force=false){
     }
     refreshOperationalStockKpis();
     const [prep,receipt,process,neg,dead]=await Promise.all([
-      opsLoadPreparation(),opsLoadReceipt(),opsLoadProcess(),opsLoadNegations(),opsLoadYesterdayDead()
+      opsLoadPreparation(),opsLoadReceipt(),opsLoadProcess(),opsLoadNegations(),opsLoadLastOperationalDead()
     ]);
     opsRenderAlerts({prep,receipt,process,neg,dead});
     $('opsDashUpdated').textContent='Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
