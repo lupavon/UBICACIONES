@@ -1141,8 +1141,60 @@ jobs:
                       try: return int(hr[0:2])
                       except Exception: return -1
 
-                  def build_time_rows(source_rows):
+                  def build_time_rows(source_rows, picking_rows=None):
                       result = []
+                      picking_rows = picking_rows or []
+
+                      # Índices de Líneas de Picking para completar Zona cuando Productividad
+                      # la devuelve vacía. Se usa la misma lógica de cruce que Negaciones.
+                      by_exact = {}
+                      by_pick_sku = {}
+                      by_pick_order = {}
+                      by_pick = {}
+
+                      for ln in picking_rows:
+                          pnum = nkey(sval(ln,"NumPicking","Picking","picking"))
+                          order = nkey(sval(ln,"pedido","Pedido","NumPedido"))
+                          skus = {
+                              nkey(sval(ln,"ean","EAN")),
+                              nkey(sval(ln,"product","Product","producto"))
+                          }
+                          skus.discard("")
+                          if pnum:
+                              by_pick.setdefault(pnum, []).append(ln)
+                          if pnum and order:
+                              by_pick_order.setdefault((pnum, order), []).append(ln)
+                          for sk in skus:
+                              if pnum:
+                                  by_pick_sku.setdefault((pnum, sk), []).append(ln)
+                              if pnum and order:
+                                  by_exact.setdefault((pnum, order, sk), []).append(ln)
+
+                      def choose_line(pr):
+                          pnum = nkey(sval(pr,"Picking","picking","NumPicking"))
+                          order = nkey(sval(pr,"NumPedido","pedido","Pedido"))
+                          skus = {
+                              nkey(sval(pr,"ean","EAN")),
+                              nkey(sval(pr,"ref","Ref","Referencia")),
+                              nkey(sval(pr,"barcode","Barcode"))
+                          }
+                          skus.discard("")
+                          for sk in skus:
+                              vals = by_exact.get((pnum, order, sk), [])
+                              if vals:
+                                  return vals[0]
+                          for sk in skus:
+                              vals = by_pick_sku.get((pnum, sk), [])
+                              if vals:
+                                  return vals[0]
+                          vals = by_pick_order.get((pnum, order), [])
+                          if len(vals) == 1:
+                              return vals[0]
+                          vals = by_pick.get(pnum, [])
+                          if len(vals) == 1:
+                              return vals[0]
+                          return None
+
                       for pr in source_rows:
                           # ProductividadPIK ya devuelve una fila por línea trabajada.
                           # Para Tiempos contamos toda línea del proceso Picking, tanto Confirmada como Negada.
@@ -1153,6 +1205,15 @@ jobs:
                           if hh < 6 or hh >= 14:
                               continue
                           state = prod_state(pr) or sval(pr,"EstadoLineaEtsscc","EstadoDeLinea","EstadoLinea","Estado")
+
+                          # Prioridad: ZonaPiso de Productividad. Si viene vacía,
+                          # completar con la línea correspondiente del reporte Líneas de Picking.
+                          zone = sval(pr,"ZonaPiso","zonapiso","Zona","zona")
+                          if not str(zone).strip():
+                              ln = choose_line(pr)
+                              if ln:
+                                  zone = sval(ln,"zonapiso","ZonaPiso","zona","Zona")
+
                           result.append({
                               "Empleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                               "Nombres": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
@@ -1164,12 +1225,12 @@ jobs:
                               "Picking": sval(pr,"Picking","picking","NumPicking"),
                               "Pedido": sval(pr,"NumPedido","Pedido","pedido"),
                               "SKU": sval(pr,"ean","EAN","ref","Ref","barcode","Barcode"),
-                              "Zona": nkey(sval(pr,"ZonaPiso","zonapiso","Zona","zona"))
+                              "Zona": nkey(zone)
                           })
                       return result
 
-                  def make_times_payload(source_rows, query_day, label_day, updated_at):
-                      rows_for_day = build_time_rows(source_rows)
+                  def make_times_payload(source_rows, picking_rows_for_day, query_day, label_day, updated_at):
+                      rows_for_day = build_time_rows(source_rows, picking_rows_for_day)
                       return {
                           "updated_at": updated_at,
                           "fecha": label_day,
@@ -1183,7 +1244,7 @@ jobs:
                       }
 
                   # Día actual.
-                  times_payload = make_times_payload(prod_rows, day, day_label, now_iso)
+                  times_payload = make_times_payload(prod_rows, pick_rows, day, day_label, now_iso)
                   save_json_file(TIMES_FILE, times_payload)
                   TIMES_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
                   history_file = TIMES_HISTORY_DIR / f"{day}.json"
@@ -1191,28 +1252,46 @@ jobs:
                   print("tiempos.json generado · líneas 06-14:", len(times_payload["rows"]))
                   print("Histórico Tiempos guardado:", history_file)
 
-                  # Backfill automático del día anterior cuando el histórico todavía no tiene Zona.
-                  # Esto permite completar archivos creados antes de incorporar ZonaPiso.
-                  yesterday_dt = datetime.now(ar_tz) - timedelta(days=1)
-                  prev_day = yesterday_dt.strftime("%Y%m%d")
-                  prev_label = yesterday_dt.strftime("%d/%m/%Y")
-                  prev_history_file = TIMES_HISTORY_DIR / f"{prev_day}.json"
-                  prev_existing = load_json_file(prev_history_file, {})
-                  prev_rows_existing = prev_existing.get("rows", []) if isinstance(prev_existing, dict) else []
-                  # Reconsultar ayer si falta Zona en alguna fila o si quedó vacía.
-                  # La versión anterior solo detectaba la ausencia de la clave, por eso
-                  # algunos pickers podían conservar Zona="" y aparecer con guion en el dashboard.
-                  needs_prev_backfill = (
-                      not prev_history_file.exists()
-                      or not prev_rows_existing
-                      or any(
-                          isinstance(r, dict)
-                          and not str(r.get("Zona", "")).strip()
-                          for r in prev_rows_existing
-                      )
-                  )
+                  # Histórico robusto para fines de semana.
+                  # Conserva cada día fechado y, además, revisa los 3 días calendario
+                  # anteriores. Solo reconsulta Copérnico si el archivo no existe,
+                  # está incompleto o tiene alguna Zona vacía.
+                  #
+                  # Ejemplo: el lunes se verifican domingo, sábado y viernes.
+                  # Si el sábado ya fue guardado correctamente, NO se vuelve a consultar;
+                  # si faltó o quedó incompleto, se reconstruye automáticamente.
+                  for back_days in (1, 2, 3):
+                      prev_dt = datetime.now(ar_tz) - timedelta(days=back_days)
+                      prev_day = prev_dt.strftime("%Y%m%d")
+                      prev_label = prev_dt.strftime("%d/%m/%Y")
+                      prev_history_file = TIMES_HISTORY_DIR / f"{prev_day}.json"
+                      prev_existing = load_json_file(prev_history_file, {})
 
-                  if needs_prev_backfill:
+                      prev_valid = (
+                          isinstance(prev_existing, dict)
+                          and isinstance(prev_existing.get("rows"), list)
+                      )
+                      prev_rows_existing = prev_existing.get("rows", []) if prev_valid else []
+
+                      # Un día sin actividad es válido si el archivo existe y rows=[].
+                      # Si hubo filas, todas deben conservar Zona para considerar el
+                      # histórico completamente normalizado.
+                      has_blank_zone = any(
+                          not str(r.get("Zona", "")).strip()
+                          for r in prev_rows_existing
+                          if isinstance(r, dict)
+                      )
+                      needs_prev_backfill = (not prev_valid) or has_blank_zone
+
+                      if not needs_prev_backfill:
+                          print(
+                              "Histórico Tiempos OK:",
+                              prev_history_file,
+                              "· líneas:",
+                              len(prev_rows_existing)
+                          )
+                          continue
+
                       try:
                           prev_prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
                               "fecha": prev_day,
@@ -1222,19 +1301,39 @@ jobs:
                               prev_prod_url, jwt=jwt, timeout=180
                           )
                           prev_prod_rows = extract_rows(prev_prod_response)
+
+                          prev_pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({
+                              "fecha": prev_day
+                          })
+                          prev_pick_response, prev_pick_http, _ = request_json(
+                              prev_pick_url, jwt=jwt, timeout=180
+                          )
+                          prev_pick_rows = extract_rows(prev_pick_response)
+
                           prev_payload = make_times_payload(
-                              prev_prod_rows, prev_day, prev_label, now_iso
+                              prev_prod_rows,
+                              prev_pick_rows,
+                              prev_day,
+                              prev_label,
+                              now_iso
                           )
                           save_json_file(prev_history_file, prev_payload)
                           print(
-                              "Backfill Tiempos día anterior:", prev_history_file,
-                              "· HTTP:", prev_prod_http,
-                              "· líneas:", len(prev_payload["rows"])
+                              "Backfill Tiempos:",
+                              prev_history_file,
+                              "· HTTP Productividad:",
+                              prev_prod_http,
+                              "· HTTP Líneas Picking:",
+                              prev_pick_http,
+                              "· líneas:",
+                              len(prev_payload["rows"])
                           )
                       except Exception as e:
                           print(
-                              "AVISO: no se pudo completar el histórico del día anterior; "
-                              "se conserva el archivo existente:", str(e)
+                              "AVISO: no se pudo completar histórico",
+                              prev_day,
+                              "; se conserva el archivo existente:",
+                              str(e)
                           )
               except Exception as e:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
