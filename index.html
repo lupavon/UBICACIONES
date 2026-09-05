@@ -2188,6 +2188,32 @@ body.heatSplit .layoutHeatGrid{
     </div>
   </div>
 
+
+  <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead">
+      <div>
+        <b>Cumplimiento de conexión efectiva</b>
+        <small>Jornada teórica 8:00 hs · objetivo mínimo 6:45 hs</small>
+      </div>
+      <small id="timeConnectionSummary">Calculando…</small>
+    </div>
+    <div class="receiptSupplierWrap" style="overflow:auto">
+      <table class="receiptSupplierTable">
+        <thead>
+          <tr>
+            <th>Picker</th>
+            <th>Tiempo muerto total</th>
+            <th>Conexión efectiva</th>
+            <th>Desvío vs 6:45</th>
+          </tr>
+        </thead>
+        <tbody id="timeConnectionBody">
+          <tr><td colspan="4">Calculando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="timeSearch" placeholder="Buscar picker..."/>
     <button class="btn" id="timeRefreshBtn">↻ Actualizar</button>
@@ -4908,6 +4934,38 @@ function renderTimes(){
   const avgDead=validTotals.length?validTotals.reduce((a,b)=>a+b,0)/validTotals.length:null;
   if($('timeAvgDead'))$('timeAvgDead').textContent=fmtDur(avgDead);
   if($('timeAvgDeadSub'))$('timeAvgDeadSub').textContent=validTotals.length?('promedio de '+validTotals.length+' pickers · TT excluido'):'sin pickers con jornada completa';
+  // Cumplimiento de conexión efectiva:
+  // jornada teórica 8:00 hs = 480 min
+  // objetivo mínimo = 6:45 hs = 405 min
+  // conexión efectiva = 480 - tiempo muerto total
+  // se muestran solo quienes NO llegan a 405 min.
+  const connectionRows=deadRows
+    .filter(x=>x.total!==null&&isFinite(x.total))
+    .map(x=>{
+      const effective=Math.max(0,480-x.total);
+      const shortfall=Math.max(0,405-effective);
+      return {name:x.p.name,total:x.total,effective,shortfall};
+    })
+    .filter(x=>x.shortfall>0)
+    .sort((a,b)=>b.shortfall-a.shortfall||a.name.localeCompare(b.name,'es'));
+
+  if($('timeConnectionSummary')){
+    $('timeConnectionSummary').textContent=connectionRows.length
+      ? connectionRows.length+' pickers por debajo de 6:45 hs'
+      : 'Todos cumplen 6:45 hs';
+  }
+  if($('timeConnectionBody')){
+    $('timeConnectionBody').innerHTML=connectionRows.length
+      ? connectionRows.map(x=>
+          '<tr>'+
+            '<td><b>'+esc(x.name)+'</b></td>'+
+            '<td><b>'+fmtDur(x.total)+'</b></td>'+
+            '<td><b>'+fmtDur(x.effective)+'</b></td>'+
+            '<td><b style="color:#ff7b86">+'+Math.round(x.shortfall)+' min</b></td>'+
+          '</tr>'
+        ).join('')
+      : '<tr><td colspan="4">Todos los pickers medidos cumplen al menos 6:45 hs de conexión efectiva.</td></tr>';
+  }
   $('timeDeadBody').innerHTML=deadRows.map(x=>{const{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total}=x;const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;return '<tr><td><b>'+esc(p.name)+'</b></td><td>06:00</td><td>'+fmtClock(first)+'</td>'+tmCell(startDead)+'<td>'+fmtClock(beforeBreakfast)+'</td><td>'+fmtClock(afterBreakfast)+'</td>'+tmCell(breakfast)+'<td>'+fmtClock(beforeLunch)+'</td><td>14:00</td>'+tmCell(lunch)+`<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td></tr>`;}).join('');
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
