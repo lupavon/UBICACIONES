@@ -55,6 +55,7 @@ jobs:
           TRACE_FILE = Path("trazabilidad-cajas.json")
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
+          NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
 
@@ -1114,6 +1115,132 @@ jobs:
                   print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("negaciones.json generado correctamente")
 
+                  # NEGACIONES HISTÓRICAS
+                  # Conserva una foto por fecha para poder consultar días anteriores.
+                  NEGATIONS_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+                  neg_history_file = NEGATIONS_HISTORY_DIR / f"{day}.json"
+                  save_json_file(neg_history_file, neg_payload)
+                  print("Histórico Negaciones guardado:", neg_history_file)
+
+                  def make_neg_payload_for_day(source_prod, source_pick, query_day, label_day, updated_at, prod_status=200, pick_status=200):
+                      # Índices propios del día histórico.
+                      by_exact = {}
+                      by_pick_sku = {}
+                      by_pick_order = {}
+                      by_pick = {}
+
+                      for ln2 in source_pick:
+                          pnum2 = nkey(sval(ln2,"NumPicking","Picking","picking"))
+                          order2 = nkey(sval(ln2,"pedido","Pedido","NumPedido"))
+                          if not pnum2:
+                              continue
+                          by_pick.setdefault(pnum2, []).append(ln2)
+                          if order2:
+                              by_pick_order.setdefault((pnum2,order2), []).append(ln2)
+                          for sk2 in sku_keys(ln2,"pick"):
+                              by_pick_sku.setdefault((pnum2,sk2), []).append(ln2)
+                              if order2:
+                                  by_exact.setdefault((pnum2,order2,sk2), []).append(ln2)
+
+                      def choose2(pr2):
+                          pnum2 = nkey(sval(pr2,"Picking","picking","NumPicking"))
+                          order2 = nkey(sval(pr2,"NumPedido","pedido","Pedido"))
+                          sks2 = sku_keys(pr2,"prod")
+                          for sk2 in sks2:
+                              vals2 = by_exact.get((pnum2,order2,sk2), [])
+                              if vals2: return vals2[0], "Picking+Pedido+SKU"
+                          for sk2 in sks2:
+                              vals2 = by_pick_sku.get((pnum2,sk2), [])
+                              if vals2: return vals2[0], "Picking+SKU"
+                          vals2 = by_pick_order.get((pnum2,order2), [])
+                          if len(vals2) == 1: return vals2[0], "Picking+Pedido"
+                          vals2 = by_pick.get(pnum2, [])
+                          if len(vals2) == 1: return vals2[0], "Picking"
+                          return None, "Sin cruce"
+
+                      neg_prod2 = [pr2 for pr2 in source_prod if productivity_is_negated(pr2)]
+                      neg_rows2 = []
+                      for pr2 in neg_prod2:
+                          ln2, match2 = choose2(pr2)
+                          sku2 = (sval(ln2,"ean","EAN") if ln2 else "") or (sval(ln2,"product","Product","producto") if ln2 else "") or sval(pr2,"ean","EAN") or sval(pr2,"ref","Ref","Referencia")
+                          zone2 = (sval(ln2,"zonapiso","ZonaPiso","zona","Zona") if ln2 else "") or sval(pr2,"ZonaPiso","zonapiso","Zona","zona")
+                          qty2 = field(ln2,"Cant","cant","Cantidad","cantidad") if ln2 else None
+                          if qty2 in (None, ""):
+                              qty2 = field(pr2,"Cantidad","cantidad","Unidades","unidades") or 0
+                          neg_rows2.append({
+                              "Hora": sval(pr2,"fecharegistro","FechaRegistro") or sval(pr2,"hora","Hora") or (sval(ln2,"hora","Hora") if ln2 else ""),
+                              "Pedido": (sval(ln2,"pedido","Pedido","NumPedido") if ln2 else "") or sval(pr2,"NumPedido","pedido","Pedido"),
+                              "Picking": sval(pr2,"Picking","picking","NumPicking") or (sval(ln2,"NumPicking","Picking","picking") if ln2 else ""),
+                              "SKU": sku2,
+                              "EAN": (sval(ln2,"ean","EAN") if ln2 else "") or sval(pr2,"ean","EAN"),
+                              "Producto": (sval(ln2,"product","Product") if ln2 else "") or sval(pr2,"ref","Ref","Referencia"),
+                              "Descripcion": sval(pr2,"Descripcion","descripcion","Descripción") or (sval(ln2,"descripcion","Descripcion","Descripción") if ln2 else ""),
+                              "CantidadNegada": qty2,
+                              "Unidad": (sval(ln2,"unidad","Unidad") if ln2 else "") or "UN",
+                              "Ubicacion": sval(ln2,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion") if ln2 else "",
+                              "Zona": nkey(zone2),
+                              "EstadoDeLinea": "Negada",
+                              "Proceso": (sval(ln2,"Proceso","proceso","TipoProceso","tipoProceso") if ln2 else "") or sval(pr2,"Proceso","proceso","TipoProceso","tipoProceso"),
+                              "Picker": sval(pr2,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
+                              "IdEmpleado": sval(pr2,"Empleado","empleado","IdEmpleado","idEmpleado"),
+                              "Caja": sval(pr2,"Caja","caja"),
+                              "FechaRegistro": sval(pr2,"fecharegistro","FechaRegistro"),
+                              "Cruce": match2
+                          })
+
+                      matched2 = sum(1 for rr in neg_rows2 if rr.get("Cruce") != "Sin cruce")
+                      return {
+                          "updated_at": updated_at,
+                          "fecha": label_day,
+                          "fecha_query": query_day,
+                          "source": "Copernico ProductividadPIK · Negada + Líneas de Picking para enriquecimiento",
+                          "productividad_http": prod_status,
+                          "lineas_picking_http": pick_status,
+                          "productividad_count": len(source_prod),
+                          "lineas_picking_count": len(source_pick),
+                          "negaciones_count": len(neg_rows2),
+                          "matched_count": matched2,
+                          "rows": neg_rows2
+                      }
+
+                  # Primera ejecución: reconstruye automáticamente los últimos 7 días
+                  # si todavía no existe el archivo histórico. Luego cada día queda persistido.
+                  for neg_back_days in range(1, 8):
+                      prev_dt_neg = datetime.now(ar_tz) - timedelta(days=neg_back_days)
+                      prev_day_neg = prev_dt_neg.strftime("%Y%m%d")
+                      prev_label_neg = prev_dt_neg.strftime("%d/%m/%Y")
+                      prev_file_neg = NEGATIONS_HISTORY_DIR / f"{prev_day_neg}.json"
+
+                      if prev_file_neg.exists():
+                          continue
+
+                      try:
+                          prev_prod_url_neg = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
+                              "fecha": prev_day_neg,
+                              "tipo_productividad": "ProductividadPIK"
+                          })
+                          prev_pick_url_neg = PICKING_LINES_URL + "?" + urllib.parse.urlencode({
+                              "fecha": prev_day_neg
+                          })
+                          prev_prod_resp_neg, prev_prod_http_neg, _ = request_json(prev_prod_url_neg, jwt=jwt, timeout=180)
+                          prev_pick_resp_neg, prev_pick_http_neg, _ = request_json(prev_pick_url_neg, jwt=jwt, timeout=180)
+                          prev_prod_rows_neg = extract_rows(prev_prod_resp_neg)
+                          prev_pick_rows_neg = extract_rows(prev_pick_resp_neg)
+
+                          prev_payload_neg = make_neg_payload_for_day(
+                              prev_prod_rows_neg,
+                              prev_pick_rows_neg,
+                              prev_day_neg,
+                              prev_label_neg,
+                              now_iso,
+                              prev_prod_http_neg,
+                              prev_pick_http_neg
+                          )
+                          save_json_file(prev_file_neg, prev_payload_neg)
+                          print("Backfill Negaciones:", prev_file_neg, "· negaciones:", len(prev_payload_neg["rows"]))
+                      except Exception as e:
+                          print("AVISO: no se pudo completar histórico de Negaciones", prev_day_neg, ":", str(e))
+
                   # TIEMPOS · Turno mañana 06:00-14:00 · solo Picking.
                   # Una línea procesada cuenta tanto si terminó Confirmada como Negada.
                   def prod_state(pr):
@@ -2098,6 +2225,7 @@ jobs:
 
           mkdir -p /tmp/ubicaciones-sync
           mkdir -p /tmp/ubicaciones-sync/datos/tiempos
+          mkdir -p /tmp/ubicaciones-sync/datos/negaciones
 
           for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
@@ -2107,6 +2235,10 @@ jobs:
 
           if [ -d "datos/tiempos" ]; then
             cp -a datos/tiempos/. /tmp/ubicaciones-sync/datos/tiempos/
+          fi
+
+          if [ -d "datos/negaciones" ]; then
+            cp -a datos/negaciones/. /tmp/ubicaciones-sync/datos/negaciones/
           fi
 
           git fetch origin main
@@ -2123,7 +2255,12 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/tiempos/. datos/tiempos/
           fi
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json datos/tiempos trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          if [ -d "/tmp/ubicaciones-sync/datos/negaciones" ]; then
+            mkdir -p datos/negaciones
+            cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
+          fi
+
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
