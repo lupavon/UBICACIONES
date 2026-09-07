@@ -2165,7 +2165,10 @@ body.heatSplit .layoutHeatGrid{
   <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead">
       <div><b>Control de tiempos</b><small>Arranque, desayuno y cierre previo al almuerzo</small></div>
-      <small>Ingreso 06:00 · Salida 14:00</small>
+      <div style="display:flex;align-items:center;gap:8px">
+        <small>Ingreso 06:00 · Salida 14:00</small>
+        <button class="btn" id="timeExportXlsBtn" type="button">⬇ Exportar XLS</button>
+      </div>
     </div>
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
@@ -2185,32 +2188,6 @@ body.heatSplit .layoutHeatGrid{
         <tbody id="timeDeadBody"></tbody>
       </table>
       <div id="timeEmpty" class="receiptSupplierEmpty" style="display:none">Todavía no hay líneas de Picking entre las 06:00 y las 14:00.</div>
-    </div>
-  </div>
-
-
-  <div class="receiptSupplierCard" style="margin-top:14px">
-    <div class="receiptSupplierHead">
-      <div>
-        <b>Cumplimiento de conexión efectiva</b>
-        <small>Jornada teórica 8:00 hs · objetivo mínimo 6:45 hs</small>
-      </div>
-      <small id="timeConnectionSummary">Calculando…</small>
-    </div>
-    <div class="receiptSupplierWrap" style="overflow:auto">
-      <table class="receiptSupplierTable">
-        <thead>
-          <tr>
-            <th>Picker</th>
-            <th>Tiempo muerto total</th>
-            <th>Conexión efectiva</th>
-            <th>Desvío vs 6:45</th>
-          </tr>
-        </thead>
-        <tbody id="timeConnectionBody">
-          <tr><td colspan="4">Calculando…</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 
@@ -4934,40 +4911,70 @@ function renderTimes(){
   const avgDead=validTotals.length?validTotals.reduce((a,b)=>a+b,0)/validTotals.length:null;
   if($('timeAvgDead'))$('timeAvgDead').textContent=fmtDur(avgDead);
   if($('timeAvgDeadSub'))$('timeAvgDeadSub').textContent=validTotals.length?('promedio de '+validTotals.length+' pickers · TT excluido'):'sin pickers con jornada completa';
-  // Cumplimiento de conexión efectiva:
-  // jornada teórica 8:00 hs = 480 min
-  // objetivo mínimo = 6:45 hs = 405 min
-  // conexión efectiva = 480 - tiempo muerto total
-  // se muestran solo quienes NO llegan a 405 min.
-  const connectionRows=deadRows
-    .filter(x=>x.total!==null&&isFinite(x.total))
-    .map(x=>{
-      const effective=Math.max(0,480-x.total);
-      const shortfall=Math.max(0,405-effective);
-      return {name:x.p.name,total:x.total,effective,shortfall};
-    })
-    .filter(x=>x.shortfall>0)
-    .sort((a,b)=>b.shortfall-a.shortfall||a.name.localeCompare(b.name,'es'));
-
-  if($('timeConnectionSummary')){
-    $('timeConnectionSummary').textContent=connectionRows.length
-      ? connectionRows.length+' pickers por debajo de 6:45 hs'
-      : 'Todos cumplen 6:45 hs';
-  }
-  if($('timeConnectionBody')){
-    $('timeConnectionBody').innerHTML=connectionRows.length
-      ? connectionRows.map(x=>
-          '<tr>'+
-            '<td><b>'+esc(x.name)+'</b></td>'+
-            '<td><b>'+fmtDur(x.total)+'</b></td>'+
-            '<td><b>'+fmtDur(x.effective)+'</b></td>'+
-            '<td><b style="color:#ff7b86">+'+Math.round(x.shortfall)+' min</b></td>'+
-          '</tr>'
-        ).join('')
-      : '<tr><td colspan="4">Todos los pickers medidos cumplen al menos 6:45 hs de conexión efectiva.</td></tr>';
-  }
   $('timeDeadBody').innerHTML=deadRows.map(x=>{const{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total}=x;const tmCell=v=>`<td style="background:rgba(255,210,0,.14);font-weight:800">${fmtDur(v)}</td>`;return '<tr><td><b>'+esc(p.name)+'</b></td><td>06:00</td><td>'+fmtClock(first)+'</td>'+tmCell(startDead)+'<td>'+fmtClock(beforeBreakfast)+'</td><td>'+fmtClock(afterBreakfast)+'</td>'+tmCell(breakfast)+'<td>'+fmtClock(beforeLunch)+'</td><td>14:00</td>'+tmCell(lunch)+`<td style="background:rgba(255,210,0,.20);font-weight:900">${fmtDur(total)}</td></tr>`;}).join('');
   $('timeEmpty').style.display=pickers.length?'none':'block';
+}
+
+
+function exportTimeControlXls(){
+  try{
+    if(typeof XLSX==='undefined')throw new Error('No se pudo cargar el exportador Excel.');
+
+    const rows=timeFiltered(),by={};
+    rows.forEach(r=>{
+      const name=String(r.Nombres||r.Empleado||'Sin nombre').trim();
+      if(!by[name])by[name]={name,rows:[]};
+      by[name].rows.push(r);
+    });
+
+    const data=Object.values(by).map(p=>{
+      const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b);
+      const first=dates[0]||null;
+      const startDead=first?Math.max(0,minsOfDay(first)-360):null;
+      const bd=dates.filter(d=>minsOfDay(d)<=470);
+      const ad=dates.filter(d=>minsOfDay(d)>=480);
+      const beforeBreakfast=bd.length?bd[bd.length-1]:null;
+      const afterBreakfast=ad.length?ad[0]:null;
+      const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;
+      const beforeLunch=dates.length?dates[dates.length-1]:null;
+      const lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null;
+      const total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;
+
+      return {
+        'Picker': p.name,
+        'Hora ingreso': '06:00',
+        'Hora inicio': fmtClock(first),
+        'TM arranque': fmtDur(startDead),
+        'Antes del desayuno': fmtClock(beforeBreakfast),
+        'Después del desayuno': fmtClock(afterBreakfast),
+        'TM desayuno': fmtDur(breakfast),
+        'Antes del almuerzo': fmtClock(beforeLunch),
+        'Hora salida': '14:00',
+        'TM almuerzo': fmtDur(lunch),
+        'Tiempo muerto total': fmtDur(total)
+      };
+    }).sort((a,b)=>String(a.Picker).localeCompare(String(b.Picker),'es'));
+
+    if(!data.length){
+      alert('No hay datos de Tiempos para exportar.');
+      return;
+    }
+
+    const ws=XLSX.utils.json_to_sheet(data);
+    ws['!cols']=[
+      {wch:24},{wch:13},{wch:13},{wch:14},{wch:20},{wch:21},
+      {wch:15},{wch:20},{wch:13},{wch:14},{wch:20}
+    ];
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Control de tiempos');
+
+    const selected=$('timeDateFilter')?.value||TIME_SELECTED_DATE||'';
+    const safeDate=selected?selected.replace(/-/g,''):'hoy';
+    XLSX.writeFile(wb,'Control_Tiempos_'+safeDate+'.xls',{bookType:'xls'});
+  }catch(e){
+    alert('No se pudo exportar el XLS: '+(e.message||e));
+  }
 }
 
 function timeLocalISO(d){
@@ -5225,6 +5232,7 @@ $('timeSearch').oninput=()=>renderTimes();
 document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeHourSort;if(TIME_HOURLY_SORT.key===k)TIME_HOURLY_SORT.dir*=-1;else TIME_HOURLY_SORT={key:k,dir:1};renderTimes();};});
 document.querySelectorAll('[data-time-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeSort;if(TIME_DEAD_SORT.key===k)TIME_DEAD_SORT.dir*=-1;else TIME_DEAD_SORT={key:k,dir:1};renderTimes();};});
 $('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
+$('timeExportXlsBtn').onclick=()=>exportTimeControlXls();
 $('timeDateFilter').onchange=()=>{TIME_LOADED=false;buildTimesPanel(true);};
 $('timePrevDay').onclick=()=>timeShiftDate(-1);
 $('timeNextDay').onclick=()=>timeShiftDate(1);
