@@ -2081,8 +2081,22 @@ body.heatSplit .layoutHeatGrid{
 </div>
 </div>
 <div id="negationsView" style="display:none">
-  <div class="layoutHeatTitle">Negaciones</div>
-  <div class="layoutHeatSubtitle">Todas las negaciones detectadas directamente en <b>Productividad</b> del día. Se cruzan con Líneas de Picking para completar zona, ubicación y datos del pedido. Podés filtrar por zona, incluida <b>RC</b>.</div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="layoutHeatTitle">Negaciones</div>
+      <div class="layoutHeatSubtitle">Histórico de negaciones detectadas en <b>Productividad</b>. Se cruzan con Líneas de Picking para completar zona, ubicación y datos del pedido.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn" id="negPrevDay" type="button">←</button>
+      <div>
+        <small style="display:block;color:#8d98a5;font-size:9px;margin-bottom:2px">Fecha analizada</small>
+        <input id="negDateFilter" type="date" class="select" style="min-width:142px"/>
+      </div>
+      <button class="btn" id="negNextDay" type="button">→</button>
+      <button class="btn" id="negYesterdayBtn" type="button">Ayer</button>
+      <button class="btn" id="negTodayBtn" type="button">Hoy</button>
+    </div>
+  </div>
   <div class="processKpis">
     <div class="processKpi"><small>NEGACIONES</small><b id="negCount">0</b><span>líneas negadas</span></div>
     <div class="processKpi"><small>UNIDADES</small><b id="negUnits">0</b><span>cantidad negada</span></div>
@@ -4672,6 +4686,7 @@ if($('receiptAgeFilter'))$('receiptAgeFilter').value='exclude_today';
 // ===== NEGACIONES · Productividad + Líneas de Picking =====
 let NEG_ROWS=[];
 let NEG_LOADED=false;
+let NEG_SELECTED_DATE='';
 let NEG_SORT={key:'hora',dir:-1};
 function negVal(r,k){
   const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso'],proceso:['Proceso','proceso','TipoProceso','tipoProceso']};
@@ -4766,8 +4781,8 @@ function exportNegationsXls(){
     XLSX.utils.book_append_sheet(wb,ws,'Negaciones');
     const zoneRaw=String($('negZoneFilter')?.value||'').trim();
     const zoneLabel=(!zoneRaw || zoneRaw==='__ALL__')?'Todas':zoneRaw;
-    const d=new Date();
-    const date=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    const selected=$('negDateFilter')?.value||NEG_SELECTED_DATE||negTodayISO();
+    const date=selected.replace(/-/g,'');
     const safeZone=zoneLabel.replace(/[^a-zA-Z0-9_-]+/g,'_');
     const process=String($('negProcessFilter')?.value||'PICKING').trim();
     const processLabel=process==='__ALL__'?'Todos':process;
@@ -4778,37 +4793,90 @@ function exportNegationsXls(){
   }
 }
 
+
+function negLocalISO(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
+function negTodayISO(){return negLocalISO(new Date());}
+function negYesterdayISO(){const d=new Date();d.setDate(d.getDate()-1);return negLocalISO(d);}
+function negFileForDate(iso){return './datos/negaciones/'+String(iso||'').replace(/-/g,'')+'.json';}
+function negShiftDate(days){
+  const el=$('negDateFilter');
+  const raw=el?.value||NEG_SELECTED_DATE||negTodayISO();
+  const [y,m,d]=raw.split('-').map(Number);
+  const dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+days);
+  el.value=negLocalISO(dt);
+  NEG_LOADED=false;
+  buildNegationsPanel(true);
+}
+
 async function buildNegationsPanel(force=false){
-  if(NEG_LOADED&&!force){renderNegations();return;}
-  const st=$('negStatus');if(st)st.textContent='Cargando negaciones del día…';
+  const dateEl=$('negDateFilter');
+  if(dateEl && !dateEl.value)dateEl.value=NEG_SELECTED_DATE||negTodayISO();
+  const selected=dateEl?.value||NEG_SELECTED_DATE||negTodayISO();
+
+  if(NEG_LOADED&&!force&&NEG_SELECTED_DATE===selected){renderNegations();return;}
+  const st=$('negStatus');
+  if(st)st.textContent='Cargando negaciones del '+selected.split('-').reverse().join('/')+'…';
+
   try{
-    const res=await fetch('./negaciones.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}});
-    if(!res.ok)throw new Error('negaciones.json HTTP '+res.status);
+    let res=await fetch(negFileForDate(selected)+'?v='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}
+    });
+
+    // Compatibilidad con el archivo actual mientras se publica el histórico del día.
+    if(!res.ok && selected===negTodayISO()){
+      res=await fetch('./negaciones.json?v='+Date.now(),{
+        cache:'no-store',
+        headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}
+      });
+    }
+    if(!res.ok){
+      if(res.status===404)throw new Error('Todavía no hay histórico guardado para esta fecha');
+      throw new Error('HTTP '+res.status);
+    }
+
     const payload=await res.json();
     NEG_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
     NEG_LOADED=true;
+    NEG_SELECTED_DATE=selected;
+
     const zoneSel=$('negZoneFilter');
     if(zoneSel){
       const current=zoneSel.value||'__ALL__';
-      const zones=[...new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'}));
-      zoneSel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+zones.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
-      if(current==='__ALL__' || !zones.includes(current)) zoneSel.value='__ALL__';
+      const zones=[...new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'}));
+      zoneSel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+
+        zones.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
+      if(current==='__ALL__' || !zones.includes(current))zoneSel.value='__ALL__';
       else zoneSel.value=current;
     }
-    const when=payload?.updated_at||payload?.fecha||'';
-    if($('negUpdated'))$('negUpdated').textContent=payload?.fecha?('Día '+payload.fecha):'';
+
+    if($('negUpdated'))$('negUpdated').textContent=payload?.fecha
+      ?('Día '+payload.fecha)
+      :('Día '+selected.split('-').reverse().join('/'));
+
     const zoneCount=new Set(NEG_ROWS.map(r=>String(negVal(r,'zona')||'').trim()).filter(Boolean)).size;
-    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+(payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'');}
+    if(st){
+      st.className='processStatus';
+      st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
+        (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
+        ' · histórico '+selected.split('-').reverse().join('/');
+    }
     renderNegations();
   }catch(err){
     console.error('Negaciones',err);
-    // No borrar datos ya descargados por un error puramente visual.
-    if(!Array.isArray(NEG_ROWS) || !NEG_ROWS.length){NEG_ROWS=[];NEG_LOADED=false;}
+    NEG_ROWS=[];NEG_LOADED=false;NEG_SELECTED_DATE=selected;
     try{renderNegations();}catch(renderErr){console.error('Render Negaciones',renderErr);}
-    if(st){st.className='processStatus bad';st.textContent='No se pudo mostrar Negaciones: '+String(err.message||err);}
+    if($('negUpdated'))$('negUpdated').textContent='Día '+selected.split('-').reverse().join('/');
+    if(st){
+      st.className='processStatus bad';
+      st.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);
+    }
   }
 }
-
 
 // ===== TIEMPOS · Productividad Picking · Turno mañana =====
 let TIME_ROWS=[];
@@ -5238,6 +5306,11 @@ $('timePrevDay').onclick=()=>timeShiftDate(-1);
 $('timeNextDay').onclick=()=>timeShiftDate(1);
 $('timeYesterdayBtn').onclick=()=>{$('timeDateFilter').value=timeYesterdayISO();TIME_LOADED=false;buildTimesPanel(true);};
 $('timeTodayBtn').onclick=()=>{$('timeDateFilter').value=timeTodayISO();TIME_LOADED=false;buildTimesPanel(true);};
+$('negDateFilter').onchange=()=>{NEG_LOADED=false;buildNegationsPanel(true);};
+$('negPrevDay').onclick=()=>negShiftDate(-1);
+$('negNextDay').onclick=()=>negShiftDate(1);
+$('negYesterdayBtn').onclick=()=>{$('negDateFilter').value=negYesterdayISO();NEG_LOADED=false;buildNegationsPanel(true);};
+$('negTodayBtn').onclick=()=>{$('negDateFilter').value=negTodayISO();NEG_LOADED=false;buildNegationsPanel(true);};
 $('negSearch').oninput=()=>renderNegations();
 $('negProcessFilter').onchange=()=>renderNegations();
 $('negZoneFilter').onchange=()=>renderNegations();
@@ -5578,6 +5651,7 @@ window.editAuthUser=(username)=>openUserModal((window.__AUTH_USERS||[]).find(u=>
 window.disconnectAuthUser=async(username)=>{if(username==='lpavon'&&!confirm('¿Desconectar tus otras sesiones?'))return;else if(username!=='lpavon'&&!confirm('¿Desconectar todas las sesiones de '+username+'?'))return;const r=await authFetch('/admin/users/'+encodeURIComponent(username)+'/disconnect',{method:'POST'});if(!r.ok){alert('No se pudo desconectar');return}loadUsers();loadSessions()};
 document.getElementById('newUserBtn').onclick=()=>openUserModal();document.getElementById('cancelUserBtn').onclick=()=>document.getElementById('userModal').classList.remove('open');
 document.getElementById('userForm').addEventListener('submit',async e=>{e.preventDefault();const orig=document.getElementById('editOriginalUser').value;const payload={username:document.getElementById('editUsername').value.trim().toLowerCase(),name:document.getElementById('editName').value.trim(),role:document.getElementById('editRole').value,password:document.getElementById('editPassword').value,active:document.getElementById('editActive').checked};if(orig==='lpavon'){payload.role='administrador';payload.active=true}const path=orig?'/admin/users/'+encodeURIComponent(orig):'/admin/users';const r=await authFetch(path,{method:orig?'PUT':'POST',body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok){document.getElementById('userFormError').textContent=d.error||'No se pudo guardar';return}document.getElementById('userModal').classList.remove('open');loadUsers();loadSessions()});
+if($('negDateFilter'))$('negDateFilter').value=negTodayISO();
 setDisplayMode('dashboard');
 authBoot();
 
