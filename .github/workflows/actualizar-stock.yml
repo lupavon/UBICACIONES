@@ -1084,6 +1084,7 @@ jobs:
                               "Pickings": set(),
                               "Zonas": set(),
                               "ProductosProcesados": {},
+                              "PendientesPorZona": {},
                               "UltimaLineaEpoch": 0
                           }
                       g = progress_groups[key_prog]
@@ -1099,6 +1100,9 @@ jobs:
                           prod_prog = nkey(sval(ln_prog,"product","Product","producto","Producto","ean","EAN"))
                           if prod_prog:
                               g["ProductosProcesados"][prod_prog] = g["ProductosProcesados"].get(prod_prog,0) + 1
+                      if st_prog == "Pendiente":
+                          zone_pending = nkey(zone_prog) or "SIN ZONA"
+                          g["PendientesPorZona"][zone_pending] = g["PendientesPorZona"].get(zone_pending,0) + 1
                       if pk_prog:
                           g["Pickings"].add(pk_prog)
                       if zone_prog:
@@ -1146,6 +1150,7 @@ jobs:
                           "Pickings": sorted(g["Pickings"]),
                           "Zonas": sorted(g["Zonas"]),
                           "ProductosProcesados": g.get("ProductosProcesados", {}),
+                          "PendientesPorZona": g.get("PendientesPorZona", {}),
                           "UltimaLineaEpoch": g.get("UltimaLineaEpoch", 0)
                       })
 
