@@ -55,6 +55,7 @@ jobs:
           TRACE_FILE = Path("trazabilidad-cajas.json")
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
+          ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
@@ -1008,6 +1009,113 @@ jobs:
                       else:
                           vals = [sval(row,"ean","EAN"), sval(row,"product","Product","producto","Producto")]
                       return [nkey(x) for x in vals if nkey(x)]
+
+
+                  # AVANCE DE PEDIDOS EN TIEMPO REAL
+                  # Fuente: Líneas de Picking del día. Se agrupa por Pedido + área operativa.
+                  def progress_area(zone):
+                      z = nkey(zone).replace(" ", "")
+                      if z in ("AR","BR") or z.startswith("MFCA") or z.startswith("MFCB") or z.startswith("MFCC"):
+                          return "Unitarios secos"
+                      if z.startswith("MFCD") or z.startswith("MFCE") or z.startswith("MFCF") or z.startswith("MFCG"):
+                          return "Unitarios químicos"
+                      if z in ("AL","BL","CL","CR","DL","DR","EL","ER","FL","FR","GL","GR","HL","HR"):
+                          return "Masterbox"
+                      if z.startswith("REF") or z.startswith("RMFC"):
+                          return "Refrigerados"
+                      if z.startswith("CON") or z.startswith("CMFC") or z.startswith("CMC"):
+                          return "Congelados"
+                      if z.startswith("CIG") or z.startswith("CSG"):
+                          return "Cigarrillos"
+                      if z in ("PM","PML","PMR") or z.startswith("PM"):
+                          return "PM"
+                      return "Otras"
+
+                  def progress_state(row):
+                      raw = nkey(sval(row,"EstadoDeLinea","estadoDeLinea","EstadoLinea","estadolinea","Estado","estado"))
+                      if "NEGAD" in raw:
+                          return "Negada"
+                      if "CONFIRM" in raw:
+                          return "Confirmada"
+                      return "Pendiente"
+
+                  progress_groups = {}
+                  for ln_prog in pick_rows:
+                      pedido_prog = sval(ln_prog,"pedido","Pedido","NumPedido")
+                      if not pedido_prog:
+                          continue
+                      zone_prog = sval(ln_prog,"zonapiso","ZonaPiso","zona","Zona")
+                      area_prog = progress_area(zone_prog)
+                      key_prog = (pedido_prog, area_prog)
+                      if key_prog not in progress_groups:
+                          progress_groups[key_prog] = {
+                              "Pedido": pedido_prog,
+                              "Area": area_prog,
+                              "TotalLineas": 0,
+                              "Confirmadas": 0,
+                              "Negadas": 0,
+                              "Pendientes": 0,
+                              "Pickings": set(),
+                              "Zonas": set()
+                          }
+                      g = progress_groups[key_prog]
+                      g["TotalLineas"] += 1
+                      st_prog = progress_state(ln_prog)
+                      if st_prog == "Confirmada": g["Confirmadas"] += 1
+                      elif st_prog == "Negada": g["Negadas"] += 1
+                      else: g["Pendientes"] += 1
+                      pk_prog = sval(ln_prog,"NumPicking","Picking","picking")
+                      if pk_prog: g["Pickings"].add(pk_prog)
+                      if zone_prog: g["Zonas"].add(nkey(zone_prog))
+
+                  progress_rows = []
+                  for g in progress_groups.values():
+                      done = g["Confirmadas"] + g["Negadas"]
+                      total = g["TotalLineas"]
+                      progress_rows.append({
+                          "Pedido": g["Pedido"],
+                          "Area": g["Area"],
+                          "TotalLineas": total,
+                          "Procesadas": done,
+                          "Confirmadas": g["Confirmadas"],
+                          "Negadas": g["Negadas"],
+                          "Pendientes": g["Pendientes"],
+                          "Avance": round((done / total * 100.0) if total else 0, 1),
+                          "Pickings": sorted(g["Pickings"]),
+                          "Zonas": sorted(g["Zonas"])
+                      })
+
+                  area_order = ["Masterbox","Refrigerados","Congelados","Cigarrillos","Unitarios secos","Unitarios químicos","PM","Otras"]
+                  progress_rows.sort(key=lambda r: (area_order.index(r["Area"]) if r["Area"] in area_order else 99, -r["Pendientes"], r["Pedido"]))
+
+                  area_summary = []
+                  for area in area_order:
+                      rr = [x for x in progress_rows if x["Area"] == area]
+                      if not rr:
+                          continue
+                      total_l = sum(x["TotalLineas"] for x in rr)
+                      done_l = sum(x["Procesadas"] for x in rr)
+                      area_summary.append({
+                          "Area": area,
+                          "Pedidos": len(rr),
+                          "PedidosCompletos": sum(1 for x in rr if x["Pendientes"] == 0),
+                          "TotalLineas": total_l,
+                          "Procesadas": done_l,
+                          "Pendientes": sum(x["Pendientes"] for x in rr),
+                          "Avance": round((done_l / total_l * 100.0) if total_l else 0, 1)
+                      })
+
+                  progress_payload = {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico Líneas de Picking · avance Pedido + área",
+                      "refresh_seconds": 60,
+                      "rows": progress_rows,
+                      "areas": area_summary
+                  }
+                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
+                  print("avance-pedidos.json generado · segmentos pedido/área:", len(progress_rows))
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
@@ -2227,7 +2335,7 @@ jobs:
           mkdir -p /tmp/ubicaciones-sync/datos/tiempos
           mkdir -p /tmp/ubicaciones-sync/datos/negaciones
 
-          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
               cp "$f" "/tmp/ubicaciones-sync/$f"
             fi
@@ -2244,7 +2352,7 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "/tmp/ubicaciones-sync/$f" ]; then
               cp "/tmp/ubicaciones-sync/$f" "$f"
             fi
