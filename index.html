@@ -2107,7 +2107,7 @@ body.heatSplit .layoutHeatGrid{
     <div class="progressPlanControls">
       <label><small>Fecha de planificación</small><input id="progressPlanDate" type="date"></label>
       <label class="filelabel">📄 Cargar Detalle TRs<input accept=".xlsx,.xls" id="progressPlanFile" type="file"/></label>
-      <span style="display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #35404d;border-radius:7px;background:#0d131a;color:#9eabb9;font-size:10px">📅 Solo FECHA ESPERADA del día seleccionado</span>
+      <span style="display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #35404d;border-radius:7px;background:#0d131a;color:#9eabb9;font-size:10px">🚫 Excluye automáticamente Warehouse_Destino_Id 38</span>
       <button class="btn progressDeletePlanBtn" id="progressPlanClearBtn" type="button" title="Borra la base de TRs de la fecha seleccionada para todos los usuarios">🗑 Borrar TRs del día</button>
       <button class="btn" id="progressPlanExportBtn" type="button">⬇ Backup historial</button>
       <label class="filelabel">⬆ Restaurar backup<input accept=".json" id="progressPlanImportFile" type="file"/></label><span id="progressGlobalStatus" class="muted" style="font-size:9px;padding:7px 2px">Base compartida: conectando…</span>
@@ -5249,17 +5249,9 @@ async function progressHydrateSnapshotsFromHistory(st,date){
 function progressPlanValue(row,names){for(const n of names){if(Object.prototype.hasOwnProperty.call(row,n)&&String(row[n]??'').trim()!=='')return row[n]}return ''}
 function progressExcelDateISO(value){
   if(value instanceof Date&&!isNaN(value))return progressLocalISO(value);
-  if(typeof value==='number'&&isFinite(value)&&value>0){
-    try{
-      const p=XLSX.SSF.parse_date_code(value);
-      if(p&&p.y&&p.m&&p.d)return `${String(p.y).padStart(4,'0')}-${String(p.m).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`;
-    }catch(e){}
-  }
   const s=String(value??'').trim();if(!s)return '';
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?:\D|$)/);
-  if(m){let y=Number(m[3]);if(y<100)y+=2000;return `${String(y).padStart(4,'0')}-${String(Number(m[2])).padStart(2,'0')}-${String(Number(m[1])).padStart(2,'0')}`}
-  const d=new Date(s);if(!isNaN(d))return progressLocalISO(d);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
   return '';
 }
 function progressPlanZone(row){
@@ -5342,23 +5334,22 @@ function progressAreaFromPlan(row){
   return 'Otras';
 }
 async function progressImportPlanFile(file,date){
-  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
   if(!raw.length)throw new Error('El archivo no tiene filas de detalle.');
-  const validRows=[];let excludedOtherDate=0,rowsWithoutDate=0;
+  const validRows=[];let excludedDestination38=0;
   raw.forEach(r=>{
     const pedido=String(progressPlanValue(r,['NRO SAP','Nro SAP','NRO_SAP','Pedido','PEDIDO'])||'').trim();
     const picking=String(progressPlanValue(r,['NRO TR','Nro TR','NRO_TR','Picking','PICKING'])||'').trim();
     if(!pedido||!picking)return;
-    const expectedISO=progressExcelDateISO(progressPlanValue(r,['FECHA ESPERADA','Fecha Esperada','fecha esperada','FECHA_ESPERADA']));
-    if(expectedISO&&expectedISO!==date){excludedOtherDate++;return}
-    if(!expectedISO)rowsWithoutDate++;
+    const warehouseDestino=String(progressPlanValue(r,['Warehouse_Destino_Id','WAREHOUSE_DESTINO_ID','Warehouse Destino Id','warehouse_destino_id'])||'').trim();
+    if(warehouseDestino==='38'||Number(warehouseDestino)===38){excludedDestination38++;return}
     validRows.push({
       raw:r,pedido,picking,
       qty:Number(String(progressPlanValue(r,['Q_Ordered','Q Ordered','Cantidad','QTY'])||0).replace(',','.'))||0,
       area:progressAreaFromPlan(r),zone:progressPlanZone(r),product:progressProductKey(r)
     });
   });
-  if(!validRows.length)throw new Error('No encontré filas válidas para la FECHA ESPERADA seleccionada con NRO SAP y NRO TR.');
+  if(!validRows.length)throw new Error('No encontré filas válidas con NRO SAP y NRO TR luego de excluir Warehouse_Destino_Id 38.');
   const dominant={};
   validRows.forEach(x=>{const k=x.pedido+'¦'+x.picking;dominant[k]=dominant[k]||{};dominant[k][x.area]=(dominant[k][x.area]||0)+1});
   const orderArea={};
@@ -5372,10 +5363,10 @@ async function progressImportPlanFile(file,date){
     if(x.product){g.ZoneProducts[zone]=g.ZoneProducts[zone]||{};g.ZoneProducts[zone][x.product]=(g.ZoneProducts[zone][x.product]||0)+1}
   });
   const st=progressLoadStore();
-  st.days[date]={fileName:file.name,loadedAt:new Date().toISOString(),sourceRows:validRows.length,excludedRows:excludedOtherDate,excludedOtherDate,rowsWithoutDate,filterMode:'FECHA ESPERADA',rows:Object.values(groups)};
+  st.days[date]={fileName:file.name,loadedAt:new Date().toISOString(),sourceRows:validRows.length,excludedRows:excludedDestination38,excludedDestination38,filterMode:'EXCLUIR DESTINO 38',rows:Object.values(groups)};
   progressSaveStore(st);
   await progressRemoteSave(st);
-  return {sourceRows:validRows.length,groups:Object.keys(groups).length,excludedOtherDate,rowsWithoutDate};
+  return {sourceRows:validRows.length,groups:Object.keys(groups).length,excludedDestination38};
 }
 function progressDatesUntil(st,date){return Object.keys(st.days||{}).filter(d=>d<=date).sort()}
 function progressSnapshotBefore(st,key,date,inclusive=true){
@@ -5434,7 +5425,7 @@ function progressMakeAreas(rows){
 }
 function progressUpdatePlanMeta(){
   const st=progressLoadStore(),date=progressSelectedDate(),day=st.days[date];
-  $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas incluidas${day.excludedOtherDate?` · ${progressFmt(day.excludedOtherDate)} excluidas por FECHA ESPERADA distinta`:''}${day.rowsWithoutDate?` · ${progressFmt(day.rowsWithoutDate)} sin fecha`:''} · ${progressFmt(day.rows?.length||0)} segmentos Pedido/Picking/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
+  $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas incluidas${day.excludedDestination38?` · ${progressFmt(day.excludedDestination38)} excluidas por destino 38`:''} · ${progressFmt(day.rows?.length||0)} segmentos Pedido/Picking/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
   const active=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'),planned=active.filter(r=>r.PlannedToday),carry=active.filter(r=>r.Carry);
   $('progressPlanToday').textContent=progressFmt(planned.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
   $('progressPlanCarry').textContent=progressFmt(carry.reduce((s,r)=>s+Number(r.Pendientes||0),0));
@@ -5524,7 +5515,7 @@ async function buildOrderProgressPanel(force=false){
 function progressInitDate(){const d=$('progressPlanDate');if(d&&!d.value)d.value=progressTodayISO()}
 progressInitDate();
 if(ORDER_PROGRESS_STALL_TIMER)clearInterval(ORDER_PROGRESS_STALL_TIMER);ORDER_PROGRESS_STALL_TIMER=setInterval(()=>{if(displayMode==='progress')progressRefreshStallCounters()},10000);
-$('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Planificación cargada: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos'+(r.excludedOtherDate?' · '+progressFmt(r.excludedOtherDate)+' líneas de otra FECHA ESPERADA excluidas':'')+'.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
+$('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Planificación cargada: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos'+(r.excludedDestination38?' · '+progressFmt(r.excludedDestination38)+' líneas de Warehouse_Destino_Id 38 excluidas':'')+'.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
 $('progressPlanDate').onchange=()=>buildOrderProgressPanel(true);
 $('progressPlanClearBtn').onclick=async()=>{const date=progressSelectedDate(),st=progressLoadStore();if(!st.days[date])return alert('No hay TRs cargadas para esta fecha.');const label=date.split('-').reverse().join('/');if(!confirm('¿Borrar TODAS las TRs cargadas del '+label+'?\n\nEsta acción elimina la planificación compartida para todos los usuarios. El histórico de avance de Copérnico no se borra.'))return;delete st.days[date];progressSaveStore(st);try{await progressRemoteSave(st);alert('TRs del '+label+' borradas correctamente para todos los usuarios.')}catch(e){alert(e.message||e);return}buildOrderProgressPanel(true)};
 $('progressPlanExportBtn').onclick=()=>{const st=progressLoadStore(),blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avance_pedidos_historial_'+progressTodayISO().replaceAll('-','')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
