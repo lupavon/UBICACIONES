@@ -2368,7 +2368,7 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
