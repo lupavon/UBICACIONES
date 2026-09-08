@@ -1043,23 +1043,91 @@ jobs:
                       return "Pendiente"
 
                   def progress_event_epoch_ms(row):
-                      """Devuelve epoch ms en hora Argentina para la última línea trabajada."""
-                      candidates = (
+                      """Devuelve epoch ms de la hora REAL de la última línea trabajada.
+                      Evita interpretar una fecha sin hora como 00:00, que generaba
+                      el mismo contador (minutos desde medianoche) para todos los TR.
+                      """
+                      def clean(v):
+                          return str(v if v is not None else "").strip()
+
+                      # 1) Prioridad absoluta: campos que normalmente ya traen fecha + hora.
+                      datetime_candidates = (
                           "fecharegistro","FechaRegistro","fechaRegistro",
-                          "FechaHora","fechaHora","Fecha","fecha"
+                          "FechaHora","fechaHora","FechaMovimiento","fecha_movimiento"
                       )
-                      raw = ""
-                      for nm in candidates:
-                          raw = sval(row, nm)
-                          if raw:
+                      raw_dt = ""
+                      for nm in datetime_candidates:
+                          v = clean(field(row, nm))
+                          # Solo aceptar aquí si realmente contiene componente horario.
+                          if v and (":" in v or "T" in v):
+                              raw_dt = v
                               break
-                      if not raw:
-                          hr = sval(row,"horaregistro","HoraRegistro","horaRegistro","Hora","hora")
+
+                      # 2) Buscar hora separada. Puede venir como HH:MM[:SS], HHMMSS,
+                      # HHMM o incluso como número de hora.
+                      raw_hr = ""
+                      for nm in ("horaregistro","HoraRegistro","horaRegistro","Hora","hora"):
+                          v = clean(field(row, nm))
+                          if v:
+                              raw_hr = v
+                              break
+
+                      def normalize_hour(v):
+                          t = clean(v)
+                          if not t:
+                              return ""
+                          # Excel/API puede entregar 9, 9.0, 09, 930, 0930, 093015.
+                          try:
+                              if t.replace(".","",1).isdigit() and ":" not in t:
+                                  n = int(float(t))
+                                  digits = str(n)
+                                  if 0 <= n <= 23:
+                                      return f"{n:02d}:00:00"
+                                  if len(digits) in (3,4):
+                                      digits = digits.zfill(4)
+                                      hh,mm = int(digits[:2]), int(digits[2:4])
+                                      if 0 <= hh <= 23 and 0 <= mm <= 59:
+                                          return f"{hh:02d}:{mm:02d}:00"
+                                  if len(digits) in (5,6):
+                                      digits = digits.zfill(6)
+                                      hh,mm,ss = int(digits[:2]), int(digits[2:4]), int(digits[4:6])
+                                      if 0 <= hh <= 23 and 0 <= mm <= 59 and 0 <= ss <= 59:
+                                          return f"{hh:02d}:{mm:02d}:{ss:02d}"
+                          except Exception:
+                              pass
+                          # HH:MM o HH:MM:SS
+                          parts = t.split(":")
+                          if len(parts) in (2,3):
+                              try:
+                                  hh,mm = int(parts[0]), int(parts[1])
+                                  ss = int(float(parts[2])) if len(parts)==3 else 0
+                                  if 0 <= hh <= 23 and 0 <= mm <= 59 and 0 <= ss <= 59:
+                                      return f"{hh:02d}:{mm:02d}:{ss:02d}"
+                              except Exception:
+                                  pass
+                          return ""
+
+                      # Si no hubo datetime completo, combinar la fecha real con la hora separada.
+                      if not raw_dt:
+                          hr = normalize_hour(raw_hr)
                           if hr:
-                              raw = day_label + " " + hr
-                      if not raw:
+                              raw_date = ""
+                              for nm in ("Fecha","fecha","FechaRegistro","fecharegistro","fechaRegistro"):
+                                  v = clean(field(row, nm))
+                                  if v:
+                                      raw_date = v
+                                      break
+                              # Si la API no trae fecha, sabemos que este payload es del día consultado.
+                              if not raw_date:
+                                  raw_date = day_label
+                              # Quedarnos solo con la parte fecha si el campo trae basura horaria.
+                              raw_date = raw_date.split("T")[0].split(" ")[0]
+                              raw_dt = raw_date + " " + hr
+
+                      if not raw_dt:
                           return 0
-                      text = str(raw).strip()
+
+                      text = clean(raw_dt)
                       fmts = (
                           "%d/%m/%Y %H:%M:%S",
                           "%d/%m/%Y %H:%M",
@@ -1067,13 +1135,13 @@ jobs:
                           "%Y-%m-%d %H:%M",
                           "%Y-%m-%dT%H:%M:%S.%fZ",
                           "%Y-%m-%dT%H:%M:%SZ",
+                          "%Y-%m-%dT%H:%M:%S.%f%z",
+                          "%Y-%m-%dT%H:%M:%S%z",
                       )
                       for fmt in fmts:
                           try:
                               dt = datetime.strptime(text, fmt)
-                              if text.endswith("Z"):
-                                  dt = dt.replace(tzinfo=timezone.utc)
-                              else:
+                              if dt.tzinfo is None:
                                   dt = dt.replace(tzinfo=ar_tz)
                               return int(dt.timestamp() * 1000)
                           except Exception:
@@ -1082,6 +1150,9 @@ jobs:
                           dt = datetime.fromisoformat(text.replace("Z","+00:00"))
                           if dt.tzinfo is None:
                               dt = dt.replace(tzinfo=ar_tz)
+                          # Protección adicional: nunca usar una fecha sin hora como actividad.
+                          if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and ":" not in text and "T" not in text:
+                              return 0
                           return int(dt.timestamp() * 1000)
                       except Exception:
                           return 0
