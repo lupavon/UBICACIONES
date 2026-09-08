@@ -1028,6 +1028,8 @@ jobs:
                           return "Congelados"
                       if z.startswith("CIG") or z.startswith("CSG"):
                           return "Cigarrillos"
+                      if z.startswith("CAR"):
+                          return "Carnes"
                       if z in ("PM","PML","PMR") or z.startswith("PM"):
                           return "PM"
                       return "Otras"
@@ -1039,6 +1041,64 @@ jobs:
                       if "CONFIRM" in raw:
                           return "Confirmada"
                       return "Pendiente"
+
+                  def progress_event_epoch_ms(row):
+                      """Devuelve epoch ms en hora Argentina para la última línea trabajada."""
+                      candidates = (
+                          "fecharegistro","FechaRegistro","fechaRegistro",
+                          "FechaHora","fechaHora","Fecha","fecha"
+                      )
+                      raw = ""
+                      for nm in candidates:
+                          raw = sval(row, nm)
+                          if raw:
+                              break
+                      if not raw:
+                          hr = sval(row,"horaregistro","HoraRegistro","horaRegistro","Hora","hora")
+                          if hr:
+                              raw = day_label + " " + hr
+                      if not raw:
+                          return 0
+                      text = str(raw).strip()
+                      fmts = (
+                          "%d/%m/%Y %H:%M:%S",
+                          "%d/%m/%Y %H:%M",
+                          "%Y-%m-%d %H:%M:%S",
+                          "%Y-%m-%d %H:%M",
+                          "%Y-%m-%dT%H:%M:%S.%fZ",
+                          "%Y-%m-%dT%H:%M:%SZ",
+                      )
+                      for fmt in fmts:
+                          try:
+                              dt = datetime.strptime(text, fmt)
+                              if text.endswith("Z"):
+                                  dt = dt.replace(tzinfo=timezone.utc)
+                              else:
+                                  dt = dt.replace(tzinfo=ar_tz)
+                              return int(dt.timestamp() * 1000)
+                          except Exception:
+                              pass
+                      try:
+                          dt = datetime.fromisoformat(text.replace("Z","+00:00"))
+                          if dt.tzinfo is None:
+                              dt = dt.replace(tzinfo=ar_tz)
+                          return int(dt.timestamp() * 1000)
+                      except Exception:
+                          return 0
+
+                  # Productividad suele traer la hora exacta de confirmación/negación.
+                  # La usamos como respaldo para medir cuánto hace que no se mueve el TR.
+                  latest_prod_by_order_pick = {}
+                  latest_prod_by_pick = {}
+                  for pr_prog in prod_rows:
+                      pp = nkey(sval(pr_prog,"Picking","picking","NumPicking"))
+                      po = nkey(sval(pr_prog,"NumPedido","pedido","Pedido"))
+                      ep = progress_event_epoch_ms(pr_prog)
+                      if not pp or ep <= 0:
+                          continue
+                      latest_prod_by_pick[pp] = max(latest_prod_by_pick.get(pp,0), ep)
+                      if po:
+                          latest_prod_by_order_pick[(po,pp)] = max(latest_prod_by_order_pick.get((po,pp),0), ep)
 
                   progress_groups = {}
                   for ln_prog in pick_rows:
@@ -1061,7 +1121,9 @@ jobs:
                               "Negadas": 0,
                               "Pendientes": 0,
                               "Pickings": set(),
-                              "Zonas": set()
+                              "Zonas": set(),
+                              "ProductosProcesados": {},
+                              "UltimaLineaEpoch": 0
                           }
                       g = progress_groups[key_prog]
                       g["TotalLineas"] += 1
@@ -1069,8 +1131,24 @@ jobs:
                       if st_prog == "Confirmada": g["Confirmadas"] += 1
                       elif st_prog == "Negada": g["Negadas"] += 1
                       else: g["Pendientes"] += 1
+                      if st_prog in ("Confirmada","Negada"):
+                          prod_prog = nkey(sval(ln_prog,"product","Product","producto","Producto","ean","EAN"))
+                          if prod_prog:
+                              g["ProductosProcesados"][prod_prog] = g["ProductosProcesados"].get(prod_prog,0) + 1
+                          ep_line = progress_event_epoch_ms(ln_prog)
+                          if ep_line > g["UltimaLineaEpoch"]:
+                              g["UltimaLineaEpoch"] = ep_line
                       if pk_prog: g["Pickings"].add(pk_prog)
                       if zone_prog: g["Zonas"].add(nkey(zone_prog))
+
+                  # Completar la última actividad con Productividad, que suele traer
+                  # FechaRegistro aun cuando Líneas de Picking no la informa.
+                  for g in progress_groups.values():
+                      pp = nkey(g.get("Picking",""))
+                      po = nkey(g.get("Pedido",""))
+                      ep_prod = latest_prod_by_order_pick.get((po,pp),0) or latest_prod_by_pick.get(pp,0)
+                      if ep_prod > g.get("UltimaLineaEpoch",0):
+                          g["UltimaLineaEpoch"] = ep_prod
 
                   progress_rows = []
                   for g in progress_groups.values():
@@ -1087,10 +1165,12 @@ jobs:
                           "Pendientes": g["Pendientes"],
                           "Avance": round((done / total * 100.0) if total else 0, 1),
                           "Pickings": sorted(g["Pickings"]),
-                          "Zonas": sorted(g["Zonas"])
+                          "Zonas": sorted(g["Zonas"]),
+                          "ProductosProcesados": g.get("ProductosProcesados", {}),
+                          "UltimaLineaEpoch": g.get("UltimaLineaEpoch", 0)
                       })
 
-                  area_order = ["Masterbox","Refrigerados","Congelados","Cigarrillos","Unitarios secos","Unitarios químicos","PM","Otras"]
+                  area_order = ["Masterbox","Refrigerados","Congelados","Carnes","Cigarrillos","Unitarios secos","Unitarios químicos","PM","Otras"]
                   progress_rows.sort(key=lambda r: (area_order.index(r["Area"]) if r["Area"] in area_order else 99, -r["Pendientes"], r["Pedido"]))
 
                   area_summary = []
