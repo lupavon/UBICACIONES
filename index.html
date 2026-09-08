@@ -2124,7 +2124,7 @@ body.heatSplit .layoutHeatGrid{
   <div class="progressAreaGrid" id="progressAreaGrid"></div>
   <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido o picking…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="OPEN" selected>Abiertos</option><option value="CLOSED">Cerrados</option><option value="__ALL__">Todos</option></select></div><div class="muted" style="margin:5px 0 8px">Abiertos = pedidos iniciados con líneas pendientes. Orden inicial: mayor avance → menor avance.</div>
   <div class="processStatus" id="progressStatus">Cargando avance…</div>
-  <div class="progressTableWrap"><table class="progressTable"><thead><tr><th data-progress-sort="area">Área <span class="sortMark">↕</span></th><th data-progress-sort="pedido">Pedido <span class="sortMark">↕</span></th><th data-progress-sort="picking">Picking <span class="sortMark">↕</span></th><th data-progress-sort="estado">Estado <span class="sortMark">↕</span></th><th class="num" data-progress-sort="total">Total líneas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="procesadas">Procesadas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="pendientes">Pendientes <span class="sortMark">↕</span></th><th class="num" data-progress-sort="negadas">Negadas <span class="sortMark">↕</span></th><th data-progress-sort="avance">Avance <span class="sortMark">↓</span></th><th data-progress-sort="zonas">Zonas pendientes <span class="sortMark">↕</span></th><th data-progress-sort="stall">Sin movimiento <span class="sortMark">↕</span></th><th>Acción</th></tr></thead><tbody id="progressBody"></tbody></table><div class="processEmpty" id="progressEmpty" style="display:none">No hay pedidos para los filtros seleccionados.</div></div>
+  <div class="progressTableWrap"><table class="progressTable"><thead><tr><th data-progress-sort="area">Área <span class="sortMark">↕</span></th><th data-progress-sort="pedido">Pedido <span class="sortMark">↕</span></th><th data-progress-sort="picking">Picking <span class="sortMark">↕</span></th><th data-progress-sort="tr">TR <span class="sortMark">↕</span></th><th data-progress-sort="estado">Estado <span class="sortMark">↕</span></th><th class="num" data-progress-sort="total">Total líneas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="procesadas">Procesadas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="pendientes">Pendientes <span class="sortMark">↕</span></th><th class="num" data-progress-sort="negadas">Negadas <span class="sortMark">↕</span></th><th data-progress-sort="avance">Avance <span class="sortMark">↓</span></th><th data-progress-sort="zonas">Zonas pendientes <span class="sortMark">↕</span></th><th data-progress-sort="stall">Sin movimiento <span class="sortMark">↕</span></th><th>Acción</th></tr></thead><tbody id="progressBody"></tbody></table><div class="processEmpty" id="progressEmpty" style="display:none">No hay pedidos para los filtros seleccionados.</div></div>
 </div>
 
 <div id="negationsView" style="display:none">
@@ -5267,31 +5267,14 @@ function progressMergeCountMaps(rows,fieldName){
   const out={};rows.forEach(r=>Object.entries(r?.[fieldName]||{}).forEach(([k,v])=>{out[k]=(out[k]||0)+Number(v||0)}));return out;
 }
 function progressPendingZones(plan,live){
-  const zoneProducts=plan?.ZoneProducts||{},processed={...(live?.ProductosProcesados||{})},result=[];
-  let matchedProcessed=0;
-  Object.entries(zoneProducts).forEach(([zone,prodMap])=>{
-    let pending=0,total=0;
-    Object.entries(prodMap||{}).forEach(([prod,c0])=>{
-      const c=Number(c0||0);total+=c;
-      const have=Number(processed[prod]||0),take=Math.min(c,have);
-      if(take>0){processed[prod]=have-take;matchedProcessed+=take}
-      pending+=c-take;
-    });
-    if(pending>0)result.push({zone,pending,total,exact:true});
-  });
-  result.sort((a,b)=>b.pending-a.pending||String(a.zone).localeCompare(String(b.zone),'es',{numeric:true}));
-  if(!result.length&&Number(plan?.Pendientes||0)>0){
-    const pz=plan?.PlanZones||{};
-    const planned=Object.entries(pz).map(([zone,total])=>({zone,pending:Number(total||0),total:Number(total||0),exact:false})).filter(x=>x.pending>0);
-    if(planned.length)return planned.sort((a,b)=>b.pending-a.pending||String(a.zone).localeCompare(String(b.zone),'es',{numeric:true}));
-    return [{zone:'Sin detalle',pending:Number(plan.Pendientes||0),total:Number(plan.TotalLineas||0),exact:false}];
+  const exact=live?.PendientesPorZona||{};
+  const exactRows=Object.entries(exact).map(([zone,pending])=>({zone,pending:Number(pending||0),total:Number(pending||0),exact:true})).filter(x=>x.pending>0);
+  if(exactRows.length){
+    exactRows.sort((a,b)=>b.pending-a.pending||String(a.zone).localeCompare(String(b.zone),'es',{numeric:true}));
+    return exactRows;
   }
-  if(matchedProcessed===0&&Number(plan?.Procesadas||0)>0&&Object.keys(zoneProducts).length){
-    const pz=plan?.PlanZones||{};
-    const planned=Object.entries(pz).map(([zone,total])=>({zone,pending:Number(total||0),total:Number(total||0),exact:false})).filter(x=>x.pending>0);
-    if(planned.length)return planned.sort((a,b)=>b.pending-a.pending||String(a.zone).localeCompare(String(b.zone),'es',{numeric:true}));
-  }
-  return result;
+  if(Number(plan?.Pendientes||0)>0)return [{zone:'Sin detalle',pending:Number(plan.Pendientes||0),total:Number(plan.TotalLineas||0),exact:false}];
+  return [];
 }
 function progressStallText(r){
   if(r.Estado==='No preparar')return {text:'No preparar',cls:'idle'};
@@ -5357,7 +5340,7 @@ async function progressImportPlanFile(file,date){
   const groups={};
   validRows.forEach(x=>{
     const area=orderArea[x.pedido+'¦'+x.picking]||x.area,k=progressKey(x.pedido,x.picking,area);
-    if(!groups[k])groups[k]={Key:k,Pedido:x.pedido,Picking:x.picking,Area:area,TotalLineas:0,UnidadesPlanificadas:0,PlanZones:{},ZoneProducts:{}};
+    if(!groups[k])groups[k]={Key:k,Pedido:x.pedido,Picking:x.picking,TR:x.picking,Area:area,TotalLineas:0,UnidadesPlanificadas:0,PlanZones:{},ZoneProducts:{}};
     const g=groups[k];g.TotalLineas+=1;g.UnidadesPlanificadas+=x.qty;
     const zone=x.zone||'SIN ZONA';g.PlanZones[zone]=(g.PlanZones[zone]||0)+1;
     if(x.product){g.ZoneProducts[zone]=g.ZoneProducts[zone]||{};g.ZoneProducts[zone][x.product]=(g.ZoneProducts[zone][x.product]||0)+1}
@@ -5376,11 +5359,14 @@ function progressSnapshotBefore(st,key,date,inclusive=true){
 function progressCancellationFor(st,key){return st.cancellations?.[key]||null}
 function progressLivePicking(r){return String(r.Picking||((r.Pickings||[]).length===1?r.Pickings[0]:'')||'').trim()}
 function progressAggregateLive(rows){
-  if(!rows.length)return null;if(rows.length===1)return rows[0];
-  return {Pedido:rows[0].Pedido,Picking:progressLivePicking(rows[0]),Area:rows[0].Area,
+  if(!rows.length)return null;
+  const pickings=[...new Set(rows.map(progressLivePicking).filter(Boolean))];
+  if(rows.length===1)return {...rows[0],Picking:pickings[0]||progressLivePicking(rows[0]),Pickings:pickings};
+  return {Pedido:rows[0].Pedido,Picking:pickings.join(' / '),Pickings:pickings,Area:rows[0].Area,
     TotalLineas:rows.reduce((s,r)=>s+Number(r.TotalLineas||0),0),Procesadas:rows.reduce((s,r)=>s+Number(r.Procesadas||0),0),
     Confirmadas:rows.reduce((s,r)=>s+Number(r.Confirmadas||0),0),Negadas:rows.reduce((s,r)=>s+Number(r.Negadas||0),0),
     Pendientes:rows.reduce((s,r)=>s+Number(r.Pendientes||0),0),Zonas:[...new Set(rows.flatMap(r=>Array.isArray(r.Zonas)?r.Zonas:[]))],
+    PendientesPorZona:progressMergeCountMaps(rows,'PendientesPorZona'),
     ProductosProcesados:progressMergeCountMaps(rows,'ProductosProcesados'),
     UltimaLineaEpoch:Math.max(0,...rows.map(r=>Number(r.UltimaLineaEpoch||0)))
   };
@@ -5412,7 +5398,7 @@ function progressBuildPlannedRows(date){
     const cancelled=!!cancelDate&&cancelDate===date,pending=Math.max(0,Number(p.TotalLineas||0)-processed),avance=Number(p.TotalLineas||0)?processed/Number(p.TotalLineas)*100:0;
     const carry=!plannedToday&&p.OriginDate<date;
     let estado=cancelled?'No preparar':pending===0?'Completo':carry?'Pendiente anterior':processed>0?'En preparación':'Sin iniciar';
-    const lastEpoch=Math.max(Number(prior?.UltimaLineaEpoch||0),Number(live?.UltimaLineaEpoch||0));const rr={...p,Procesadas:processed,Confirmadas:Math.max(0,processed-neg),Negadas:neg,Pendientes:pending,Avance:avance,Pickings:[p.Picking],Zonas:Array.isArray(live?.Zonas)?live.Zonas:[],ProductosProcesados:live?.ProductosProcesados||{},UltimaLineaEpoch:lastEpoch,PlannedToday:plannedToday,Carry:carry,Estado:estado,CancelReason:cancel?.reason||''};rr.FaltanZonas=progressPendingZones(rr,live);
+    const lastEpoch=Math.max(Number(prior?.UltimaLineaEpoch||0),Number(live?.UltimaLineaEpoch||0));const livePickings=Array.isArray(live?.Pickings)&&live.Pickings.length?live.Pickings:(progressLivePicking(live)?[progressLivePicking(live)]:[]);const rr={...p,TR:p.TR||p.Picking,Picking:livePickings.join(' / ')||progressLivePicking(live)||'',Procesadas:processed,Confirmadas:Math.max(0,processed-neg),Negadas:neg,Pendientes:pending,Avance:avance,Pickings:livePickings,Zonas:Array.isArray(live?.Zonas)?live.Zonas:[],PendientesPorZona:live?.PendientesPorZona||{},ProductosProcesados:live?.ProductosProcesados||{},UltimaLineaEpoch:lastEpoch,PlannedToday:plannedToday,Carry:carry,Estado:estado,CancelReason:cancel?.reason||''};rr.FaltanZonas=progressPendingZones(rr,live);
     out.push(rr);
     if(!cancelled)snapDay[k]={Procesadas:processed,Negadas:neg,UltimaLineaEpoch:lastEpoch,updatedAt:new Date().toISOString()};
   });
@@ -5425,7 +5411,7 @@ function progressMakeAreas(rows){
 }
 function progressUpdatePlanMeta(){
   const st=progressLoadStore(),date=progressSelectedDate(),day=st.days[date];
-  $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas incluidas${day.excludedDestination38?` · ${progressFmt(day.excludedDestination38)} excluidas por destino 38`:''} · ${progressFmt(day.rows?.length||0)} segmentos Pedido/Picking/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
+  $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas incluidas${day.excludedDestination38?` · ${progressFmt(day.excludedDestination38)} excluidas por destino 38`:''} · ${progressFmt(day.rows?.length||0)} segmentos Pedido/TR/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
   const active=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'),planned=active.filter(r=>r.PlannedToday),carry=active.filter(r=>r.Carry);
   $('progressPlanToday').textContent=progressFmt(planned.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
   $('progressPlanCarry').textContent=progressFmt(carry.reduce((s,r)=>s+Number(r.Pendientes||0),0));
@@ -5437,6 +5423,7 @@ function progressSortValue(r,key){
   if(key==='area')return String(r.Area||'');
   if(key==='pedido')return String(r.Pedido||'');
   if(key==='picking')return String(r.Picking||'');
+  if(key==='tr')return String(r.TR||'');
   if(key==='estado')return String(r.Estado||'');
   if(key==='total')return Number(r.TotalLineas||0);
   if(key==='procesadas')return Number(r.Procesadas||0);
@@ -5461,7 +5448,7 @@ function progressFilteredRows(){
   const q=String($('progressSearch')?.value||'').trim().toLowerCase(),area=$('progressAreaFilter')?.value||'__ALL__',state=$('progressStateFilter')?.value||'__ALL__';
   const rows=ORDER_PROGRESS_ROWS.filter(r=>{
     const matchesArea=(area==='__ALL__'||r.Area===area);
-    const matchesSearch=(!q||String(r.Pedido||'').toLowerCase().includes(q)||String(r.Picking||'').toLowerCase().includes(q)||String((r.Pickings||[]).join(' ')).toLowerCase().includes(q));
+    const matchesSearch=(!q||String(r.Pedido||'').toLowerCase().includes(q)||String(r.Picking||'').toLowerCase().includes(q)||String((r.Pickings||[]).join(' ')).toLowerCase().includes(q)||String(r.TR||'').toLowerCase().includes(q));
     const isOpen=Number(r.Pendientes||0)>0&&Number(r.Procesadas||0)>0&&r.Estado!=='No preparar';
     const isClosed=Number(r.Pendientes||0)===0||r.Estado==='No preparar';
     const matchesState=(state==='__ALL__'||(state==='OPEN'&&isOpen)||(state==='CLOSED'&&isClosed));
@@ -5481,7 +5468,7 @@ function renderOrderProgress(){
   grid.innerHTML=ORDER_PROGRESS_AREAS.map(a=>'<div class="progressAreaCard '+(active===a.Area?'active':'')+'" data-area="'+esc(a.Area)+'"><div class="head"><b>'+esc(a.Area)+'</b><span class="pct">'+Number(a.Avance||0).toFixed(1)+'%</span></div><div class="progressBar"><i style="width:'+progressPct(a.Avance)+'%"></i></div><div class="progressMeta"><span>'+progressFmt(a.Procesadas)+' / '+progressFmt(a.TotalLineas)+' líneas</span><span>'+progressFmt(a.Pendientes)+' pendientes</span></div><div class="progressMeta" style="margin-top:5px"><span>'+progressFmt(a.Pedidos)+' pedidos</span><span>'+progressFmt(a.PedidosCompletos)+' completos</span></div></div>').join('');
   grid.querySelectorAll('[data-area]').forEach(c=>c.onclick=()=>{$('progressAreaFilter').value=c.dataset.area;renderOrderProgress();});
   const rows=progressFilteredRows(),today=progressSelectedDate()===progressTodayISO();
-  $('progressBody').innerHTML=rows.map(r=>{const faltan=(r.FaltanZonas||[]),zoneHtml=Number(r.Pendientes||0)===0?'—':faltan.length?'<div class="progressPendingZones">'+faltan.map(z=>'<span class="zoneChip" title="'+(z.exact===false?'Zona según planificación; sin cruce exacto de SKU':'Zona con líneas pendientes según cruce Producto/SKU')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+(faltan.some(z=>z.exact===false)?'<span class="zoneHint">* distribución de zonas según planificación; el cruce exacto de SKU no estuvo disponible para esas líneas</span>':'')+'</div>':'<span class="muted">Sin detalle</span>';const st=progressStallText(r);return '<tr><td><b>'+esc(r.Area||'')+'</b></td><td><b>'+esc(r.Pedido||'')+'</b></td><td>'+esc(r.Picking||((r.Pickings||[]).join(' / ')))+'</td><td>'+progressStatusBadge(r)+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+zoneHtml+'</td><td><span data-progress-stall data-estado="'+esc(r.Estado||'')+'" data-pendientes="'+Number(r.Pendientes||0)+'" data-procesadas="'+Number(r.Procesadas||0)+'" data-last-epoch="'+Number(r.UltimaLineaEpoch||0)+'" class="progressStall '+st.cls+'">'+st.text+'</span></td><td>'+(today&&r.Estado!=='Completo'&&r.Estado!=='No preparar'?'<button class="btn progressActionBtn" data-progress-cancel="'+esc(r.Key||progressKey(r.Pedido,r.Picking,r.Area))+'">No preparar</button>':'—')+'</td></tr>'}).join('');progressRefreshStallCounters();progressUpdateSortMarks();
+  $('progressBody').innerHTML=rows.map(r=>{const faltan=(r.FaltanZonas||[]),zoneHtml=Number(r.Pendientes||0)===0?'—':faltan.length?'<div class="progressPendingZones">'+faltan.map(z=>'<span class="zoneChip" title="'+(z.exact===false?'Copérnico no devolvió detalle de zona pendiente':'Zona pendiente informada directamente por Líneas de Picking')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+(faltan.some(z=>z.exact===false)?'<span class="zoneHint">* sin detalle de zona pendiente en Copérnico</span>':'')+'</div>':'<span class="muted">Sin detalle</span>';const st=progressStallText(r);return '<tr><td><b>'+esc(r.Area||'')+'</b></td><td><b>'+esc(r.Pedido||'')+'</b></td><td>'+esc(r.Picking||((r.Pickings||[]).join(' / '))||'—')+'</td><td>'+esc(r.TR||'—')+'</td><td>'+progressStatusBadge(r)+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+zoneHtml+'</td><td><span data-progress-stall data-estado="'+esc(r.Estado||'')+'" data-pendientes="'+Number(r.Pendientes||0)+'" data-procesadas="'+Number(r.Procesadas||0)+'" data-last-epoch="'+Number(r.UltimaLineaEpoch||0)+'" class="progressStall '+st.cls+'">'+st.text+'</span></td><td>'+(today&&r.Estado!=='Completo'&&r.Estado!=='No preparar'?'<button class="btn progressActionBtn" data-progress-cancel="'+esc(r.Key||progressKey(r.Pedido,r.Picking,r.Area))+'">No preparar</button>':'—')+'</td></tr>'}).join('');progressRefreshStallCounters();progressUpdateSortMarks();
   $('progressEmpty').style.display=rows.length?'none':'block';
   document.querySelectorAll('[data-progress-cancel]').forEach(b=>b.onclick=()=>progressCancelOrder(b.dataset.progressCancel));progressUpdatePlanMeta();
 }
