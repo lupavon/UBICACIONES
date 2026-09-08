@@ -5249,9 +5249,17 @@ async function progressHydrateSnapshotsFromHistory(st,date){
 function progressPlanValue(row,names){for(const n of names){if(Object.prototype.hasOwnProperty.call(row,n)&&String(row[n]??'').trim()!=='')return row[n]}return ''}
 function progressExcelDateISO(value){
   if(value instanceof Date&&!isNaN(value))return progressLocalISO(value);
+  if(typeof value==='number'&&isFinite(value)&&value>0){
+    try{
+      const p=XLSX.SSF.parse_date_code(value);
+      if(p&&p.y&&p.m&&p.d)return `${String(p.y).padStart(4,'0')}-${String(p.m).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`;
+    }catch(e){}
+  }
   const s=String(value??'').trim();if(!s)return '';
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?:\D|$)/);
+  if(m){let y=Number(m[3]);if(y<100)y+=2000;return `${String(y).padStart(4,'0')}-${String(Number(m[2])).padStart(2,'0')}-${String(Number(m[1])).padStart(2,'0')}`}
+  const d=new Date(s);if(!isNaN(d))return progressLocalISO(d);
   return '';
 }
 function progressPlanZone(row){
@@ -5334,7 +5342,7 @@ function progressAreaFromPlan(row){
   return 'Otras';
 }
 async function progressImportPlanFile(file,date){
-  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
   if(!raw.length)throw new Error('El archivo no tiene filas de detalle.');
   const validRows=[];let excludedOtherDate=0,rowsWithoutDate=0;
   raw.forEach(r=>{
