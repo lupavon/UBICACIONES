@@ -56,6 +56,7 @@ jobs:
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
+          ORDER_PROGRESS_HISTORY_DIR = Path("datos/avance")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
@@ -1044,12 +1045,16 @@ jobs:
                       pedido_prog = sval(ln_prog,"pedido","Pedido","NumPedido")
                       if not pedido_prog:
                           continue
+                      pk_prog = sval(ln_prog,"NumPicking","Picking","picking")
                       zone_prog = sval(ln_prog,"zonapiso","ZonaPiso","zona","Zona")
                       area_prog = progress_area(zone_prog)
-                      key_prog = (pedido_prog, area_prog)
+                      # Clave exacta para cruzar contra el Detalle TRs cargado en el dashboard.
+                      # Si Copérnico no informa Picking, conservamos igualmente el segmento con clave vacía.
+                      key_prog = (pedido_prog, pk_prog, area_prog)
                       if key_prog not in progress_groups:
                           progress_groups[key_prog] = {
                               "Pedido": pedido_prog,
+                              "Picking": pk_prog,
                               "Area": area_prog,
                               "TotalLineas": 0,
                               "Confirmadas": 0,
@@ -1064,7 +1069,6 @@ jobs:
                       if st_prog == "Confirmada": g["Confirmadas"] += 1
                       elif st_prog == "Negada": g["Negadas"] += 1
                       else: g["Pendientes"] += 1
-                      pk_prog = sval(ln_prog,"NumPicking","Picking","picking")
                       if pk_prog: g["Pickings"].add(pk_prog)
                       if zone_prog: g["Zonas"].add(nkey(zone_prog))
 
@@ -1074,6 +1078,7 @@ jobs:
                       total = g["TotalLineas"]
                       progress_rows.append({
                           "Pedido": g["Pedido"],
+                          "Picking": g.get("Picking", ""),
                           "Area": g["Area"],
                           "TotalLineas": total,
                           "Procesadas": done,
@@ -1115,7 +1120,11 @@ jobs:
                       "areas": area_summary
                   }
                   save_json_file(ORDER_PROGRESS_FILE, progress_payload)
-                  print("avance-pedidos.json generado · segmentos pedido/área:", len(progress_rows))
+                  ORDER_PROGRESS_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+                  progress_history_file = ORDER_PROGRESS_HISTORY_DIR / f"{day}.json"
+                  save_json_file(progress_history_file, progress_payload)
+                  print("avance-pedidos.json generado · segmentos pedido/picking/área:", len(progress_rows))
+                  print("Histórico Avance guardado:", progress_history_file)
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
@@ -2368,7 +2377,7 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/avance datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
