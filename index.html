@@ -1666,6 +1666,7 @@ body.heatSplit .layoutHeatGrid{
 .progressTableWrap{overflow:auto;border:1px solid #303a47;border-radius:9px;background:#0d1218;max-height:62vh}.progressTable{width:100%;border-collapse:collapse;min-width:1100px}.progressTable th{position:sticky;top:0;background:#171e27;padding:9px;text-align:left;font-size:10px;border-bottom:1px solid #394452}.progressTable td{padding:9px;font-size:11px;border-bottom:1px solid #242d38}.progressTable .num{text-align:right}.orderProgressCell{min-width:210px}.orderProgressCell .progressBar{height:8px;margin:3px 0 2px}.orderProgressCell small{color:#9aa7b5}
 .progressLive{display:flex;align-items:center;gap:6px;font-size:10px;color:#8d98a5}.progressLive .dot{width:8px;height:8px;border-radius:50%;background:#55d892;box-shadow:0 0 8px #55d89288}
 @media(max-width:1100px){.progressAreaGrid{grid-template-columns:repeat(2,minmax(190px,1fr))}}@media(max-width:650px){.progressAreaGrid{grid-template-columns:1fr}}
+.progressPlanPanel{margin:12px 0;padding:12px;border:1px solid #303a47;border-radius:10px;background:#111820}.progressPlanControls{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.progressPlanControls label>small{display:block;color:#8d98a5;font-size:9px;margin-bottom:4px}.progressPlanControls input[type=date]{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:8px 10px}.progressPlanMeta{margin-top:8px;color:#9eabb9;font-size:10px}.progressPlanKpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin-top:10px}.progressPlanKpi{border:1px solid #293441;background:#0d131a;border-radius:8px;padding:9px}.progressPlanKpi small{display:block;color:#8d98a5;font-size:8px;text-transform:uppercase}.progressPlanKpi b{display:block;font-size:18px;margin-top:2px}.progressStateBadge{display:inline-block;border:1px solid #3b4655;border-radius:999px;padding:3px 7px;font-size:8px;font-weight:900;white-space:nowrap}.progressStateBadge.done{color:#78dfaa;border-color:#315c48}.progressStateBadge.active{color:#75c8ff;border-color:#355b70}.progressStateBadge.carry{color:#f5c96c;border-color:#6b5830}.progressStateBadge.cancel{color:#ff8e98;border-color:#71333a}.progressActionBtn{font-size:9px;padding:5px 7px}.progressOrigin{display:block;color:#8d98a5;font-size:8px;margin-top:3px}@media(max-width:900px){.progressPlanKpis{grid-template-columns:repeat(2,minmax(120px,1fr))}}
 </style>
 
 </head>
@@ -2102,10 +2103,27 @@ body.heatSplit .layoutHeatGrid{
     <div><div class="layoutHeatTitle">Avance de pedidos · tiempo real</div><div class="layoutHeatSubtitle">Seguimiento de líneas por pedido y zona operativa. Confirmadas + Negadas se consideran procesadas.</div></div>
     <div style="display:flex;align-items:center;gap:10px"><div class="progressLive"><span class="dot"></span><span id="progressUpdated">Cargando…</span></div><button class="btn" id="progressRefreshBtn">↻ Actualizar</button></div>
   </div>
+  <div class="progressPlanPanel">
+    <div class="progressPlanControls">
+      <label><small>Fecha de planificación</small><input id="progressPlanDate" type="date"></label>
+      <label class="filelabel">📄 Cargar Detalle TRs<input accept=".xlsx,.xls" id="progressPlanFile" type="file"/></label>
+      <button class="btn" id="progressPlanClearBtn" type="button">Quitar planificación del día</button>
+      <button class="btn" id="progressPlanExportBtn" type="button">⬇ Backup historial</button>
+      <label class="filelabel">⬆ Restaurar backup<input accept=".json" id="progressPlanImportFile" type="file"/></label>
+    </div>
+    <div class="progressPlanMeta" id="progressPlanMeta">Sin planificación cargada para esta fecha.</div>
+    <div class="progressPlanKpis">
+      <div class="progressPlanKpi"><small>Planificado hoy</small><b id="progressPlanToday">0</b><span class="muted">líneas</span></div>
+      <div class="progressPlanKpi"><small>Arrastre anterior</small><b id="progressPlanCarry">0</b><span class="muted">líneas pendientes</span></div>
+      <div class="progressPlanKpi"><small>Total vigente</small><b id="progressPlanTotal">0</b><span class="muted">líneas</span></div>
+      <div class="progressPlanKpi"><small>Procesadas acum.</small><b id="progressPlanProcessed">0</b><span class="muted">líneas</span></div>
+      <div class="progressPlanKpi"><small>Pendientes</small><b id="progressPlanPending">0</b><span class="muted">líneas</span></div>
+    </div>
+  </div>
   <div class="progressAreaGrid" id="progressAreaGrid"></div>
-  <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido o picking…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="__ALL__">Todos los pedidos</option><option value="PENDING">Con pendientes</option><option value="DONE">Completos</option></select></div>
+  <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido o picking…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="__ALL__">Todos los pedidos</option><option value="PENDING">Con pendientes</option><option value="CARRY">Pendientes anteriores</option><option value="DONE">Completos</option><option value="CANCELLED">No preparar</option></select></div>
   <div class="processStatus" id="progressStatus">Cargando avance…</div>
-  <div class="progressTableWrap"><table class="progressTable"><thead><tr><th>Área</th><th>Pedido</th><th>Picking</th><th class="num">Total líneas</th><th class="num">Procesadas</th><th class="num">Pendientes</th><th class="num">Negadas</th><th>Avance</th><th>Zonas</th></tr></thead><tbody id="progressBody"></tbody></table><div class="processEmpty" id="progressEmpty" style="display:none">No hay pedidos para los filtros seleccionados.</div></div>
+  <div class="progressTableWrap"><table class="progressTable"><thead><tr><th>Área</th><th>Pedido</th><th>Picking</th><th>Estado</th><th class="num">Total líneas</th><th class="num">Procesadas</th><th class="num">Pendientes</th><th class="num">Negadas</th><th>Avance</th><th>Zonas</th><th>Acción</th></tr></thead><tbody id="progressBody"></tbody></table><div class="processEmpty" id="progressEmpty" style="display:none">No hay pedidos para los filtros seleccionados.</div></div>
 </div>
 
 <div id="negationsView" style="display:none">
@@ -5161,33 +5179,150 @@ async function buildTimesPanel(force=false){
 
 
 // ===== Avance de pedidos =====
-let ORDER_PROGRESS_ROWS=[],ORDER_PROGRESS_AREAS=[],ORDER_PROGRESS_TIMER=null;
+let ORDER_PROGRESS_ROWS=[],ORDER_PROGRESS_AREAS=[],ORDER_PROGRESS_TIMER=null,ORDER_PROGRESS_LIVE_ROWS=[];
+const PROGRESS_PLAN_STORE_KEY='ubicaciones_progress_planning_v2';
 function progressFmt(n){return Number(n||0).toLocaleString('es-AR')}
 function progressPct(v){return Math.max(0,Math.min(100,Number(v)||0))}
-function progressAreaOrder(a){return ['Masterbox','Refrigerados','Congelados','Cigarrillos','Unitarios secos','Unitarios químicos','PM','Otras'].indexOf(a)}
+function progressAreaOrder(a){const i=['Masterbox','Refrigerados','Congelados','Cigarrillos','Unitarios secos','Unitarios químicos','PM','Otras'].indexOf(a);return i<0?99:i}
+function progressLocalISO(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`}
+function progressTodayISO(){return progressLocalISO(new Date())}
+function progressSelectedDate(){return $('progressPlanDate')?.value||progressTodayISO()}
+function progressCompactDate(iso){return String(iso||'').replaceAll('-','')}
+function progressKey(pedido,picking,area){return [String(pedido||'').trim(),String(picking||'').trim(),String(area||'').trim()].join('¦')}
+function progressLoadStore(){
+  try{
+    const x=JSON.parse(localStorage.getItem(PROGRESS_PLAN_STORE_KEY)||'{}');
+    if(!x||typeof x!=='object')throw 0;
+    x.version=2;x.days=x.days||{};x.snapshots=x.snapshots||{};x.cancellations=x.cancellations||{};return x;
+  }catch(e){return {version:2,days:{},snapshots:{},cancellations:{}}}
+}
+function progressSaveStore(st){try{localStorage.setItem(PROGRESS_PLAN_STORE_KEY,JSON.stringify(st));return true}catch(e){alert('No se pudo guardar la planificación localmente: '+(e.message||e));return false}}
+function progressAreaFromPlan(row){
+  const txt=[row['SECTOR'],row['Transferencias'],row['codigo'],row['Sector'],row['transferencias'],row['Código']].map(v=>String(v||'').trim().toUpperCase()).join(' ');
+  if(txt.includes('REFRIG')||txt.includes('REFMFC')||txt.includes('CARNES')||/(^|\s)REF([\s]|$)/.test(txt))return 'Refrigerados';
+  if(txt.includes('CONG')||txt.includes('CMFC')||txt.includes('CONMFC'))return 'Congelados';
+  if(txt.includes('CIG')||txt.includes('CSG'))return 'Cigarrillos';
+  if(txt.includes('QUIM')||txt.includes('JAULA QUIMICOS')||txt.includes('MFCD')||txt.includes('MFCE')||txt.includes('MFCF')||txt.includes('MFCG'))return 'Unitarios químicos';
+  if(txt.includes('MASTER')||txt.includes('FULLCASE')||/(^|\s)(AL|BL|CL|CR|DL|DR|EL|ER|FL|FR|GL|GR|HL|HR)([\s]|$)/.test(txt))return 'Masterbox';
+  if(txt.includes('PM'))return 'PM';
+  if(txt.includes('SECO')||txt.includes('MASCOT')||txt.includes('JAULA SECOS')||txt.includes('MFCA')||txt.includes('MFCB')||txt.includes('MFCC')||/(^|\s)(AR|BR)([\s]|$)/.test(txt))return 'Unitarios secos';
+  return 'Otras';
+}
+function progressPlanValue(row,names){for(const n of names){if(Object.prototype.hasOwnProperty.call(row,n)&&String(row[n]??'').trim()!=='')return row[n]}return ''}
+async function progressImportPlanFile(file,date){
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  if(!raw.length)throw new Error('El archivo no tiene filas de detalle.');
+  const groups={};let valid=0;
+  raw.forEach(r=>{
+    const pedido=String(progressPlanValue(r,['NRO SAP','Nro SAP','NRO_SAP','Pedido','PEDIDO'])||'').trim();
+    const picking=String(progressPlanValue(r,['NRO TR','Nro TR','NRO_TR','Picking','PICKING'])||'').trim();
+    if(!pedido||!picking)return;
+    const area=progressAreaFromPlan(r),k=progressKey(pedido,picking,area),qty=Number(String(progressPlanValue(r,['Q_Ordered','Q Ordered','Cantidad','QTY'])||0).replace(',','.'))||0;
+    if(!groups[k])groups[k]={Key:k,Pedido:pedido,Picking:picking,Area:area,TotalLineas:0,UnidadesPlanificadas:0};
+    groups[k].TotalLineas+=1;groups[k].UnidadesPlanificadas+=qty;valid++;
+  });
+  if(!valid)throw new Error('No encontré las columnas NRO SAP y NRO TR con datos.');
+  const st=progressLoadStore();st.days[date]={fileName:file.name,loadedAt:new Date().toISOString(),sourceRows:valid,rows:Object.values(groups)};progressSaveStore(st);
+  return {sourceRows:valid,groups:Object.keys(groups).length};
+}
+function progressDatesUntil(st,date){return Object.keys(st.days||{}).filter(d=>d<=date).sort()}
+function progressSnapshotBefore(st,key,date,inclusive=true){
+  const dates=Object.keys(st.snapshots||{}).filter(d=>inclusive?d<=date:d<date).sort().reverse();
+  for(const d of dates){const x=st.snapshots[d]?.[key];if(x)return x}return null;
+}
+function progressCancellationFor(st,key){return st.cancellations?.[key]||null}
+function progressLivePicking(r){return String(r.Picking||((r.Pickings||[]).length===1?r.Pickings[0]:'')||'').trim()}
+function progressFindLiveRow(plan){
+  const pedido=String(plan.Pedido),picking=String(plan.Picking),area=String(plan.Area);
+  let found=ORDER_PROGRESS_LIVE_ROWS.find(r=>String(r.Pedido||'').trim()===pedido&&progressLivePicking(r)===picking&&String(r.Area||'').trim()===area);
+  if(found)return found;
+  const pp=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&progressLivePicking(r)===picking);if(pp.length===1)return pp[0];
+  const pa=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&String(r.Area||'').trim()===area);if(pa.length===1)return pa[0];
+  return null;
+}
+function progressBuildPlannedRows(date){
+  const st=progressLoadStore(),planDays=progressDatesUntil(st,date),latest={},todayKeys=new Set();
+  planDays.forEach(d=>(st.days[d]?.rows||[]).forEach(r=>{
+    const k=r.Key||progressKey(r.Pedido,r.Picking,r.Area),prev=latest[k];
+    latest[k]={...r,Key:k,OriginDate:prev?.OriginDate||d,LastPlanDate:d};if(d===date)todayKeys.add(k);
+  }));
+  const out=[],snapDay=st.snapshots[date]||(st.snapshots[date]={});
+  Object.values(latest).forEach(p=>{
+    const k=p.Key,rawCancel=progressCancellationFor(st,k),cancel=(rawCancel&&String(p.LastPlanDate||'')<=String(rawCancel.date||''))?rawCancel:null,cancelDate=cancel?.date||'';
+    if(cancelDate&&cancelDate<date)return;
+    const prev=progressSnapshotBefore(st,k,date,false),beforeProcessed=Number(prev?.Procesadas||0),plannedToday=todayKeys.has(k);
+    if(!plannedToday&&p.OriginDate<date&&beforeProcessed>=Number(p.TotalLineas||0))return;
+    const live=progressFindLiveRow(p),prior=progressSnapshotBefore(st,k,date,true);
+    let processed=Math.max(Number(prior?.Procesadas||0),Number(live?.Procesadas||0));processed=Math.min(Number(p.TotalLineas||0),processed);
+    let neg=Math.max(Number(prior?.Negadas||0),Number(live?.Negadas||0));neg=Math.min(processed,neg);
+    const cancelled=!!cancelDate&&cancelDate===date,pending=Math.max(0,Number(p.TotalLineas||0)-processed),avance=Number(p.TotalLineas||0)?processed/Number(p.TotalLineas)*100:0;
+    const carry=!plannedToday&&p.OriginDate<date;
+    let estado=cancelled?'No preparar':pending===0?'Completo':carry?'Pendiente anterior':processed>0?'En preparación':'Sin iniciar';
+    const rr={...p,Procesadas:processed,Confirmadas:Math.max(0,processed-neg),Negadas:neg,Pendientes:pending,Avance:avance,Pickings:[p.Picking],Zonas:Array.isArray(live?.Zonas)?live.Zonas:[],PlannedToday:plannedToday,Carry:carry,Estado:estado,CancelReason:cancel?.reason||''};
+    out.push(rr);
+    if(!cancelled)snapDay[k]={Procesadas:processed,Negadas:neg,updatedAt:new Date().toISOString()};
+  });
+  progressSaveStore(st);return out;
+}
+function progressBuildFallbackRows(){return ORDER_PROGRESS_LIVE_ROWS.map(r=>({...r,Picking:progressLivePicking(r),Estado:Number(r.Pendientes||0)===0?'Completo':Number(r.Procesadas||0)>0?'En preparación':'Sin iniciar',PlannedToday:true,Carry:false,Key:progressKey(r.Pedido,progressLivePicking(r),r.Area)}))}
+function progressMakeAreas(rows){
+  const m={};rows.filter(r=>r.Estado!=='No preparar').forEach(r=>{const a=r.Area||'Otras';if(!m[a])m[a]={Area:a,PedidosSet:new Set(),CompleteSet:new Set(),TotalLineas:0,Procesadas:0,Pendientes:0};const x=m[a];x.PedidosSet.add(String(r.Pedido));if(Number(r.Pendientes||0)===0)x.CompleteSet.add(String(r.Pedido));x.TotalLineas+=Number(r.TotalLineas||0);x.Procesadas+=Number(r.Procesadas||0);x.Pendientes+=Number(r.Pendientes||0)});
+  return Object.values(m).map(x=>({Area:x.Area,Pedidos:x.PedidosSet.size,PedidosCompletos:x.CompleteSet.size,TotalLineas:x.TotalLineas,Procesadas:x.Procesadas,Pendientes:x.Pendientes,Avance:x.TotalLineas?x.Procesadas/x.TotalLineas*100:0})).sort((a,b)=>progressAreaOrder(a.Area)-progressAreaOrder(b.Area));
+}
+function progressUpdatePlanMeta(){
+  const st=progressLoadStore(),date=progressSelectedDate(),day=st.days[date];
+  $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas de detalle · ${progressFmt(day.rows?.length||0)} segmentos Pedido/Picking/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
+  const active=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'),planned=active.filter(r=>r.PlannedToday),carry=active.filter(r=>r.Carry);
+  $('progressPlanToday').textContent=progressFmt(planned.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
+  $('progressPlanCarry').textContent=progressFmt(carry.reduce((s,r)=>s+Number(r.Pendientes||0),0));
+  $('progressPlanTotal').textContent=progressFmt(active.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
+  $('progressPlanProcessed').textContent=progressFmt(active.reduce((s,r)=>s+Number(r.Procesadas||0),0));
+  $('progressPlanPending').textContent=progressFmt(active.reduce((s,r)=>s+Number(r.Pendientes||0),0));
+}
 function progressFilteredRows(){
   const q=String($('progressSearch')?.value||'').trim().toLowerCase(),area=$('progressAreaFilter')?.value||'__ALL__',state=$('progressStateFilter')?.value||'__ALL__';
-  return ORDER_PROGRESS_ROWS.filter(r=>(area==='__ALL__'||r.Area===area)&&(!q||String(r.Pedido||'').toLowerCase().includes(q)||String((r.Pickings||[]).join(' ')).toLowerCase().includes(q))&&(state==='__ALL__'||(state==='PENDING'&&Number(r.Pendientes)>0)||(state==='DONE'&&Number(r.Pendientes)===0))).sort((a,b)=>(progressAreaOrder(a.Area)-progressAreaOrder(b.Area))||Number(b.Pendientes)-Number(a.Pendientes)||String(a.Pedido).localeCompare(String(b.Pedido),'es',{numeric:true}));
+  return ORDER_PROGRESS_ROWS.filter(r=>(area==='__ALL__'||r.Area===area)&&(!q||String(r.Pedido||'').toLowerCase().includes(q)||String(r.Picking||'').toLowerCase().includes(q)||String((r.Pickings||[]).join(' ')).toLowerCase().includes(q))&&(state==='__ALL__'||(state==='PENDING'&&Number(r.Pendientes)>0&&r.Estado!=='No preparar')||(state==='DONE'&&Number(r.Pendientes)===0&&r.Estado!=='No preparar')||(state==='CARRY'&&r.Carry)||(state==='CANCELLED'&&r.Estado==='No preparar'))).sort((a,b)=>(progressAreaOrder(a.Area)-progressAreaOrder(b.Area))||Number(b.Carry)-Number(a.Carry)||Number(b.Pendientes)-Number(a.Pendientes)||String(a.Pedido).localeCompare(String(b.Pedido),'es',{numeric:true}));
 }
+function progressStatusBadge(r){const cls=r.Estado==='Completo'?'done':r.Estado==='Pendiente anterior'?'carry':r.Estado==='No preparar'?'cancel':'active';return '<span class="progressStateBadge '+cls+'">'+esc(r.Estado||'')+'</span>'+(r.Carry?'<span class="progressOrigin">desde '+esc(String(r.OriginDate||'').split('-').reverse().join('/'))+'</span>':'')+(r.CancelReason?'<span class="progressOrigin">'+esc(r.CancelReason)+'</span>':'')}
 function renderOrderProgress(){
-  const grid=$('progressAreaGrid');
-  const active=$('progressAreaFilter')?.value||'__ALL__';
+  const grid=$('progressAreaGrid'),active=$('progressAreaFilter')?.value||'__ALL__';
   grid.innerHTML=ORDER_PROGRESS_AREAS.map(a=>'<div class="progressAreaCard '+(active===a.Area?'active':'')+'" data-area="'+esc(a.Area)+'"><div class="head"><b>'+esc(a.Area)+'</b><span class="pct">'+Number(a.Avance||0).toFixed(1)+'%</span></div><div class="progressBar"><i style="width:'+progressPct(a.Avance)+'%"></i></div><div class="progressMeta"><span>'+progressFmt(a.Procesadas)+' / '+progressFmt(a.TotalLineas)+' líneas</span><span>'+progressFmt(a.Pendientes)+' pendientes</span></div><div class="progressMeta" style="margin-top:5px"><span>'+progressFmt(a.Pedidos)+' pedidos</span><span>'+progressFmt(a.PedidosCompletos)+' completos</span></div></div>').join('');
   grid.querySelectorAll('[data-area]').forEach(c=>c.onclick=()=>{$('progressAreaFilter').value=c.dataset.area;renderOrderProgress();});
-  const rows=progressFilteredRows();
-  $('progressBody').innerHTML=rows.map(r=>'<tr><td><b>'+esc(r.Area||'')+'</b></td><td><b>'+esc(r.Pedido||'')+'</b></td><td>'+esc((r.Pickings||[]).join(' / '))+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+esc((r.Zonas||[]).join(' / '))+'</td></tr>').join('');
+  const rows=progressFilteredRows(),today=progressSelectedDate()===progressTodayISO();
+  $('progressBody').innerHTML=rows.map(r=>'<tr><td><b>'+esc(r.Area||'')+'</b></td><td><b>'+esc(r.Pedido||'')+'</b></td><td>'+esc(r.Picking||((r.Pickings||[]).join(' / ')))+'</td><td>'+progressStatusBadge(r)+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+esc((r.Zonas||[]).join(' / '))+'</td><td>'+(today&&r.Estado!=='Completo'&&r.Estado!=='No preparar'?'<button class="btn progressActionBtn" data-progress-cancel="'+esc(r.Key||progressKey(r.Pedido,r.Picking,r.Area))+'">No preparar</button>':'—')+'</td></tr>').join('');
   $('progressEmpty').style.display=rows.length?'none':'block';
+  document.querySelectorAll('[data-progress-cancel]').forEach(b=>b.onclick=()=>progressCancelOrder(b.dataset.progressCancel));progressUpdatePlanMeta();
 }
+function progressCancelOrder(key){
+  if(progressSelectedDate()!==progressTodayISO()){alert('Para mantener el histórico, esta acción solo se puede registrar en el día de hoy.');return}
+  const row=ORDER_PROGRESS_ROWS.find(r=>(r.Key||progressKey(r.Pedido,r.Picking,r.Area))===key);if(!row)return;
+  const reason=prompt('Motivo opcional para no preparar el pedido '+row.Pedido+' / picking '+row.Picking+':','') ;if(reason===null)return;
+  const st=progressLoadStore();st.cancellations[key]={date:progressSelectedDate(),reason:String(reason||'').trim(),createdAt:new Date().toISOString()};progressSaveStore(st);buildOrderProgressPanel(true);
+}
+function progressHistoryUrl(date){return date===progressTodayISO()?'./avance-pedidos.json':'./datos/avance/'+progressCompactDate(date)+'.json'}
 async function buildOrderProgressPanel(force=false){
+  const date=progressSelectedDate();
   try{
-    const res=await fetch('./avance-pedidos.json?v='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const payload=await res.json();
-    ORDER_PROGRESS_ROWS=Array.isArray(payload.rows)?payload.rows:[];ORDER_PROGRESS_AREAS=Array.isArray(payload.areas)?payload.areas:[];
+    const res=await fetch(progressHistoryUrl(date)+'?v='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const payload=await res.json();
+    ORDER_PROGRESS_LIVE_ROWS=Array.isArray(payload.rows)?payload.rows:[];
+    const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;
+    ORDER_PROGRESS_ROWS=hasAnyPlan?progressBuildPlannedRows(date):progressBuildFallbackRows();ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);
     const sel=$('progressAreaFilter'),cur=sel.value||'__ALL__',areas=ORDER_PROGRESS_AREAS.map(x=>x.Area);sel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+areas.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');sel.value=areas.includes(cur)?cur:'__ALL__';
     const upd=payload.updated_at?new Date(payload.updated_at):null;$('progressUpdated').textContent=upd&&!isNaN(upd)?'Actualizado '+upd.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Actualizado';
-    $('progressStatus').className='processStatus';$('progressStatus').textContent='Fuente: Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos pedido/zona · actualización automática cada minuto';renderOrderProgress();
-    if(ORDER_PROGRESS_TIMER)clearInterval(ORDER_PROGRESS_TIMER);ORDER_PROGRESS_TIMER=setInterval(()=>{if(displayMode==='progress')buildOrderProgressPanel(true)},60000);
-  }catch(e){$('progressStatus').className='processStatus bad';$('progressStatus').textContent='No se pudo cargar el avance de pedidos: '+String(e.message||e);ORDER_PROGRESS_ROWS=[];ORDER_PROGRESS_AREAS=[];renderOrderProgress();}
+    $('progressStatus').className='processStatus';$('progressStatus').textContent=(hasAnyPlan?'Planificación cargada + ':'')+'Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos vigentes · fecha '+date.split('-').reverse().join('/')+(date===progressTodayISO()?' · actualización automática cada minuto':' · histórico');renderOrderProgress();
+    if(ORDER_PROGRESS_TIMER)clearInterval(ORDER_PROGRESS_TIMER);ORDER_PROGRESS_TIMER=null;if(date===progressTodayISO())ORDER_PROGRESS_TIMER=setInterval(()=>{if(displayMode==='progress'&&progressSelectedDate()===progressTodayISO())buildOrderProgressPanel(true)},60000);
+  }catch(e){
+    ORDER_PROGRESS_LIVE_ROWS=[];const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;ORDER_PROGRESS_ROWS=hasAnyPlan?progressBuildPlannedRows(date):[];ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);renderOrderProgress();
+    $('progressStatus').className='processStatus '+(hasAnyPlan?'':'bad');$('progressStatus').textContent=hasAnyPlan?'Planificación disponible, pero no se pudo cargar el histórico Copérnico de '+date.split('-').reverse().join('/')+': '+String(e.message||e):'No se pudo cargar el avance de pedidos: '+String(e.message||e);
+  }
 }
+function progressInitDate(){const d=$('progressPlanDate');if(d&&!d.value)d.value=progressTodayISO()}
+progressInitDate();
+$('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Planificación cargada: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
+$('progressPlanDate').onchange=()=>buildOrderProgressPanel(true);
+$('progressPlanClearBtn').onclick=()=>{const date=progressSelectedDate(),st=progressLoadStore();if(!st.days[date])return alert('No hay planificación cargada para esta fecha.');if(!confirm('¿Quitar la planificación cargada del '+date.split('-').reverse().join('/')+'? El histórico de otros días no se borra.'))return;delete st.days[date];progressSaveStore(st);buildOrderProgressPanel(true)};
+$('progressPlanExportBtn').onclick=()=>{const st=progressLoadStore(),blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avance_pedidos_historial_'+progressTodayISO().replaceAll('-','')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('progressPlanImportFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const st=JSON.parse(await f.text());if(!st||typeof st!=='object'||!st.days)throw new Error('Backup inválido');if(!confirm('Esto reemplazará el historial local de planificación en este navegador. ¿Continuar?'))return;st.version=2;st.snapshots=st.snapshots||{};st.cancellations=st.cancellations||{};progressSaveStore(st);await buildOrderProgressPanel(true)}catch(err){alert('No se pudo restaurar el backup: '+(err.message||err))}finally{e.target.value=''}};
 $('progressRefreshBtn').onclick=()=>buildOrderProgressPanel(true);$('progressSearch').oninput=()=>renderOrderProgress();$('progressAreaFilter').onchange=()=>renderOrderProgress();$('progressStateFilter').onchange=()=>renderOrderProgress();
 
 // ===== Dashboard operativo MAIN =====
