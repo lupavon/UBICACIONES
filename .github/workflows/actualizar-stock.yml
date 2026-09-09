@@ -1038,20 +1038,6 @@ jobs:
 
                       rs8_rows = extract_rs8_rows(rs8_response)
                       print("RS8 HTTP:", rs8_http, "· filas:", len(rs8_rows))
-                      if rs8_rows:
-                          rr0 = rs8_rows[0]
-                          print("=== DIAGNOSTICO RS8 · CAMPOS ===")
-                          print(sorted(list(rr0.keys())) if isinstance(rr0, dict) else type(rr0).__name__)
-                          print("=== DIAGNOSTICO RS8 · MUESTRA ===")
-                          print({
-                              "Pedido": field(rr0,"Pedido","pedido","NumPedido"),
-                              "picking": field(rr0,"picking","Picking","NumPicking"),
-                              "productoean": field(rr0,"productoean","ProductoEAN","EAN","ean","product"),
-                              "idempleadoniega": field(rr0,"idempleadoniega","IdEmpleadoNiega","IdEmpleado","idEmpleado"),
-                              "total_negaciones": field(rr0,"total_negaciones","TotalNegaciones","CantidadNegada","cantidadNegada","Cantidad","cantidad"),
-                              "tipotransaccion": field(rr0,"tipotransaccion","TipoTransaccion","tipo_transaccion","Transaccion","transaccion"),
-                              "cod_motivo_niega": field(rr0,"cod_motivo_niega","cod_motivo_neg","CodMotivoNiega","MotivoNegacion","motivo")
-                          })
                   except Exception as e:
                       # El resto de Negaciones debe seguir funcionando aun si RS8
                       # está temporalmente indisponible.
@@ -1137,7 +1123,9 @@ jobs:
                       transaction = nkey(sval(rr,
                           "tipotransaccion","TipoTransaccion","tipo_transaccion",
                           "Transaccion","transaccion"))
-                      if transaction and "PICK" not in transaction:
+                      # En RS8 Copérnico identifica las negaciones de Picking como EPK.
+                      # Aceptamos EPK y también textos que contengan PICKING/PICK por compatibilidad.
+                      if transaction and transaction != "EPK" and "PICK" not in transaction:
                           continue
 
                       rp = nkey(sval(rr,"Pedido","pedido","NumPedido"))
@@ -1265,33 +1253,6 @@ jobs:
                       return None, "Sin cruce"
 
                   neg_prod_rows = [pr for pr in prod_rows if productivity_is_negated(pr)]
-                  if neg_prod_rows:
-                      pr0 = neg_prod_rows[0]
-                      ln0, mt0 = choose_picking_line(pr0)
-                      sku0 = (sval(ln0,"ean","EAN") if ln0 else "") or (sval(ln0,"product","Product","producto") if ln0 else "") or sval(pr0,"ean","EAN") or sval(pr0,"ref","Ref","Referencia")
-                      qty0 = field(ln0,"Cant","cant","Cantidad","cantidad") if ln0 else None
-                      if qty0 in (None, ""):
-                          qty0 = field(pr0,"Cantidad","cantidad","Unidades","unidades") or 0
-                      pedido0 = (sval(ln0,"pedido","Pedido","NumPedido") if ln0 else "") or sval(pr0,"NumPedido","pedido","Pedido")
-                      picking0 = sval(pr0,"Picking","picking","NumPicking") or (sval(ln0,"NumPicking","Picking","picking") if ln0 else "")
-                      empleado0 = sval(pr0,"Empleado","empleado","IdEmpleado","idEmpleado")
-                      print("=== DIAGNOSTICO NEGACION · MUESTRA ===")
-                      print({
-                          "Pedido": pedido0,
-                          "Picking": picking0,
-                          "SKU": sku0,
-                          "IdEmpleado": empleado0,
-                          "CantidadNegada": qty0,
-                          "CruceLineaPicking": mt0
-                      })
-                      print("=== DIAGNOSTICO CLAVE NORMALIZADA ===")
-                      print({
-                          "Pedido": nkey(pedido0),
-                          "Picking": nkey(picking0),
-                          "SKU": nkey(sku0),
-                          "IdEmpleado": nkey(empleado0),
-                          "Cantidad": norm_qty(qty0)
-                      })
                   neg_rows = []
                   for pr in neg_prod_rows:
                       ln, match_type = choose_picking_line(pr)
