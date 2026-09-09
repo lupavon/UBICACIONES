@@ -42,6 +42,7 @@ jobs:
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
           PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
           PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/pasillos/lineas/picking"
+          NEGATIONS_RS8_URL = "https://services.copernicowms.com/backweb25/kpi/dashboard/lineas-negadas"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
@@ -56,7 +57,6 @@ jobs:
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
-          ORDER_PROGRESS_HISTORY_DIR = Path("datos/avance")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
@@ -997,6 +997,84 @@ jobs:
                   prod_rows = extract_rows(prod_response)
                   pick_rows = extract_rows(pick_response)
 
+                  # RS8: reporte detallado de líneas negadas. Es la fuente del motivo
+                  # que el picker selecciona en la PDA (cod_motivo_niega).
+                  rs8_rows = []
+                  rs8_http = None
+                  try:
+                      rs8_url = NEGATIONS_RS8_URL + "?" + urllib.parse.urlencode({
+                          "fechainicial": day,
+                          "fechafinal": day,
+                          "topRanking": 10,
+                          "tipo": 0,
+                          "opcion": "RS8"
+                      })
+                      rs8_response, rs8_http, _ = request_json(rs8_url, jwt=jwt, timeout=180)
+
+                      def extract_rs8_rows(obj):
+                          # La API de Copérnico puede responder una lista directa o envolverla
+                          # en uno o más objetos. Buscamos la lista que realmente contiene
+                          # productoean / cod_motivo_niega.
+                          if isinstance(obj, list):
+                              if not obj:
+                                  return []
+                              if any(isinstance(x, dict) and (
+                                  "cod_motivo_niega" in x or
+                                  "productoean" in x or
+                                  "idempleadoniega" in x
+                              ) for x in obj):
+                                  return obj
+                              for x in obj:
+                                  found = extract_rs8_rows(x)
+                                  if found:
+                                      return found
+                              return []
+                          if isinstance(obj, dict):
+                              for v in obj.values():
+                                  found = extract_rs8_rows(v)
+                                  if found:
+                                      return found
+                          return []
+
+                      rs8_rows = extract_rs8_rows(rs8_response)
+                      print("RS8 HTTP:", rs8_http, "· filas:", len(rs8_rows))
+                  except Exception as e:
+                      # El resto de Negaciones debe seguir funcionando aun si RS8
+                      # está temporalmente indisponible.
+                      print("AVISO RS8:", str(e)[:300])
+
+                  # AVANCE DE PEDIDOS EN TIEMPO REAL
+                  # Fuente: reporte Líneas de Picking del día.
+                  # Se conserva una versión simplificada por línea para que el frontend
+                  # pueda agrupar por pedido, picking y familia operativa.
+                  def progress_sval(row, *names):
+                      v = field(row, *names)
+                      return str(v if v is not None else "").strip()
+
+                  progress_rows = []
+                  for ln_prog in pick_rows:
+                      progress_rows.append({
+                          "Pedido": progress_sval(ln_prog, "pedido", "Pedido", "NumPedido"),
+                          "Picking": progress_sval(ln_prog, "NumPicking", "Picking", "picking"),
+                          "Zona": progress_sval(ln_prog, "zonapiso", "ZonaPiso", "zona", "Zona").upper(),
+                          "Estado": progress_sval(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado"),
+                          "SKU": progress_sval(ln_prog, "ean", "EAN", "product", "Product"),
+                          "Descripcion": progress_sval(ln_prog, "descripcion", "Descripcion", "Descripción"),
+                          "Ubicacion": progress_sval(ln_prog, "ubicacion_asig", "Ubicacion_asig", "ubicacion", "Ubicacion"),
+                          "Cantidad": field(ln_prog, "Cant", "cant", "Cantidad", "cantidad", "unidad", "Unidad") or 0
+                      })
+
+                  progress_payload = {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico Líneas de Picking",
+                      "lineas_count": len(progress_rows),
+                      "rows": progress_rows
+                  }
+                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
+                  print("avance-pedidos.json generado · líneas:", len(progress_rows))
+
                   def sval(row, *names):
                       v = field(row, *names)
                       return str(v if v is not None else "").strip()
@@ -1011,185 +1089,60 @@ jobs:
                           vals = [sval(row,"ean","EAN"), sval(row,"product","Product","producto","Producto")]
                       return [nkey(x) for x in vals if nkey(x)]
 
+                  # Referencia larga del artículo: stock.json/Copérnico Inventario relaciona
+                  # el EAN interno (SKU) con la referencia comercial larga.
+                  reference_by_sku = {}
+                  for sr in rows:
+                      sku_stock = nkey(sval(sr,"EAN","ean"))
+                      ref_stock = sval(sr,"referencia","Referencia","ref","Ref")
+                      if sku_stock and ref_stock and sku_stock not in reference_by_sku:
+                          reference_by_sku[sku_stock] = ref_stock
 
-                  # AVANCE DE PEDIDOS EN TIEMPO REAL
-                  # Fuente: Líneas de Picking del día. Se agrupa por Pedido + área operativa.
-                  def progress_area(zone):
-                      z = nkey(zone).replace(" ", "")
-                      if z in ("AR","BR") or z.startswith("MFCA") or z.startswith("MFCB") or z.startswith("MFCC"):
-                          return "Unitarios secos"
-                      if z.startswith("MFCD") or z.startswith("MFCE") or z.startswith("MFCF") or z.startswith("MFCG"):
-                          return "Unitarios químicos"
-                      if z in ("AL","BL","CL","CR","DL","DR","EL","ER","FL","FR","GL","GR","HL","HR"):
-                          return "Masterbox"
-                      if z.startswith("REF") or z.startswith("RMFC"):
-                          return "Refrigerados"
-                      if z.startswith("CON") or z.startswith("CMFC") or z.startswith("CMC"):
-                          return "Congelados"
-                      if z.startswith("CIG") or z.startswith("CSG"):
-                          return "Cigarrillos"
-                      if z.startswith("CAR"):
-                          return "Carnes"
-                      if z in ("PM","PML","PMR") or z.startswith("PM"):
-                          return "PM"
-                      return "Otras"
+                  # Índices de RS8. No usamos solo Picking porque un picking puede tener
+                  # muchas negaciones. Se prioriza Pedido + Picking + SKU + empleado y
+                  # se relaja la clave únicamente como contingencia.
+                  rs8_used = set()
+                  rs8_exact = {}
+                  rs8_order_pick_sku = {}
+                  rs8_pick_sku_emp = {}
+                  rs8_pick_sku = {}
 
-                  def progress_state(row):
-                      raw = nkey(sval(row,"EstadoDeLinea","estadoDeLinea","EstadoLinea","estadolinea","Estado","estado"))
-                      if "NEGAD" in raw:
-                          return "Negada"
-                      if "CONFIRM" in raw:
-                          return "Confirmada"
-                      return "Pendiente"
+                  for rs8_i, rr in enumerate(rs8_rows):
+                      rp = nkey(sval(rr,"Pedido","pedido","NumPedido"))
+                      rpick = nkey(sval(rr,"picking","Picking","NumPicking"))
+                      rsku = nkey(sval(rr,"productoean","ProductoEAN","EAN","ean","product"))
+                      remp = nkey(sval(rr,"idempleadoniega","IdEmpleadoNiega","IdEmpleado","Empleado"))
+                      if rpick and rsku:
+                          rs8_pick_sku.setdefault((rpick,rsku), []).append((rs8_i,rr))
+                          if rp:
+                              rs8_order_pick_sku.setdefault((rp,rpick,rsku), []).append((rs8_i,rr))
+                          if remp:
+                              rs8_pick_sku_emp.setdefault((rpick,rsku,remp), []).append((rs8_i,rr))
+                          if rp and remp:
+                              rs8_exact.setdefault((rp,rpick,rsku,remp), []).append((rs8_i,rr))
 
-                  # CONTADOR "SIN MOVIMIENTO"
-                  # Copérnico no expone de forma confiable la hora real de cada línea en
-                  # estos endpoints: algunos campos de fecha/hora corresponden al refresco
-                  # del reporte y hacían que todos los TR quedaran en 0 min.
-                  # Por eso medimos actividad por DELTA: si entre dos corridas aumenta la
-                  # cantidad procesada de Pedido + Picking + Área, consideramos que hubo
-                  # movimiento en esta corrida. Si no aumenta, conservamos la última hora
-                  # observada. Con el workflow cada minuto, el error máximo es ~1 minuto.
-                  ACTIVITY_TRACKING_MODE = "observed_processed_delta_v1"
-                  previous_progress_payload = load_json_file(ORDER_PROGRESS_FILE, {})
-                  previous_tracking_mode = previous_progress_payload.get("activity_tracking", "") if isinstance(previous_progress_payload, dict) else ""
-                  previous_progress_rows = extract_rows(previous_progress_payload)
-                  previous_progress_by_key = {}
-                  for prev_prog in previous_progress_rows:
-                      prev_key = (
-                          nkey(sval(prev_prog,"Pedido","pedido","NumPedido")),
-                          nkey(sval(prev_prog,"Picking","picking","NumPicking")),
-                          sval(prev_prog,"Area","area")
-                      )
-                      previous_progress_by_key[prev_key] = prev_prog
+                  def first_unused(candidates):
+                      for idx, rr in candidates or []:
+                          if idx not in rs8_used:
+                              rs8_used.add(idx)
+                              return rr
+                      return None
 
-                  progress_groups = {}
-                  for ln_prog in pick_rows:
-                      pedido_prog = sval(ln_prog,"pedido","Pedido","NumPedido")
-                      if not pedido_prog:
-                          continue
-                      pk_prog = sval(ln_prog,"NumPicking","Picking","picking")
-                      zone_prog = sval(ln_prog,"zonapiso","ZonaPiso","zona","Zona")
-                      area_prog = progress_area(zone_prog)
-                      key_prog = (pedido_prog, pk_prog, area_prog)
-                      if key_prog not in progress_groups:
-                          progress_groups[key_prog] = {
-                              "Pedido": pedido_prog,
-                              "Picking": pk_prog,
-                              "Area": area_prog,
-                              "TotalLineas": 0,
-                              "Confirmadas": 0,
-                              "Negadas": 0,
-                              "Pendientes": 0,
-                              "Pickings": set(),
-                              "Zonas": set(),
-                              "ProductosProcesados": {},
-                              "PendientesPorZona": {},
-                              "UltimaLineaEpoch": 0
-                          }
-                      g = progress_groups[key_prog]
-                      g["TotalLineas"] += 1
-                      st_prog = progress_state(ln_prog)
-                      if st_prog == "Confirmada":
-                          g["Confirmadas"] += 1
-                      elif st_prog == "Negada":
-                          g["Negadas"] += 1
-                      else:
-                          g["Pendientes"] += 1
-                      if st_prog in ("Confirmada","Negada"):
-                          prod_prog = nkey(sval(ln_prog,"product","Product","producto","Producto","ean","EAN"))
-                          if prod_prog:
-                              g["ProductosProcesados"][prod_prog] = g["ProductosProcesados"].get(prod_prog,0) + 1
-                      if st_prog == "Pendiente":
-                          zone_pending = nkey(zone_prog) or "SIN ZONA"
-                          g["PendientesPorZona"][zone_pending] = g["PendientesPorZona"].get(zone_pending,0) + 1
-                      if pk_prog:
-                          g["Pickings"].add(pk_prog)
-                      if zone_prog:
-                          g["Zonas"].add(nkey(zone_prog))
-
-                  observed_now_ms = int(datetime.now(ar_tz).timestamp() * 1000)
-                  for g in progress_groups.values():
-                      curr_done = g["Confirmadas"] + g["Negadas"]
-                      lookup_key = (nkey(g.get("Pedido","")), nkey(g.get("Picking","")), g.get("Area",""))
-                      prev = previous_progress_by_key.get(lookup_key, {})
-                      prev_done = int(field(prev, "Procesadas", "procesadas") or 0) if prev else 0
-                      prev_epoch = int(field(prev, "UltimaLineaEpoch", "ultimaLineaEpoch") or 0) if prev else 0
-
-                      if curr_done <= 0:
-                          # Todavía no arrancó: no inventar hora.
-                          g["UltimaLineaEpoch"] = 0
-                      elif previous_tracking_mode != ACTIVITY_TRACKING_MODE:
-                          # Primera corrida con el nuevo método: arrancamos el reloj ahora.
-                          # Desde la siguiente corrida queda acumulando correctamente.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-                      elif curr_done > prev_done:
-                          # Se observó al menos una nueva línea procesada desde la corrida anterior.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-                      elif prev_epoch > 0:
-                          # No hubo nuevas líneas: conservar la última actividad observada.
-                          g["UltimaLineaEpoch"] = prev_epoch
-                      else:
-                          # Pedido ya iniciado pero sin baseline previo: iniciar contador ahora.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-
-                  progress_rows = []
-                  for g in progress_groups.values():
-                      done = g["Confirmadas"] + g["Negadas"]
-                      total = g["TotalLineas"]
-                      progress_rows.append({
-                          "Pedido": g["Pedido"],
-                          "Picking": g.get("Picking", ""),
-                          "Area": g["Area"],
-                          "TotalLineas": total,
-                          "Procesadas": done,
-                          "Confirmadas": g["Confirmadas"],
-                          "Negadas": g["Negadas"],
-                          "Pendientes": g["Pendientes"],
-                          "Avance": round((done / total * 100.0) if total else 0, 1),
-                          "Pickings": sorted(g["Pickings"]),
-                          "Zonas": sorted(g["Zonas"]),
-                          "ProductosProcesados": g.get("ProductosProcesados", {}),
-                          "PendientesPorZona": g.get("PendientesPorZona", {}),
-                          "UltimaLineaEpoch": g.get("UltimaLineaEpoch", 0)
-                      })
-
-                  area_order = ["Masterbox","Refrigerados","Congelados","Carnes","Cigarrillos","Unitarios secos","Unitarios químicos","PM","Otras"]
-                  progress_rows.sort(key=lambda r: (area_order.index(r["Area"]) if r["Area"] in area_order else 99, -r["Pendientes"], r["Pedido"]))
-
-                  area_summary = []
-                  for area in area_order:
-                      rr = [x for x in progress_rows if x["Area"] == area]
-                      if not rr:
-                          continue
-                      total_l = sum(x["TotalLineas"] for x in rr)
-                      done_l = sum(x["Procesadas"] for x in rr)
-                      area_summary.append({
-                          "Area": area,
-                          "Pedidos": len(rr),
-                          "PedidosCompletos": sum(1 for x in rr if x["Pendientes"] == 0),
-                          "TotalLineas": total_l,
-                          "Procesadas": done_l,
-                          "Pendientes": sum(x["Pendientes"] for x in rr),
-                          "Avance": round((done_l / total_l * 100.0) if total_l else 0, 1)
-                      })
-
-                  progress_payload = {
-                      "updated_at": now_iso,
-                      "fecha": day_label,
-                      "fecha_query": day,
-                      "source": "Copernico Líneas de Picking · avance Pedido + área",
-                      "refresh_seconds": 60,
-                      "activity_tracking": ACTIVITY_TRACKING_MODE,
-                      "rows": progress_rows,
-                      "areas": area_summary
-                  }
-                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
-                  ORDER_PROGRESS_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-                  progress_history_file = ORDER_PROGRESS_HISTORY_DIR / f"{day}.json"
-                  save_json_file(progress_history_file, progress_payload)
-                  print("avance-pedidos.json generado · segmentos pedido/picking/área:", len(progress_rows))
-                  print("Histórico Avance guardado:", progress_history_file)
+                  def choose_rs8(order, picking, sku, emp):
+                      o, p, s, e = nkey(order), nkey(picking), nkey(sku), nkey(emp)
+                      if o and p and s and e:
+                          rr = first_unused(rs8_exact.get((o,p,s,e)))
+                          if rr is not None: return rr, "Pedido+Picking+SKU+Empleado"
+                      if o and p and s:
+                          rr = first_unused(rs8_order_pick_sku.get((o,p,s)))
+                          if rr is not None: return rr, "Pedido+Picking+SKU"
+                      if p and s and e:
+                          rr = first_unused(rs8_pick_sku_emp.get((p,s,e)))
+                          if rr is not None: return rr, "Picking+SKU+Empleado"
+                      if p and s:
+                          rr = first_unused(rs8_pick_sku.get((p,s)))
+                          if rr is not None: return rr, "Picking+SKU"
+                      return None, "Sin cruce RS8"
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
@@ -1256,45 +1209,63 @@ jobs:
                       qty = field(ln,"Cant","cant","Cantidad","cantidad") if ln else None
                       if qty in (None, ""):
                           qty = field(pr,"Cantidad","cantidad","Unidades","unidades") or 0
+
+                      pedido_row = (sval(ln,"pedido","Pedido","NumPedido") if ln else "") or sval(pr,"NumPedido","pedido","Pedido")
+                      picking_row = sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else "")
+                      empleado_row = sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado")
+                      rr, rs8_match = choose_rs8(pedido_row, picking_row, sku, empleado_row)
+                      motivo = sval(rr,"cod_motivo_niega","CodMotivoNiega","motivo","Motivo") if rr else ""
+                      referencia = reference_by_sku.get(nkey(sku), "")
+
                       row = {
                           "Hora": sval(pr,"fecharegistro","FechaRegistro") or sval(pr,"hora","Hora") or (sval(ln,"hora","Hora") if ln else ""),
-                          "Pedido": (sval(ln,"pedido","Pedido","NumPedido") if ln else "") or sval(pr,"NumPedido","pedido","Pedido"),
-                          "Picking": sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else ""),
+                          "Pedido": pedido_row,
+                          "Picking": picking_row,
                           "SKU": sku,
                           "EAN": (sval(ln,"ean","EAN") if ln else "") or sval(pr,"ean","EAN"),
+                          "Referencia": referencia,
                           "Producto": (sval(ln,"product","Product") if ln else "") or sval(pr,"ref","Ref","Referencia"),
                           "Descripcion": sval(pr,"Descripcion","descripcion","Descripción") or (sval(ln,"descripcion","Descripcion","Descripción") if ln else ""),
                           "CantidadNegada": qty,
+                          "MotivoNegacion": motivo,
                           "Unidad": (sval(ln,"unidad","Unidad") if ln else "") or "UN",
                           "Ubicacion": sval(ln,"ubicacion_asig","Ubicacion_asig","ubicacion","Ubicacion") if ln else "",
                           "Zona": nkey(zone),
                           "EstadoDeLinea": "Negada",
                           "Proceso": (sval(ln,"Proceso","proceso","TipoProceso","tipoProceso") if ln else "") or sval(pr,"Proceso","proceso","TipoProceso","tipoProceso"),
                           "Picker": sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"),
-                          "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
+                          "IdEmpleado": empleado_row,
                           "Caja": sval(pr,"Caja","caja"),
                           "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro"),
-                          "Cruce": match_type
+                          "Cruce": match_type,
+                          "CruceRS8": rs8_match
                       }
                       neg_rows.append(row)
 
                   matched = sum(1 for r in neg_rows if r.get("Cruce") != "Sin cruce")
+                  rs8_matched = sum(1 for r in neg_rows if r.get("CruceRS8") != "Sin cruce RS8")
+                  ref_matched = sum(1 for r in neg_rows if str(r.get("Referencia") or "").strip())
                   neg_payload = {
                       "updated_at": now_iso,
                       "fecha": day_label,
                       "fecha_query": day,
-                      "source": "Copernico ProductividadPIK · Negada + Líneas de Picking para enriquecimiento",
+                      "source": "Copernico ProductividadPIK + Líneas de Picking + RS8 motivos + Inventario referencias",
                       "productividad_http": prod_http,
                       "lineas_picking_http": pick_http,
+                      "rs8_http": rs8_http,
                       "productividad_count": len(prod_rows),
                       "lineas_picking_count": len(pick_rows),
+                      "rs8_count": len(rs8_rows),
                       "negaciones_count": len(neg_rows),
                       "matched_count": matched,
+                      "rs8_matched_count": rs8_matched,
+                      "referencia_matched_count": ref_matched,
                       "rows": neg_rows
                   }
                   save_json_file(NEGATIONS_FILE, neg_payload)
                   print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
                   print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
+                  print("RS8 motivos asociados:", rs8_matched, "/", len(neg_rows), "· referencias asociadas:", ref_matched, "/", len(neg_rows))
                   print("negaciones.json generado correctamente")
 
                   # NEGACIONES HISTÓRICAS
@@ -2442,7 +2413,7 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/avance datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
