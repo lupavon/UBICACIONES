@@ -1005,7 +1005,6 @@ jobs:
                       rs8_url = NEGATIONS_RS8_URL + "?" + urllib.parse.urlencode({
                           "fechainicial": day,
                           "fechafinal": day,
-                          "topRanking": 10,
                           "tipo": 0,
                           "opcion": "RS8"
                       })
