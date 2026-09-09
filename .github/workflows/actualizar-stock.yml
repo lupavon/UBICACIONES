@@ -1098,51 +1098,78 @@ jobs:
                       if sku_stock and ref_stock and sku_stock not in reference_by_sku:
                           reference_by_sku[sku_stock] = ref_stock
 
-                  # Índices de RS8. No usamos solo Picking porque un picking puede tener
-                  # muchas negaciones. Se prioriza Pedido + Picking + SKU + empleado y
-                  # se relaja la clave únicamente como contingencia.
+                  # Índices de RS8.
+                  # Regla de cruce definida para Negaciones:
+                  #   - tipotransaccion = Picking
+                  #   - mismo Pedido
+                  #   - mismo producto/SKU
+                  #   - mismo picker (preferimos ID de empleado)
+                  #   - misma cantidad negada
+                  # La Caja NO participa del cruce.
+                  #
+                  # Picking numérico se usa únicamente como desempate cuando existen
+                  # varias filas RS8 con la misma clave operativa.
                   rs8_used = set()
-                  rs8_exact = {}
-                  rs8_order_pick_sku = {}
-                  rs8_pick_sku_emp = {}
-                  rs8_pick_sku = {}
+                  rs8_operational = {}
+
+                  def norm_qty(v):
+                      try:
+                          # RS8 puede devolver 6, 6.0 o "6.0000".
+                          return round(float(str(v).replace(",", ".").strip()), 6)
+                      except Exception:
+                          return None
 
                   for rs8_i, rr in enumerate(rs8_rows):
+                      transaction = nkey(sval(rr,
+                          "tipotransaccion","TipoTransaccion","tipo_transaccion",
+                          "Transaccion","transaccion"))
+                      if transaction and "PICK" not in transaction:
+                          continue
+
                       rp = nkey(sval(rr,"Pedido","pedido","NumPedido"))
                       rpick = nkey(sval(rr,"picking","Picking","NumPicking"))
                       rsku = nkey(sval(rr,"productoean","ProductoEAN","EAN","ean","product"))
-                      remp = nkey(sval(rr,"idempleadoniega","IdEmpleadoNiega","IdEmpleado","Empleado"))
-                      if rpick and rsku:
-                          rs8_pick_sku.setdefault((rpick,rsku), []).append((rs8_i,rr))
-                          if rp:
-                              rs8_order_pick_sku.setdefault((rp,rpick,rsku), []).append((rs8_i,rr))
-                          if remp:
-                              rs8_pick_sku_emp.setdefault((rpick,rsku,remp), []).append((rs8_i,rr))
-                          if rp and remp:
-                              rs8_exact.setdefault((rp,rpick,rsku,remp), []).append((rs8_i,rr))
+                      remp = nkey(sval(rr,
+                          "idempleadoniega","IdEmpleadoNiega","IdEmpleado","idEmpleado"))
+                      rqty = norm_qty(field(rr,
+                          "total_negaciones","TotalNegaciones","CantidadNegada",
+                          "cantidadNegada","Cantidad","cantidad"))
 
-                  def first_unused(candidates):
-                      for idx, rr in candidates or []:
-                          if idx not in rs8_used:
-                              rs8_used.add(idx)
-                              return rr
-                      return None
+                      if rp and rsku and remp and rqty is not None:
+                          key = (rp, rsku, remp, rqty)
+                          rs8_operational.setdefault(key, []).append((rs8_i, rpick, rr))
 
-                  def choose_rs8(order, picking, sku, emp):
+                  def choose_rs8(order, picking, sku, emp, qty):
                       o, p, s, e = nkey(order), nkey(picking), nkey(sku), nkey(emp)
-                      if o and p and s and e:
-                          rr = first_unused(rs8_exact.get((o,p,s,e)))
-                          if rr is not None: return rr, "Pedido+Picking+SKU+Empleado"
-                      if o and p and s:
-                          rr = first_unused(rs8_order_pick_sku.get((o,p,s)))
-                          if rr is not None: return rr, "Pedido+Picking+SKU"
-                      if p and s and e:
-                          rr = first_unused(rs8_pick_sku_emp.get((p,s,e)))
-                          if rr is not None: return rr, "Picking+SKU+Empleado"
-                      if p and s:
-                          rr = first_unused(rs8_pick_sku.get((p,s)))
-                          if rr is not None: return rr, "Picking+SKU"
-                      return None, "Sin cruce RS8"
+                      q = norm_qty(qty)
+                      if not (o and s and e and q is not None):
+                          return None, "Sin cruce RS8"
+
+                      candidates = [
+                          item for item in rs8_operational.get((o,s,e,q), [])
+                          if item[0] not in rs8_used
+                      ]
+                      if not candidates:
+                          return None, "Sin cruce RS8"
+
+                      # Si existe una única coincidencia por
+                      # Pedido+SKU+Empleado+Cantidad, ésa es la negación correcta.
+                      if len(candidates) == 1:
+                          idx, _, rr = candidates[0]
+                          rs8_used.add(idx)
+                          return rr, "Pedido+SKU+Empleado+Cantidad"
+
+                      # Si hay más de una fila idéntica operacionalmente, usar el
+                      # número de Picking sólo como desempate, nunca la Caja.
+                      if p:
+                          same_pick = [item for item in candidates if item[1] == p]
+                          if len(same_pick) == 1:
+                              idx, _, rr = same_pick[0]
+                              rs8_used.add(idx)
+                              return rr, "Pedido+SKU+Empleado+Cantidad+Picking"
+
+                      # Ambiguo: es preferible dejar el motivo vacío a asignarlo mal.
+                      return None, "RS8 ambiguo"
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
@@ -1213,7 +1240,7 @@ jobs:
                       pedido_row = (sval(ln,"pedido","Pedido","NumPedido") if ln else "") or sval(pr,"NumPedido","pedido","Pedido")
                       picking_row = sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else "")
                       empleado_row = sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado")
-                      rr, rs8_match = choose_rs8(pedido_row, picking_row, sku, empleado_row)
+                      rr, rs8_match = choose_rs8(pedido_row, picking_row, sku, empleado_row, qty)
                       motivo = sval(rr,"cod_motivo_niega","CodMotivoNiega","motivo","Motivo") if rr else ""
                       referencia = reference_by_sku.get(nkey(sku), "")
 
