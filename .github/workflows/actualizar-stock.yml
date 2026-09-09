@@ -1239,16 +1239,21 @@ jobs:
                       pnum = nkey(sval(pr,"Picking","picking","NumPicking"))
                       order = nkey(sval(pr,"NumPedido","pedido","Pedido"))
                       sks = sku_keys(pr,"prod")
+
+                      # 1) Cruce ideal: mismo Picking + mismo Pedido + mismo SKU.
                       for sk in sks:
                           vals = pick_by_exact.get((pnum,order,sk), [])
-                          if vals: return vals[0], "Picking+Pedido+SKU"
+                          if vals:
+                              return vals[0], "Picking+Pedido+SKU"
+
+                      # 2) Único fallback permitido: mismo Picking + mismo SKU.
+                      # No usamos sólo Pedido ni sólo Picking porque podría asociar
+                      # la negación a otro artículo del mismo picking.
                       for sk in sks:
                           vals = pick_by_pick_sku.get((pnum,sk), [])
-                          if vals: return vals[0], "Picking+SKU"
-                      vals = pick_by_pick_order.get((pnum,order), [])
-                      if len(vals) == 1: return vals[0], "Picking+Pedido"
-                      vals = pick_by_pick.get(pnum, [])
-                      if len(vals) == 1: return vals[0], "Picking"
+                          if vals:
+                              return vals[0], "Picking+SKU"
+
                       return None, "Sin cruce"
 
                   neg_prod_rows = [pr for pr in prod_rows if productivity_is_negated(pr)]
@@ -1318,34 +1323,6 @@ jobs:
                   print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("RS8 motivos asociados:", rs8_matched, "/", len(neg_rows), "· referencias asociadas:", ref_matched, "/", len(neg_rows))
 
-                  # DEBUG: mostrar hasta 10 negaciones sin motivo y candidatos RS8 del mismo pedido.
-                  faltantes_debug = [r for r in neg_rows if not str(r.get("MotivoNegacion") or "").strip()][:10]
-                  if faltantes_debug:
-                      print("=== DEBUG RS8 FALTANTES ===")
-                  for i, nr in enumerate(faltantes_debug, 1):
-                      dp = nkey(nr.get("Pedido"))
-                      print(f"--- FALTANTE {i} ---")
-                      print({
-                          "Pedido": nr.get("Pedido"),
-                          "Picking": nr.get("Picking"),
-                          "SKU": nr.get("SKU"),
-                          "IdEmpleado": nr.get("IdEmpleado"),
-                          "CantidadNegada": nr.get("CantidadNegada")
-                      })
-                      candidatos = []
-                      for rr in rs8_rows:
-                          rp = nkey(field(rr,"Pedido","pedido","NumPedido"))
-                          if rp != dp:
-                              continue
-                          candidatos.append({
-                              "picking": field(rr,"picking","Picking","NumPicking"),
-                              "productoean": field(rr,"productoean","ProductoEAN","EAN","ean","product"),
-                              "idempleadoniega": field(rr,"idempleadoniega","IdEmpleadoNiega","IdEmpleado","idEmpleado"),
-                              "total_negaciones": field(rr,"total_negaciones","TotalNegaciones","CantidadNegada","cantidadNegada","Cantidad","cantidad"),
-                              "tipotransaccion": field(rr,"tipotransaccion","TipoTransaccion","tipo_transaccion","Transaccion","transaccion"),
-                              "cod_motivo_niega": field(rr,"cod_motivo_niega","cod_motivo_neg","CodMotivoNiega","MotivoNegacion","motivo")
-                          })
-                      print("CANDIDATOS MISMO PEDIDO:", candidatos[:20])
                   print("negaciones.json generado correctamente")
 
                   # NEGACIONES HISTÓRICAS
