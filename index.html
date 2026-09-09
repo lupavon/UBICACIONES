@@ -2179,8 +2179,10 @@ body.heatSplit .layoutHeatGrid{
         <th data-neg-sort="pedido">Pedido <span class="sortMark">↕</span></th>
         <th data-neg-sort="picking">Picking <span class="sortMark">↕</span></th>
         <th data-neg-sort="sku">SKU / EAN <span class="sortMark">↕</span></th>
+        <th data-neg-sort="referencia">Referencia <span class="sortMark">↕</span></th>
         <th data-neg-sort="desc">Descripción <span class="sortMark">↕</span></th>
         <th data-neg-sort="cantidad">Cant. negada <span class="sortMark">↕</span></th>
+        <th data-neg-sort="motivo">Motivo negación <span class="sortMark">↕</span></th>
         <th data-neg-sort="ubicacion">Ubicación <span class="sortMark">↕</span></th>
         <th data-neg-sort="picker">Picker <span class="sortMark">↕</span></th>
         <th data-neg-sort="id">ID empleado <span class="sortMark">↕</span></th>
@@ -4740,7 +4742,7 @@ let NEG_LOADED=false;
 let NEG_SELECTED_DATE='';
 let NEG_SORT={key:'hora',dir:-1};
 function negVal(r,k){
-  const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso'],proceso:['Proceso','proceso','TipoProceso','tipoProceso']};
+  const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],referencia:['Referencia','referencia','Barcode','barcode'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],motivo:['MotivoNegacion','motivoNegacion','cod_motivo_niega','CodMotivoNiega'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso'],proceso:['Proceso','proceso','TipoProceso','tipoProceso']};
   for(const key of (m[k]||[])){ if(r&&r[key]!==undefined&&r[key]!==null&&String(r[key]).trim()!=='')return r[key]; }
   return '';
 }
@@ -4779,9 +4781,9 @@ function renderNegations(){
   const body=$('negBody'),empty=$('negEmpty');
   if(empty)empty.style.display=rows.length?'none':'block';
   if(body)body.innerHTML=rows.map(r=>'<tr>'+[
-    negVal(r,'hora')||'—',negVal(r,'pedido')||'—',negVal(r,'picking')||'—',negVal(r,'sku')||'—',negVal(r,'desc')||'—',
-    negVal(r,'cantidad')||'0',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'—'
-  ].map((v,i)=>'<td'+(i===7?' class="who"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
+    negVal(r,'hora')||'—',negVal(r,'pedido')||'—',negVal(r,'picking')||'—',negVal(r,'sku')||'—',negVal(r,'referencia')||'—',negVal(r,'desc')||'—',
+    negVal(r,'cantidad')||'0',negVal(r,'motivo')||'—',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'—'
+  ].map((v,i)=>'<td'+(i===9?' class="who"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
   document.querySelectorAll('[data-neg-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.negSort===NEG_SORT.key?(NEG_SORT.dir===1?'↑':'↓'):'↕';});
 
   const all=rows;
@@ -4818,8 +4820,10 @@ function exportNegationsXls(){
       'Pedido': negVal(r,'pedido')||'',
       'Picking': negVal(r,'picking')||'',
       'SKU / EAN': negVal(r,'sku')||'',
+      'Referencia': negVal(r,'referencia')||'',
       'Descripción': negVal(r,'desc')||'',
       'Cant. negada': Number(negVal(r,'cantidad'))||0,
+      'Motivo negación': negVal(r,'motivo')||'',
       'Ubicación': negVal(r,'ubicacion')||'',
       'Picker': negVal(r,'picker')||'',
       'ID empleado': negVal(r,'id')||'',
@@ -4827,7 +4831,7 @@ function exportNegationsXls(){
       'Zona': negVal(r,'zona')||''
     }));
     const ws=XLSX.utils.json_to_sheet(data);
-    ws['!cols']=[{wch:12},{wch:16},{wch:14},{wch:18},{wch:48},{wch:14},{wch:18},{wch:26},{wch:14},{wch:14},{wch:10}];
+    ws['!cols']=[{wch:12},{wch:16},{wch:14},{wch:18},{wch:20},{wch:48},{wch:14},{wch:22},{wch:18},{wch:26},{wch:14},{wch:14},{wch:10}];
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Negaciones');
     const zoneRaw=String($('negZoneFilter')?.value||'').trim();
@@ -5413,7 +5417,7 @@ function progressUpdatePlanMeta(){
   const st=progressLoadStore(),date=progressSelectedDate(),day=st.days[date];
   $('progressPlanMeta').textContent=day?`Planificación: ${day.fileName} · ${progressFmt(day.sourceRows)} líneas incluidas${day.excludedDestination38?` · ${progressFmt(day.excludedDestination38)} excluidas por destino 38`:''} · ${progressFmt(day.rows?.length||0)} segmentos Pedido/TR/Área · cargada ${new Date(day.loadedAt).toLocaleString('es-AR')}`:'Sin planificación cargada para '+date.split('-').reverse().join('/')+'. Los pendientes de días anteriores se arrastran automáticamente.';
   const active=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'),planned=active.filter(r=>r.PlannedToday),carry=active.filter(r=>r.Carry);
-  $('progressPlanToday').textContent=progressFmt(planned.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
+  $('progressPlanToday').textContent=progressFmt(day ? Number(day.sourceRows||0)+Number(day.excludedDestination38||0) : 0);
   $('progressPlanCarry').textContent=progressFmt(carry.reduce((s,r)=>s+Number(r.Pendientes||0),0));
   $('progressPlanTotal').textContent=progressFmt(active.reduce((s,r)=>s+Number(r.TotalLineas||0),0));
   $('progressPlanProcessed').textContent=progressFmt(active.reduce((s,r)=>s+Number(r.Procesadas||0),0));
