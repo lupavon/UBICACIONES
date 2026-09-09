@@ -1322,6 +1322,75 @@ jobs:
                   print("Productividad:", len(prod_rows), "· Líneas Picking:", len(pick_rows))
                   print("Negaciones detectadas en Productividad:", len(neg_prod_rows), "· enriquecidas con Líneas Picking:", matched, "· zonas:", len({r.get("Zona","") for r in neg_rows if r.get("Zona","")}))
                   print("RS8 motivos asociados:", rs8_matched, "/", len(neg_rows), "· referencias asociadas:", ref_matched, "/", len(neg_rows))
+                  # === DIAGNOSTICO RS8 FALTANTES ===
+                  # Solo imprime evidencia; no modifica la logica ni los JSON.
+                  print("=== DIAGNOSTICO RS8 FALTANTES ===")
+
+                  def _dstr(v):
+                      if v is None:
+                          return ""
+                      s = str(v).strip()
+                      return s[:-2] if s.endswith(".0") else s
+
+                  def _dnum(v):
+                      try:
+                          return float(str(v).strip().replace(",", "."))
+                      except Exception:
+                          return None
+
+                  falt_diag = []
+                  for n in neg_rows:
+                      mot = _dstr(n.get("MotivoNegacion") or n.get("Motivo negación") or n.get("motivo_negacion") or n.get("cod_motivo_niega"))
+                      if not mot or mot in ("-", "—"):
+                          falt_diag.append(n)
+
+                  print("Faltantes de motivo RS8:", len(falt_diag))
+
+                  for ix, n in enumerate(falt_diag, 1):
+                      ped = _dstr(n.get("Pedido") or n.get("pedido") or n.get("NumPedido"))
+                      pick = _dstr(n.get("Picking") or n.get("picking") or n.get("NumPicking"))
+                      sku = _dstr(n.get("SKU") or n.get("Sku") or n.get("sku") or n.get("productoean"))
+                      emp = _dstr(n.get("IdEmpleado") or n.get("ID empleado") or n.get("idempleado") or n.get("idempleadoniega"))
+                      cant = _dnum(n.get("CantidadNegada") or n.get("Cant. negada") or n.get("Cantidad") or n.get("cantidad"))
+
+                      c1, c2, c3, c4 = [], [], [], []
+                      for r in rs8_rows:
+                          tipo = _dstr(r.get("tipotransaccion")).upper()
+                          if tipo not in ("PICKING", "EPK"):
+                              continue
+                          rped = _dstr(r.get("Pedido") or r.get("pedido"))
+                          rsku = _dstr(r.get("productoean"))
+                          remp = _dstr(r.get("idempleadoniega"))
+                          rcant = _dnum(r.get("total_negaciones"))
+
+                          if rped == ped:
+                              c1.append(r)
+                              if rsku == sku:
+                                  c2.append(r)
+                                  if remp == emp:
+                                      c3.append(r)
+                                      if cant is not None and rcant is not None and abs(rcant-cant) < 0.000001:
+                                          c4.append(r)
+
+                      print("--- FALTANTE RS8", ix, "/", len(falt_diag), "---")
+                      print({"Pedido":ped, "Picking":pick, "SKU":sku, "IdEmpleado":emp, "CantidadNegada":cant})
+                      print("CANDIDATOS: mismo pedido=",len(c1),"| +SKU=",len(c2),"| +empleado=",len(c3),"| +cantidad=",len(c4))
+
+                      muestra = c3 or c2 or c1
+                      if muestra:
+                          print("MUESTRA RS8:", [{
+                              "Pedido": _dstr(x.get("Pedido") or x.get("pedido")),
+                              "picking": _dstr(x.get("picking")),
+                              "productoean": _dstr(x.get("productoean")),
+                              "idempleadoniega": _dstr(x.get("idempleadoniega")),
+                              "total_negaciones": _dstr(x.get("total_negaciones")),
+                              "tipotransaccion": _dstr(x.get("tipotransaccion")),
+                              "cod_motivo_niega": _dstr(x.get("cod_motivo_niega"))
+                          } for x in muestra[:5]])
+                      else:
+                          print("MUESTRA RS8: sin filas del mismo pedido")
+
+                  print("=== FIN DIAGNOSTICO RS8 FALTANTES ===")
 
                   print("negaciones.json generado correctamente")
 
