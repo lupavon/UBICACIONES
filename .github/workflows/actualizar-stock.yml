@@ -1159,17 +1159,40 @@ jobs:
                           rs8_used.add(idx)
                           return rr, "Pedido+SKU+Empleado+Cantidad"
 
-                      # Si hay más de una fila idéntica operacionalmente, usar el
-                      # número de Picking sólo como desempate, nunca la Caja.
+                      # Si hay más de una fila idéntica operacionalmente, primero
+                      # usar Picking como filtro adicional (Caja sigue ignorada).
                       if p:
                           same_pick = [item for item in candidates if item[1] == p]
-                          if len(same_pick) == 1:
-                              idx, _, rr = same_pick[0]
-                              rs8_used.add(idx)
-                              return rr, "Pedido+SKU+Empleado+Cantidad+Picking"
+                          if same_pick:
+                              candidates = same_pick
 
-                      # Ambiguo: es preferible dejar el motivo vacío a asignarlo mal.
-                      return None, "RS8 ambiguo"
+                      # Si todas las coincidencias restantes tienen el MISMO motivo,
+                      # ese motivo es seguro aunque RS8 repita la negación por distintas cajas.
+                      motives = {}
+                      for idx, _, rr in candidates:
+                          motive = str(field(rr,
+                              "cod_motivo_niega","cod_motivo_neg",
+                              "CodMotivoNiega","MotivoNegacion","motivo") or "").strip()
+                          motives.setdefault(motive, []).append((idx, rr))
+
+                      nonempty_motives = [m for m in motives.keys() if m]
+                      if len(set(nonempty_motives)) == 1:
+                          motive = nonempty_motives[0]
+                          idx, rr = motives[motive][0]
+                          # Marcar todas las filas equivalentes como consumidas para que
+                          # otra negación no reutilice duplicados de RS8 de la misma operación.
+                          for cand_idx, _, _ in candidates:
+                              rs8_used.add(cand_idx)
+                          return rr, "Coincidencias múltiples con mismo motivo"
+
+                      # Si hay una sola fila restante, usarla aunque el motivo venga vacío.
+                      if len(candidates) == 1:
+                          idx, _, rr = candidates[0]
+                          rs8_used.add(idx)
+                          return rr, "Coincidencia única"
+
+                      # Ambiguo de verdad: mismas claves pero motivos distintos.
+                      return None, "RS8 ambiguo: motivos distintos"
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
