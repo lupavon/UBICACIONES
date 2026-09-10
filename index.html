@@ -2237,6 +2237,26 @@ body.heatSplit .layoutHeatGrid{
   </div>
 
   <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead" style="gap:12px;flex-wrap:wrap">
+      <div>
+        <b>Evolución mensual por picker</b>
+        <small>Promedio diario de líneas/h del picker seleccionado</small>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label style="font-size:11px;color:#9fb0c3">Picker
+          <select id="productivityMonthPicker" class="select" style="display:block;margin-top:3px;min-width:220px"></select>
+        </label>
+        <button class="btn" id="productivityMonthRefreshBtn" type="button">↻ Mes</button>
+      </div>
+    </div>
+    <div style="padding:10px 12px 4px">
+      <div id="productivityMonthSummary" style="font-size:12px;color:#aebed0;margin-bottom:8px"></div>
+      <div id="productivityMonthChart" style="min-height:260px;overflow-x:auto"></div>
+    </div>
+  </div>
+
+
+  <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
     <div class="receiptSupplierWrap" style="overflow:auto">
       <table class="receiptSupplierTable">
@@ -5109,7 +5129,120 @@ function renderProductivityDaily(pickers){
   $('productivityTotalLines').textContent=total.toLocaleString('es-AR');
   $('productivityPickerCount').textContent=arr.length;
   $('productivityGeneralAvg').textContent=avg.toFixed(1);
+  productivityUpdateMonthPicker(arr);
+  productivityLoadMonth($('productivityDateFilter')?.value||TIME_SELECTED_DATE||timeYesterdayISO(),false);
 }
+
+let PRODUCTIVITY_MONTH_CACHE={};
+let PRODUCTIVITY_MONTH_LOADING=false;
+
+function productivityPickerNameFromRow(r){
+  return String(r?.Nombres||r?.Empleado||'Sin nombre').trim();
+}
+
+function productivityUpdateMonthPicker(pickers){
+  const sel=$('productivityMonthPicker'); if(!sel)return;
+  const current=sel.value;
+  const names=[...new Set((pickers||[]).map(p=>p.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  sel.innerHTML=names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  if(current && names.includes(current)) sel.value=current;
+  else {
+    const dailyTop=(pickers||[]).slice().sort((a,b)=>b.rows.length-a.rows.length)[0];
+    if(dailyTop && names.includes(dailyTop.name)) sel.value=dailyTop.name;
+  }
+}
+
+async function productivityLoadMonth(iso,force=false){
+  const chart=$('productivityMonthChart'),sum=$('productivityMonthSummary'),sel=$('productivityMonthPicker');
+  if(!chart||!sum||!sel)return;
+  const month=(iso||$('productivityDateFilter')?.value||timeYesterdayISO()).slice(0,7);
+  if(PRODUCTIVITY_MONTH_LOADING)return;
+  if(!force && PRODUCTIVITY_MONTH_CACHE[month]){
+    renderProductivityMonthChart(month,PRODUCTIVITY_MONTH_CACHE[month]);
+    return;
+  }
+  PRODUCTIVITY_MONTH_LOADING=true;
+  chart.innerHTML='<div class="processStatus">Cargando evolución mensual…</div>';
+  try{
+    const [y,m]=month.split('-').map(Number);
+    const lastDay=new Date(y,m,0).getDate();
+    const today=timeTodayISO();
+    const tasks=[];
+    for(let d=1;d<=lastDay;d++){
+      const day=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if(day>today)break;
+      tasks.push((async()=>{
+        try{
+          let res=await fetch(timeFileForDate(day)+'?month='+Date.now(),{cache:'no-store'});
+          if(!res.ok && day===today)res=await fetch('./tiempos.json?month='+Date.now(),{cache:'no-store'});
+          if(!res.ok)return {day,rows:[]};
+          const payload=await res.json();
+          const rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
+          return {day,rows};
+        }catch(e){return {day,rows:[]};}
+      })());
+    }
+    const result=await Promise.all(tasks);
+    PRODUCTIVITY_MONTH_CACHE[month]=result;
+    renderProductivityMonthChart(month,result);
+  }finally{
+    PRODUCTIVITY_MONTH_LOADING=false;
+  }
+}
+
+function renderProductivityMonthChart(month,daysData){
+  const chart=$('productivityMonthChart'),sum=$('productivityMonthSummary'),sel=$('productivityMonthPicker');
+  if(!chart||!sum||!sel)return;
+  const picker=sel.value;
+  if(!picker){
+    chart.innerHTML='<div class="processEmpty">No hay picker seleccionado.</div>';
+    sum.textContent='';
+    return;
+  }
+  const norm=timeNormName(picker);
+  const points=(daysData||[]).map(x=>{
+    const rows=(x.rows||[]).filter(r=>timeNormName(productivityPickerNameFromRow(r))===norm);
+    return {day:x.day,count:rows.length,avg:rows.length?rows.length/6.5:null};
+  });
+  const active=points.filter(p=>p.avg!==null);
+  if(!active.length){
+    chart.innerHTML='<div class="processEmpty">No hay actividad de '+esc(picker)+' en este mes.</div>';
+    sum.textContent='Sin días con actividad en '+month.split('-').reverse().join('/');
+    return;
+  }
+  const vals=active.map(p=>p.avg);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const best=active.slice().sort((a,b)=>b.avg-a.avg)[0];
+  const worst=active.slice().sort((a,b)=>a.avg-b.avg)[0];
+  sum.innerHTML='<b>'+esc(picker)+'</b> · '+active.length+' días con actividad · Promedio mensual <b>'+avg.toFixed(1)+' líneas/h</b> · Mejor día <b>'+best.avg.toFixed(1)+'</b> ('+best.day.slice(8,10)+') · Menor día <b>'+worst.avg.toFixed(1)+'</b> ('+worst.day.slice(8,10)+')';
+
+  const W=Math.max(760,points.length*34),H=260,PL=48,PR=18,PT=18,PB=42;
+  const maxVal=Math.max(10,Math.ceil(Math.max(...vals)/10)*10);
+  const x=(i)=>PL + (W-PL-PR)*(points.length===1?0.5:i/(points.length-1));
+  const y=(v)=>PT + (H-PT-PB)*(1-(v/maxVal));
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Evolución mensual de productividad">`;
+  for(let t=0;t<=4;t++){
+    const val=maxVal*(t/4),yy=y(val);
+    svg+=`<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="currentColor" opacity=".12"/>`;
+    svg+=`<text x="${PL-8}" y="${yy+4}" text-anchor="end" fill="currentColor" opacity=".7" font-size="10">${val.toFixed(0)}</text>`;
+  }
+  const validPts=points.map((p,i)=>p.avg===null?null:[x(i),y(p.avg),p]).filter(Boolean);
+  if(validPts.length){
+    svg+=`<polyline fill="none" stroke="#75c8ff" stroke-width="3" points="${validPts.map(v=>v[0]+','+v[1]).join(' ')}"/>`;
+    validPts.forEach(v=>{
+      svg+=`<circle cx="${v[0]}" cy="${v[1]}" r="4" fill="#75c8ff"><title>${v[2].day.split('-').reverse().join('/')} · ${v[2].avg.toFixed(1)} líneas/h · ${v[2].count} líneas</title></circle>`;
+    });
+  }
+  points.forEach((p,i)=>{
+    const dd=Number(p.day.slice(8,10));
+    if(dd===1||dd%2===0||i===points.length-1)
+      svg+=`<text x="${x(i)}" y="${H-16}" text-anchor="middle" fill="currentColor" opacity=".75" font-size="10">${dd}</text>`;
+  });
+  svg+=`<text x="${PL}" y="${H-2}" fill="currentColor" opacity=".55" font-size="10">Día del mes</text>`;
+  svg+='</svg>';
+  chart.innerHTML=svg;
+}
+
 function productivitySelectDate(iso){
   if(!iso||iso>timeTodayISO())return;
   if($('productivityDateFilter'))$('productivityDateFilter').value=iso;
@@ -5140,7 +5273,7 @@ function productivityShiftMonth(delta){
   const base=(productivityCalendarAnchor||$('productivityDateFilter')?.value||timeYesterdayISO()).slice(0,7);
   const [y,m]=base.split('-').map(Number),dt=new Date(y,m-1+delta,1);
   const next=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
-  if(next>timeTodayISO().slice(0,7))return;productivityCalendarAnchor=next;renderProductivityCalendar();
+  if(next>timeTodayISO().slice(0,7))return;productivityCalendarAnchor=next;renderProductivityCalendar();productivityLoadMonth(next+'-01',false);
 }
 
 function exportTimeControlXls(){
@@ -5800,6 +5933,8 @@ $('timesModeBtn').onclick=()=>setDisplayMode('times');
 $('productivitySearch').oninput=()=>renderTimes();
 document.querySelectorAll('[data-productivity-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.productivitySort;if(PRODUCTIVITY_SORT.key===k)PRODUCTIVITY_SORT.dir*=-1;else PRODUCTIVITY_SORT={key:k,dir:1};renderTimes();};});
 $('productivityRefreshBtn').onclick=()=>buildTimesPanel(true,$('productivityDateFilter').value);
+$('productivityMonthPicker').onchange=()=>productivityLoadMonth($('productivityDateFilter')?.value||timeYesterdayISO(),false);
+$('productivityMonthRefreshBtn').onclick=()=>productivityLoadMonth($('productivityDateFilter')?.value||timeYesterdayISO(),true);
 $('productivityDateFilter').onchange=()=>productivitySelectDate($('productivityDateFilter').value);
 $('productivityPrevDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()-1);productivitySelectDate(timeLocalISO(dt));};
 $('productivityNextDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+1);productivitySelectDate(timeLocalISO(dt));};
