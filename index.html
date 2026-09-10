@@ -1701,6 +1701,7 @@ body.heatSplit .layoutHeatGrid{
 <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
 <button class="btn" id="receiptModeBtn">📥 En recibo</button>
 <button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
+<button class="btn" id="productivityModeBtn">📈 Productividad</button>
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn adminOnly" id="usersModeBtn">👥 Usuarios</button>
 </div>
@@ -2194,6 +2195,62 @@ body.heatSplit .layoutHeatGrid{
     <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones para el filtro seleccionado.</div>
   </div>
 </div>
+<div id="productivityView" style="display:none">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="viewtitle">📈 Productividad · Picking</div>
+      <div class="authNotice">Histórico de Productividad · Confirmadas + Negadas · Turno 06:00 a 14:00 · Promedio operativo calculado sobre 6 h 30 min. · Personal TT excluido.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+      <button class="btn" id="productivityPrevDay" title="Día anterior">←</button>
+      <label style="font-size:11px;color:#9fb0c3">Fecha analizada
+        <input id="productivityDateFilter" type="date" style="display:block;margin-top:3px;background:#0b1118;color:#eef5ff;border:1px solid #344152;border-radius:6px;padding:7px 9px;font:inherit;color-scheme:dark">
+      </label>
+      <button class="btn" id="productivityNextDay" title="Día siguiente">→</button>
+      <button class="btn" id="productivityYesterdayBtn">Ayer</button>
+      <button class="btn" id="productivityTodayBtn">Hoy</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(260px,330px) 1fr;gap:14px;margin-top:14px;align-items:start">
+    <div class="receiptSupplierCard" style="margin-top:0">
+      <div class="receiptSupplierHead"><div><b>Calendario</b><small>Elegí un día para consultar productividad</small></div><div style="display:flex;gap:5px"><button class="btn" id="productivityPrevMonth">←</button><button class="btn" id="productivityNextMonth">→</button></div></div>
+      <div id="productivityCalendarTitle" style="text-align:center;font-weight:900;padding:8px 8px 3px"></div>
+      <div id="productivityCalendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:10px"></div>
+    </div>
+    <div>
+      <div class="processKpis" style="grid-template-columns:repeat(3,minmax(170px,1fr));margin-top:0;margin-bottom:14px">
+        <div class="processKpi"><small>LÍNEAS DEL DÍA</small><b id="productivityTotalLines">0</b><span>Confirmadas + Negadas</span></div>
+        <div class="processKpi"><small>PICKERS</small><b id="productivityPickerCount">0</b><span>con actividad</span></div>
+        <div class="processKpi"><small>PROMEDIO GENERAL</small><b id="productivityGeneralAvg">0.0</b><span>líneas/h por picker</span></div>
+      </div>
+      <div class="receiptSupplierCard" style="margin-top:0">
+        <div class="receiptSupplierHead"><div><b>Promedio diario por picker</b><small>Resultado del día seleccionado</small></div><small id="productivityUpdated"></small></div>
+        <div class="receiptSupplierWrap" style="overflow:auto">
+          <table class="receiptSupplierTable">
+            <thead><tr><th data-productivity-sort="name">Picker <span class="sortMark">↕</span></th><th data-productivity-sort="total">Líneas del día <span class="sortMark">↕</span></th><th data-productivity-sort="avg">Promedio líneas/h <span class="sortMark">↕</span></th><th data-productivity-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
+            <tbody id="productivityDailyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="receiptSupplierCard" style="margin-top:14px">
+    <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
+    <div class="receiptSupplierWrap" style="overflow:auto">
+      <table class="receiptSupplierTable">
+        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th><th data-time-hour-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
+        <tbody id="timeHourlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="receiptToolbar" style="margin-top:14px">
+    <input id="productivitySearch" placeholder="Buscar picker..."/>
+    <button class="btn" id="productivityRefreshBtn">↻ Actualizar</button>
+  </div>
+  <div class="processStatus" id="productivityStatus">Cargando productividad del día…</div>
+</div>
 <div id="timesView" style="display:none">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div>
@@ -2213,16 +2270,6 @@ body.heatSplit .layoutHeatGrid{
 
   <div class="processKpis" style="grid-template-columns:minmax(260px,360px);margin-top:14px;margin-bottom:0">
     <div class="processKpi"><small>PROMEDIO TIEMPO MUERTO</small><b id="timeAvgDead">—</b><span id="timeAvgDeadSub">promedio de pickers del turno mañana</span></div>
-  </div>
-
-  <div class="receiptSupplierCard" style="margin-top:14px">
-    <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
-    <div class="receiptSupplierWrap" style="overflow:auto">
-      <table class="receiptSupplierTable">
-        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th><th data-time-hour-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
-        <tbody id="timeHourlyBody"></tbody>
-      </table>
-    </div>
   </div>
 
   <div class="receiptSupplierCard" style="margin-top:14px">
@@ -3057,6 +3104,7 @@ function setDisplayMode(mode){
   $('palletsProcessView').style.display=mode==='process'?'block':'none';
   $('receiptView').style.display=mode==='receipt'?'block':'none';
   $('negationsView').style.display=mode==='negations'?'block':'none';
+  $('productivityView').style.display=mode==='productivity'?'block':'none';
   $('timesView').style.display=mode==='times'?'block':'none';
 
   $('dashboardModeBtn').classList.toggle('active',mode==='dashboard');
@@ -3069,6 +3117,7 @@ function setDisplayMode(mode){
   $('palletsProcessModeBtn').classList.toggle('active',mode==='process');
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
   $('negationsModeBtn').classList.toggle('active',mode==='negations');
+  $('productivityModeBtn').classList.toggle('active',mode==='productivity');
   $('timesModeBtn').classList.toggle('active',mode==='times');
 
   if(mode==='dashboard') buildOperationalDashboard();
@@ -3080,6 +3129,8 @@ function setDisplayMode(mode){
   if(mode==='process') buildPalletsProcessPanel();
   if(mode==='receipt') buildReceiptPanel(true);
   if(mode==='negations') buildNegationsPanel();
+  if(mode==='productivity') buildTimesPanel(false, $('productivityDateFilter')?.value||'');
+  if(mode==='times') buildTimesPanel(false, $('timeDateFilter')?.value||'');
   if(mode==='times') buildTimesPanel();
 }
 
@@ -5007,7 +5058,7 @@ function timePickerZones(rows){
   return main;
 }
 function timeFiltered(){
-  const q=String($('timeSearch')?.value||'').trim().toLowerCase();
+  const q=String((displayMode==='productivity'?$('productivitySearch')?.value:$('timeSearch')?.value)||'').trim().toLowerCase();
   return TIME_ROWS.filter(r=>!timeIsExcluded(r)).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
 }
 let TIME_HOURLY_SORT={key:'name',dir:1};
@@ -5025,7 +5076,8 @@ function renderTimes(){
     return (av-bv)*hd || a.name.localeCompare(b.name,'es');
   });
   document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeHourSort===hk?(hd===1?'↑':'↓'):'↕';});
-  $('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td><td><b>'+esc(timePickerZones(p.rows))+'</b></td></tr>').join('');
+  if($('timeHourlyBody'))$('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td><td><b>'+esc(timePickerZones(p.rows))+'</b></td></tr>').join('');
+  renderProductivityDaily(hourlyPickers);
   const deadRows=pickers.map(p=>{const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b),first=dates[0]||null;const startDead=first?Math.max(0,minsOfDay(first)-360):null;const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);const beforeBreakfast=bd.length?bd[bd.length-1]:null,afterBreakfast=ad.length?ad[0]:null;const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;const beforeLunch=dates.length?dates[dates.length-1]:null,lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null,total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;return{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total};});
   const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
   deadRows.sort((a,b)=>{const av=getVal(a),bv=getVal(b);if(av==null&&bv==null)return a.p.name.localeCompare(b.p.name,'es');if(av==null)return 1;if(bv==null)return-1;if(typeof av==='string')return av.localeCompare(bv,'es')*d;return(av-bv)*d;});
@@ -5038,6 +5090,58 @@ function renderTimes(){
   $('timeEmpty').style.display=pickers.length?'none':'block';
 }
 
+
+let PRODUCTIVITY_SORT={key:'avg',dir:-1};
+let productivityCalendarAnchor='';
+function renderProductivityDaily(pickers){
+  if(!$('productivityDailyBody'))return;
+  const k=PRODUCTIVITY_SORT.key,d=PRODUCTIVITY_SORT.dir;
+  const arr=pickers.slice().sort((a,b)=>{
+    const val=p=>k==='name'?p.name.toLowerCase():k==='total'?p.rows.length:k==='avg'?p.rows.length/6.5:timePickerZones(p.rows).toLowerCase();
+    const av=val(a),bv=val(b);
+    if(typeof av==='string')return av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'})*d;
+    return (av-bv)*d||a.name.localeCompare(b.name,'es');
+  });
+  document.querySelectorAll('[data-productivity-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.productivitySort===k?(d===1?'↑':'↓'):'↕';});
+  $('productivityDailyBody').innerHTML=arr.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td><td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td><td>'+esc(timePickerZones(p.rows))+'</td></tr>').join('');
+  const total=arr.reduce((a,p)=>a+p.rows.length,0);
+  const avg=arr.length?arr.reduce((a,p)=>a+(p.rows.length/6.5),0)/arr.length:0;
+  $('productivityTotalLines').textContent=total.toLocaleString('es-AR');
+  $('productivityPickerCount').textContent=arr.length;
+  $('productivityGeneralAvg').textContent=avg.toFixed(1);
+}
+function productivitySelectDate(iso){
+  if(!iso||iso>timeTodayISO())return;
+  if($('productivityDateFilter'))$('productivityDateFilter').value=iso;
+  if($('timeDateFilter'))$('timeDateFilter').value=iso;
+  TIME_LOADED=false;buildTimesPanel(true,iso);
+}
+function renderProductivityCalendar(){
+  const box=$('productivityCalendar'),title=$('productivityCalendarTitle');if(!box||!title)return;
+  const base=(productivityCalendarAnchor||$('productivityDateFilter')?.value||timeYesterdayISO()).slice(0,7);
+  const [y,m]=base.split('-').map(Number);
+  const first=new Date(y,m-1,1),days=new Date(y,m,0).getDate(),start=(first.getDay()+6)%7;
+  const names=['L','M','X','J','V','S','D'];
+  const monthNames=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  title.textContent=monthNames[m-1].charAt(0).toUpperCase()+monthNames[m-1].slice(1)+' '+y;
+  let html=names.map(n=>'<div style="text-align:center;color:#8fa0b4;font-size:10px;font-weight:900;padding:3px">'+n+'</div>').join('');
+  for(let i=0;i<start;i++)html+='<div></div>';
+  const selected=$('productivityDateFilter')?.value||'';
+  const today=timeTodayISO();
+  for(let day=1;day<=days;day++){
+    const iso=`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const disabled=iso>today,active=iso===selected;
+    html+='<button type="button" data-productivity-day="'+iso+'" '+(disabled?'disabled':'')+' style="min-height:34px;border:1px solid '+(active?'#75c8ff':'#344152')+';border-radius:7px;background:'+(active?'#173044':'#111820')+';color:'+(disabled?'#566270':'#eef5ff')+';font-weight:'+(active?'900':'700')+';cursor:'+(disabled?'default':'pointer')+'">'+day+'</button>';
+  }
+  box.innerHTML=html;
+  box.querySelectorAll('[data-productivity-day]').forEach(btn=>btn.onclick=()=>productivitySelectDate(btn.dataset.productivityDay));
+}
+function productivityShiftMonth(delta){
+  const base=(productivityCalendarAnchor||$('productivityDateFilter')?.value||timeYesterdayISO()).slice(0,7);
+  const [y,m]=base.split('-').map(Number),dt=new Date(y,m-1+delta,1);
+  const next=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+  if(next>timeTodayISO().slice(0,7))return;productivityCalendarAnchor=next;renderProductivityCalendar();
+}
 
 function exportTimeControlXls(){
   try{
@@ -5107,9 +5211,12 @@ function timeLocalISO(d){
 function timeYesterdayISO(){const d=new Date();d.setDate(d.getDate()-1);return timeLocalISO(d);}
 function timeTodayISO(){return timeLocalISO(new Date());}
 function timeInitDate(){
-  const inp=$('timeDateFilter'); if(!inp)return;
-  inp.max=timeTodayISO();
-  if(!inp.value)inp.value=timeYesterdayISO();
+  const t=$('timeDateFilter'),p=$('productivityDateFilter');
+  [t,p].filter(Boolean).forEach(inp=>{inp.max=timeTodayISO();if(!inp.value)inp.value=timeYesterdayISO();});
+  const chosen=(p?.value||t?.value||timeYesterdayISO());
+  if(t)t.value=chosen;if(p)p.value=chosen;
+  productivityCalendarAnchor=chosen.slice(0,7);
+  renderProductivityCalendar();
 }
 function timeFileForDate(iso){return './datos/tiempos/'+String(iso||'').replaceAll('-','')+'.json';}
 
@@ -5139,13 +5246,17 @@ function timeShiftDate(days){
   const next=timeLocalISO(dt); if(next>timeTodayISO())return;
   inp.value=next; TIME_LOADED=false; buildTimesPanel(true);
 }
-async function buildTimesPanel(force=false){
-  const st=$('timeStatus');
+async function buildTimesPanel(force=false,requestedDate=''){
+  const st=$('timeStatus'),pst=$('productivityStatus');
   timeInitDate();
-  const selected=$('timeDateFilter')?.value||timeYesterdayISO();
+  const selected=requestedDate||$('productivityDateFilter')?.value||$('timeDateFilter')?.value||timeYesterdayISO();
+  if($('timeDateFilter'))$('timeDateFilter').value=selected;
+  if($('productivityDateFilter'))$('productivityDateFilter').value=selected;
+  productivityCalendarAnchor=selected.slice(0,7);
+  renderProductivityCalendar();
   if(TIME_LOADED&&!force&&TIME_SELECTED_DATE===selected){renderTimes();return;}
   try{
-    if(st){st.className='processStatus';st.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';}
+    if(st){st.className='processStatus';st.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';} if(pst){pst.className='processStatus';pst.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';}
     let url=timeFileForDate(selected)+'?ts='+Date.now();
     let res=await fetch(url,{cache:'no-store'});
     // Compatibilidad: para hoy, si todavía no existe el histórico fechado, usar tiempos.json.
@@ -5159,8 +5270,8 @@ async function buildTimesPanel(force=false){
           const payload=last.payload;
           TIME_ROWS=last.rows;
           TIME_LOADED=true;
-          $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+last.iso.split('-').reverse().join('/'));
-          if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · último día operativo '+last.iso.split('-').reverse().join('/');}
+          if($('timeUpdated'))$('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+last.iso.split('-').reverse().join('/')); if($('productivityUpdated'))$('productivityUpdated').textContent='Día '+last.iso.split('-').reverse().join('/');
+          if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · último día operativo '+last.iso.split('-').reverse().join('/');} if(pst){pst.className='processStatus';pst.textContent='Fuente: Copérnico Productividad · '+TIME_ROWS.length+' líneas · último día operativo '+last.iso.split('-').reverse().join('/');}
           renderTimes();
           return;
         }
@@ -5171,13 +5282,13 @@ async function buildTimesPanel(force=false){
     const payload=await res.json();
     TIME_ROWS=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
     TIME_LOADED=true; TIME_SELECTED_DATE=selected;
-    $('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+selected.split('-').reverse().join('/'));
-    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · histórico '+selected.split('-').reverse().join('/');}
+    if($('timeUpdated'))$('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+selected.split('-').reverse().join('/')); if($('productivityUpdated'))$('productivityUpdated').textContent='Día '+selected.split('-').reverse().join('/');
+    if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · histórico '+selected.split('-').reverse().join('/');} if(pst){pst.className='processStatus';pst.textContent='Fuente: Copérnico Productividad · '+TIME_ROWS.length+' líneas · histórico '+selected.split('-').reverse().join('/');}
     renderTimes();
   }catch(err){
     console.error('Tiempos',err);TIME_LOADED=false;TIME_ROWS=[];
     renderTimes();
-    if(st){st.className='processStatus bad';st.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);}
+    if(st){st.className='processStatus bad';st.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);} if(pst){pst.className='processStatus bad';pst.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);}
   }
 }
 
@@ -5683,13 +5794,25 @@ document.querySelectorAll('[data-ops-open]').forEach(el=>el.onclick=()=>setDispl
 
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
+$('productivityModeBtn').onclick=()=>setDisplayMode('productivity');
 $('timesModeBtn').onclick=()=>setDisplayMode('times');
+
+$('productivitySearch').oninput=()=>renderTimes();
+document.querySelectorAll('[data-productivity-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.productivitySort;if(PRODUCTIVITY_SORT.key===k)PRODUCTIVITY_SORT.dir*=-1;else PRODUCTIVITY_SORT={key:k,dir:1};renderTimes();};});
+$('productivityRefreshBtn').onclick=()=>buildTimesPanel(true,$('productivityDateFilter').value);
+$('productivityDateFilter').onchange=()=>productivitySelectDate($('productivityDateFilter').value);
+$('productivityPrevDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()-1);productivitySelectDate(timeLocalISO(dt));};
+$('productivityNextDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+1);productivitySelectDate(timeLocalISO(dt));};
+$('productivityYesterdayBtn').onclick=()=>productivitySelectDate(timeYesterdayISO());
+$('productivityTodayBtn').onclick=()=>productivitySelectDate(timeTodayISO());
+$('productivityPrevMonth').onclick=()=>productivityShiftMonth(-1);
+$('productivityNextMonth').onclick=()=>productivityShiftMonth(1);
 $('timeSearch').oninput=()=>renderTimes();
 document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeHourSort;if(TIME_HOURLY_SORT.key===k)TIME_HOURLY_SORT.dir*=-1;else TIME_HOURLY_SORT={key:k,dir:1};renderTimes();};});
 document.querySelectorAll('[data-time-sort]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.timeSort;if(TIME_DEAD_SORT.key===k)TIME_DEAD_SORT.dir*=-1;else TIME_DEAD_SORT={key:k,dir:1};renderTimes();};});
 $('timeRefreshBtn').onclick=()=>buildTimesPanel(true);
 $('timeExportXlsBtn').onclick=()=>exportTimeControlXls();
-$('timeDateFilter').onchange=()=>{TIME_LOADED=false;buildTimesPanel(true);};
+$('timeDateFilter').onchange=()=>{if($('productivityDateFilter'))$('productivityDateFilter').value=$('timeDateFilter').value;TIME_LOADED=false;buildTimesPanel(true,$('timeDateFilter').value);};
 $('timePrevDay').onclick=()=>timeShiftDate(-1);
 $('timeNextDay').onclick=()=>timeShiftDate(1);
 $('timeYesterdayBtn').onclick=()=>{$('timeDateFilter').value=timeYesterdayISO();TIME_LOADED=false;buildTimesPanel(true);};
