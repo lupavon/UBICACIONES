@@ -2250,7 +2250,7 @@ body.heatSplit .layoutHeatGrid{
       </div>
     </div>
     <div style="padding:10px 12px 4px">
-      <div id="productivityMonthSummary" style="font-size:12px;color:#aebed0;margin-bottom:8px"></div>
+      <div id="productivityMonthSummary"></div>
       <div id="productivityMonthChart" style="min-height:260px;overflow-x:auto"></div>
     </div>
   </div>
@@ -5199,47 +5199,94 @@ function renderProductivityMonthChart(month,daysData){
     sum.textContent='';
     return;
   }
+
   const norm=timeNormName(picker);
   const points=(daysData||[]).map(x=>{
     const rows=(x.rows||[]).filter(r=>timeNormName(productivityPickerNameFromRow(r))===norm);
-    return {day:x.day,count:rows.length,avg:rows.length?rows.length/6.5:null};
+    const zones=rows.length?timePickerZones(rows):'';
+    return {
+      day:x.day,
+      count:rows.length,
+      avg:rows.length?rows.length/6.5:null,
+      zones:zones||''
+    };
   });
+
   const active=points.filter(p=>p.avg!==null);
   if(!active.length){
     chart.innerHTML='<div class="processEmpty">No hay actividad de '+esc(picker)+' en este mes.</div>';
     sum.textContent='Sin días con actividad en '+month.split('-').reverse().join('/');
     return;
   }
+
   const vals=active.map(p=>p.avg);
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
   const best=active.slice().sort((a,b)=>b.avg-a.avg)[0];
   const worst=active.slice().sort((a,b)=>a.avg-b.avg)[0];
-  sum.innerHTML='<b>'+esc(picker)+'</b> · '+active.length+' días con actividad · Promedio mensual <b>'+avg.toFixed(1)+' líneas/h</b> · Mejor día <b>'+best.avg.toFixed(1)+'</b> ('+best.day.slice(8,10)+') · Menor día <b>'+worst.avg.toFixed(1)+'</b> ('+worst.day.slice(8,10)+')';
 
-  const W=Math.max(760,points.length*34),H=260,PL=48,PR=18,PT=18,PB=42;
+  const fmtDay=p=>p.day.slice(8,10)+'/'+p.day.slice(5,7);
+  const zoneText=p=>p.zones||'Sin zona';
+
+  sum.innerHTML=
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:10px;margin:4px 0 12px">'+
+      '<div class="processKpi" style="min-height:82px">'+
+        '<small>PROMEDIO MENSUAL</small>'+
+        '<b>'+avg.toFixed(1)+'</b>'+
+        '<span>líneas/h · '+active.length+' días con actividad</span>'+
+      '</div>'+
+      '<div class="processKpi" style="min-height:82px">'+
+        '<small>MEJOR DÍA</small>'+
+        '<b>'+best.avg.toFixed(1)+'</b>'+
+        '<span>'+fmtDay(best)+' · '+esc(zoneText(best))+'</span>'+
+      '</div>'+
+      '<div class="processKpi" style="min-height:82px">'+
+        '<small>PEOR DÍA</small>'+
+        '<b>'+worst.avg.toFixed(1)+'</b>'+
+        '<span>'+fmtDay(worst)+' · '+esc(zoneText(worst))+'</span>'+
+      '</div>'+
+    '</div>';
+
+  // Más ancho por día para que se vea claramente la zona debajo de cada punto.
+  const W=Math.max(900,points.length*48),H=315,PL=50,PR=20,PT=20,PB=88;
   const maxVal=Math.max(10,Math.ceil(Math.max(...vals)/10)*10);
   const x=(i)=>PL + (W-PL-PR)*(points.length===1?0.5:i/(points.length-1));
   const y=(v)=>PT + (H-PT-PB)*(1-(v/maxVal));
+
   let svg=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Evolución mensual de productividad">`;
+
   for(let t=0;t<=4;t++){
     const val=maxVal*(t/4),yy=y(val);
     svg+=`<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="currentColor" opacity=".12"/>`;
     svg+=`<text x="${PL-8}" y="${yy+4}" text-anchor="end" fill="currentColor" opacity=".7" font-size="10">${val.toFixed(0)}</text>`;
   }
-  const validPts=points.map((p,i)=>p.avg===null?null:[x(i),y(p.avg),p]).filter(Boolean);
+
+  const validPts=points.map((p,i)=>p.avg===null?null:[x(i),y(p.avg),p,i]).filter(Boolean);
   if(validPts.length){
     svg+=`<polyline fill="none" stroke="#75c8ff" stroke-width="3" points="${validPts.map(v=>v[0]+','+v[1]).join(' ')}"/>`;
+
     validPts.forEach(v=>{
-      svg+=`<circle cx="${v[0]}" cy="${v[1]}" r="4" fill="#75c8ff"><title>${v[2].day.split('-').reverse().join('/')} · ${v[2].avg.toFixed(1)} líneas/h · ${v[2].count} líneas</title></circle>`;
+      const px=v[0],py=v[1],p=v[2];
+      const tooltip=`${p.day.split('-').reverse().join('/')} · ${p.avg.toFixed(1)} líneas/h · ${p.count} líneas · Zona: ${p.zones||'Sin zona'}`;
+      svg+=`<circle cx="${px}" cy="${py}" r="4.5" fill="#75c8ff"><title>${esc(tooltip)}</title></circle>`;
+      svg+=`<text x="${px}" y="${py-10}" text-anchor="middle" fill="currentColor" font-size="9" font-weight="800">${p.avg.toFixed(0)}</text>`;
     });
   }
+
+  // Día + zona debajo del gráfico. Se muestran solamente los días con actividad.
   points.forEach((p,i)=>{
-    const dd=Number(p.day.slice(8,10));
-    if(dd===1||dd%2===0||i===points.length-1)
-      svg+=`<text x="${x(i)}" y="${H-16}" text-anchor="middle" fill="currentColor" opacity=".75" font-size="10">${dd}</text>`;
+    if(p.avg===null)return;
+    const px=x(i),dd=Number(p.day.slice(8,10));
+    const z=(p.zones||'Sin zona');
+    const zShort=z.length>13?z.slice(0,12)+'…':z;
+    svg+=`<line x1="${px}" y1="${H-PB+3}" x2="${px}" y2="${H-PB+9}" stroke="currentColor" opacity=".28"/>`;
+    svg+=`<text x="${px}" y="${H-56}" text-anchor="middle" fill="currentColor" font-size="10" font-weight="900">${dd}</text>`;
+    svg+=`<text x="${px}" y="${H-39}" text-anchor="middle" fill="#9fc9ea" font-size="9" font-weight="800"><title>${esc(z)}</title>${esc(zShort)}</text>`;
   });
-  svg+=`<text x="${PL}" y="${H-2}" fill="currentColor" opacity=".55" font-size="10">Día del mes</text>`;
+
+  svg+=`<text x="${PL}" y="${H-14}" fill="currentColor" opacity=".55" font-size="10">Día</text>`;
+  svg+=`<text x="${PL+28}" y="${H-14}" fill="#9fc9ea" opacity=".85" font-size="10">· zona trabajada debajo de cada día</text>`;
   svg+='</svg>';
+
   chart.innerHTML=svg;
 }
 
