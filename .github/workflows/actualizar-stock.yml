@@ -35,6 +35,7 @@ jobs:
           import http.cookiejar
           import time
           from concurrent.futures import ThreadPoolExecutor, as_completed
+          from collections import defaultdict, Counter
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
 
@@ -1669,15 +1670,113 @@ jobs:
                       }
 
                   def build_productivity_summary(source_prod, source_pick, query_day, label_day, updated_at):
-                      # Reutiliza el cruce seguro ya usado por Tiempos, pero en este resumen
-                      # la zona debe venir de la línea real de picking cuando exista cruce.
-                      base = build_time_rows(source_prod, source_pick)
+                      # MISMA LÓGICA QUE EL BACKFILL: la zona sale exclusivamente de
+                      # Líneas de Picking. Productividad solo aporta picker/actividad.
+                      by_exact = defaultdict(list)
+                      by_pick_sku = defaultdict(list)
+
+                      for ln in source_pick:
+                          picking = nkey(sval(ln, "NumPicking", "Picking", "picking"))
+                          pedido = nkey(sval(ln, "pedido", "Pedido", "NumPedido"))
+                          if not picking:
+                              continue
+                          for sku in sku_keys(ln, "pick"):
+                              by_pick_sku[(picking, sku)].append(ln)
+                              if pedido:
+                                  by_exact[(picking, pedido, sku)].append(ln)
+
+                      def choose_summary_line(pr):
+                          picking = nkey(sval(pr, "Picking", "picking", "NumPicking"))
+                          pedido = nkey(sval(pr, "NumPedido", "Pedido", "pedido"))
+                          skus = sku_keys(pr, "prod")
+                          for sku in skus:
+                              vals = by_exact.get((picking, pedido, sku), [])
+                              if len(vals) == 1:
+                                  return vals[0], "Picking+Pedido+SKU"
+                              if len(vals) > 1:
+                                  zones = {nkey(sval(x, "zonapiso", "ZonaPiso", "zona", "Zona")) for x in vals}
+                                  zones.discard("")
+                                  if len(zones) == 1:
+                                      return vals[0], "Picking+Pedido+SKU (misma zona)"
+                          for sku in skus:
+                              vals = by_pick_sku.get((picking, sku), [])
+                              zones = {nkey(sval(x, "zonapiso", "ZonaPiso", "zona", "Zona")) for x in vals}
+                              zones.discard("")
+                              if vals and (len(vals) == 1 or len(zones) == 1):
+                                  return vals[0], "Picking+SKU"
+                          return None, "Sin cruce seguro"
+
+                      detail = []
+                      grouped = {}
+                      for pr in source_prod:
+                          proc = nkey(prod_process(pr))
+                          if proc and "PICK" not in proc:
+                              continue
+                          hh = prod_hour(pr)
+                          if hh < 6 or hh >= 14:
+                              continue
+
+                          picker = sval(pr, "Nombres", "nombres", "NombreEmpleado", "nombreEmpleado")
+                          emp = sval(pr, "Empleado", "empleado", "IdEmpleado", "idEmpleado")
+                          if not picker:
+                              picker = emp or "Sin nombre"
+
+                          ln, match = choose_summary_line(pr)
+                          zone = nkey(sval(ln, "zonapiso", "ZonaPiso", "zona", "Zona")) if ln else ""
+                          detail.append({
+                              "Fecha": label_day,
+                              "Picker": picker,
+                              "IdEmpleado": emp,
+                              "Picking": sval(pr, "Picking", "picking", "NumPicking"),
+                              "Pedido": sval(pr, "NumPedido", "Pedido", "pedido"),
+                              "SKU": sval(pr, "ean", "EAN", "ref", "Ref", "barcode", "Barcode"),
+                              "FechaRegistro": sval(pr, "fecharegistro", "FechaRegistro", "fechaRegistro"),
+                              "Hora": hh,
+                              "ZonaLineaPicking": zone,
+                              "CruceZona": match,
+                          })
+
+                          gkey = (emp, picker)
+                          if gkey not in grouped:
+                              grouped[gkey] = {
+                                  "Fecha": label_day, "FechaQuery": query_day,
+                                  "IdEmpleado": emp, "Picker": picker,
+                                  "Lineas": 0, "Zonas": Counter(), "SinCruceZona": 0,
+                              }
+                          g = grouped[gkey]
+                          g["Lineas"] += 1
+                          if zone:
+                              g["Zonas"][zone] += 1
+                          else:
+                              g["SinCruceZona"] += 1
+
+                      pickers = []
+                      for g in grouped.values():
+                          zonas = dict(g["Zonas"].most_common())
+                          principal = next(iter(zonas), "")
+                          pickers.append({
+                              "Fecha": g["Fecha"], "FechaQuery": g["FechaQuery"],
+                              "IdEmpleado": g["IdEmpleado"], "Picker": g["Picker"],
+                              "Lineas": g["Lineas"],
+                              "PromedioLineasHora": round(g["Lineas"] / 6.5, 2),
+                              "ZonaPrincipal": principal,
+                              "Zonas": zonas,
+                              "SinCruceZona": g["SinCruceZona"],
+                          })
+
+                      pickers.sort(key=lambda x: (-x["Lineas"], x["Picker"].upper()))
                       return {
                           "updated_at": updated_at,
                           "fecha": label_day,
                           "fecha_query": query_day,
-                          "source": "Copernico ProductividadPIK + Líneas de Picking",
-                          "rows": base
+                          "source": "Cruce ProductividadPIK + Líneas de Picking; zona exclusivamente desde Líneas de Picking",
+                          "referencia_minutos": 390,
+                          "productividad_raw_count": len(source_prod),
+                          "lineas_picking_raw_count": len(source_pick),
+                          "lineas_productividad_06_14": len(detail),
+                          "pickers_count": len(pickers),
+                          "pickers": pickers,
+                          "rows": detail,
                       }
 
                   prod_raw_file = PRODUCTIVITY_HISTORY_DIR / f"{day}.json"
