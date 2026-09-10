@@ -5058,24 +5058,32 @@ function timeIsVolZone(v){
   const z=String(v||'').trim().toUpperCase().replace(/\s+/g,'');
   return /^MFCC(?:L|R)?$/.test(z)||['AR','BR'].includes(z);
 }
-function timePickerZones(rows){
-  const counts={MFCS:0,MFCQ:0,Masterbox:0,PM:0,Cigarrillos:0,Refrigerados:0,Congelados:0};
-  let mfcsVol=0;
+function timePickerZoneBreakdown(rows){
+  const counts={MFCS:0,'MFCS (VOL)':0,MFCQ:0,Masterbox:0,PM:0,Cigarrillos:0,Refrigerados:0,Congelados:0};
   rows.forEach(r=>{
     const raw=timeRawZone(r);
     const cat=timeZoneCategory(raw);
-    if(cat)counts[cat]=(counts[cat]||0)+1;
-    if(cat==='MFCS'&&timeIsVolZone(raw))mfcsVol++;
+    if(!cat)return;
+    if(cat==='MFCS'&&timeIsVolZone(raw)) counts['MFCS (VOL)']++;
+    else counts[cat]=(counts[cat]||0)+1;
   });
   const ranked=Object.entries(counts).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  const total=ranked.reduce((s,[,n])=>s+n,0);
+  return {ranked,total};
+}
+function timePickerZones(rows){
+  const {ranked,total}=timePickerZoneBreakdown(rows);
   if(!ranked.length)return '—';
   const [main,mainCount]=ranked[0];
-  // Si la mayoría de las líneas fue Masterbox, se muestra sólo Masterbox.
-  if(main==='Masterbox')return 'Masterbox';
-  // Para MFC, las calles MFCC / AR / BR se identifican como volumen.
-  if(main==='MFCS')return mfcsVol>0?'MFCS (VOL)':'MFCS';
-  // Para el resto se toma el tipo de pedido predominante del picker.
+  // La zona mostrada ahora es realmente la predominante. Antes cualquier línea VOL
+  // hacía que todo el día apareciera como MFCS (VOL).
   return main;
+}
+function timePickerZonesDetailed(rows){
+  const {ranked,total}=timePickerZoneBreakdown(rows);
+  if(!ranked.length)return '—';
+  const meaningful=ranked.filter(([,n],i)=>i===0 || n/total>=0.15).slice(0,3);
+  return meaningful.map(([z,n])=>z+' '+Math.round(n/total*100)+'%').join(' · ');
 }
 function timeFiltered(){
   const q=String((displayMode==='productivity'?$('productivitySearch')?.value:$('timeSearch')?.value)||'').trim().toLowerCase();
@@ -5203,7 +5211,7 @@ function renderProductivityMonthChart(month,daysData){
   const norm=timeNormName(picker);
   const points=(daysData||[]).map(x=>{
     const rows=(x.rows||[]).filter(r=>timeNormName(productivityPickerNameFromRow(r))===norm);
-    const zones=rows.length?timePickerZones(rows):'';
+    const zones=rows.length?timePickerZonesDetailed(rows):'';
     return {
       day:x.day,
       count:rows.length,
