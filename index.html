@@ -1669,24 +1669,69 @@ body.heatSplit .layoutHeatGrid{
 .progressPlanPanel{margin:12px 0;padding:12px;border:1px solid #303a47;border-radius:10px;background:#111820}.progressPlanControls{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.progressPlanControls label>small{display:block;color:#8d98a5;font-size:9px;margin-bottom:4px}.progressPlanControls input[type=date]{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:8px 10px}.progressPlanMeta{margin-top:8px;color:#9eabb9;font-size:10px}.progressPlanKpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin-top:10px}.progressPlanKpi{border:1px solid #293441;background:#0d131a;border-radius:8px;padding:9px}.progressPlanKpi small{display:block;color:#8d98a5;font-size:8px;text-transform:uppercase}.progressPlanKpi b{display:block;font-size:18px;margin-top:2px}.progressStateBadge{display:inline-block;border:1px solid #3b4655;border-radius:999px;padding:3px 7px;font-size:8px;font-weight:900;white-space:nowrap}.progressStateBadge.done{color:#78dfaa;border-color:#315c48}.progressStateBadge.active{color:#75c8ff;border-color:#355b70}.progressStateBadge.carry{color:#f5c96c;border-color:#6b5830}.progressStateBadge.cancel{color:#ff8e98;border-color:#71333a}.progressActionBtn{font-size:9px;padding:5px 7px}.progressDeletePlanBtn{border-color:#71333a!important;color:#ff9aa3!important;background:#251318!important}.progressDeletePlanBtn:hover{background:#35181e!important;border-color:#a94854!important}.progressOrigin{display:block;color:#8d98a5;font-size:8px;margin-top:3px}.progressPendingZones{font-size:9px;line-height:1.35;display:flex;gap:4px;flex-wrap:wrap;max-width:360px}.progressPendingZones .zoneChip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid #354252;border-radius:999px;background:#121a23;color:#eef1f5;font-weight:800;white-space:nowrap}.progressPendingZones .zoneChip em{font-style:normal;color:#f5c96c}.progressPendingZones .zoneHint{display:block;width:100%;color:#8d98a5;font-size:8px;margin-top:1px}.progressStall{font-size:9px;font-weight:800;white-space:nowrap}.progressStall.running{color:#f5c96c}.progressStall.fresh{color:#78dfaa}.progressStall.idle{color:#8d98a5}.progressStall.hot{color:#ff8e98}@media(max-width:900px){.progressPlanKpis{grid-template-columns:repeat(2,minmax(120px,1fr))}}
 </style>
 
+
+<style id="visual-cleanup-v1">
+/* ===== Visual cleanup · cabecera compacta ===== */
+.top{
+  flex-wrap:nowrap!important;
+  min-height:72px;
+  padding:12px 18px!important;
+}
+.top .brand{min-width:0}
+.top .userChip{
+  margin-left:auto!important;
+  flex:0 0 auto;
+}
+
+/* Ya no hay herramientas/KPIs globales en cabecera */
+.top > .controls,
+.top > .kpis,
+.top > .zonebar{display:none!important}
+
+/* Selector de zona exclusivo de Vista racks */
+.rackOnlyZonebar{
+  display:none;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin:0 0 14px;
+  padding:0;
+}
+.rackOnlyZonebar.visible{display:flex}
+
+/* Mantener la navegación como primera franja funcional */
+.modebar{margin-bottom:14px}
+
+/* En Vista racks la zona aparece pegada debajo de pestañas */
+#rackZonebar .btn{
+  font-size:11px;
+  padding:7px 10px;
+}
+
+@media(max-width:900px){
+  .top{
+    flex-wrap:nowrap!important;
+    align-items:center!important;
+  }
+  .top .brand{width:auto!important;flex:1 1 auto}
+  .top .userChip{margin-left:auto!important}
+  .rackOnlyZonebar{
+    width:100%;
+    overflow-x:auto;
+    flex-wrap:nowrap;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:3px;
+  }
+  .rackOnlyZonebar .btn{flex:0 0 auto}
+}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
 
 <div class="top">
 <div class="brand"><h1>UBICACIONES · Control de almacenamiento</h1><small id="sourceText">Cargando referencia de stock…</small></div><div class="userChip" id="userChip" style="display:none"><div><b id="currentUserName"></b><br><small id="currentUserRole"></small></div><button class="btn" id="logoutBtn" type="button">Cerrar sesión</button></div>
-<div class="zonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
-<div class="controls">
-<button class="btn" id="refreshStockBtn" type="button">↻ Actualizar stock</button>
-<label class="filelabel">Vista previa XLSX local<input accept=".xlsx,.xls" id="fileInput" type="file"/></label>
-<input class="search" id="search" placeholder="Buscar SKU, EAN, descripción o ubicación..."/>
-</div>
-<div class="kpis">
-<div class="kpi"><b id="kOcc">0</b><span>ocupadas</span></div>
-<div class="kpi"><b id="kBad">0</b><span>mal ubicadas</span></div>
-<div class="kpi"><b id="kMulti">0</b><span>mezcla SKU</span></div>
-<div class="kpi"><b id="kUnknown">0</b><span>sin clasificación</span></div>
-</div>
 </div>
 <div class="layout">
 <main class="main">
@@ -1705,6 +1750,8 @@ body.heatSplit .layoutHeatGrid{
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn adminOnly" id="usersModeBtn">👥 Usuarios</button>
 </div>
+<div class="zonebar rackOnlyZonebar" id="rackZonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
+
 
 <div id="dashboardView" class="opsDash active">
   <div class="opsHero">
@@ -2434,7 +2481,11 @@ function applyVisual(s,text,st){
 function setKPIs(rows,cells){
  let occ=0,bad=0,multi=0,unk=0;
  cells.forEach(({items,st})=>{if(items.length)occ++;if(st==='bad')bad++;if(st==='multi')multi++;if(st==='unknown')unk++});
- $('kOcc').textContent=occ;$('kBad').textContent=bad;$('kMulti').textContent=multi;$('kUnknown').textContent=unk;
+ const kOcc=$('kOcc'),kBad=$('kBad'),kMulti=$('kMulti'),kUnknown=$('kUnknown');
+ if(kOcc)kOcc.textContent=occ;
+ if(kBad)kBad.textContent=bad;
+ if(kMulti)kMulti.textContent=multi;
+ if(kUnknown)kUnknown.textContent=unk;
 }
 function rebuild(){
  const cfg=VIEWS[view],rows=currentRows(),root=$('racks');root.innerHTML='';
@@ -3063,11 +3114,11 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-view]').forEach(x=>x.classList.remove('active'));b.classList.add('active');
  view=b.dataset.view;selected=null;rebuild();
 });
-$('search').oninput=e=>{query=e.target.value;rebuild();if(displayMode==='heat')buildHeatmap()};
+if($('search')) $('search').oninput=e=>{query=e.target.value;rebuild();if(displayMode==='heat')buildHeatmap()};
 document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active'));b.classList.add('active');filter=b.dataset.filter;rebuild();
 });
-$('fileInput').onchange=async e=>{
+if($('fileInput')) $('fileInput').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
  try{
    if(typeof XLSX==='undefined')throw new Error('No se pudo cargar el lector XLSX. Abrí el dashboard con conexión a internet.');
@@ -3110,6 +3161,8 @@ function placeDetailForMode(mode){
 
 function setDisplayMode(mode){
   displayMode=mode;
+  const rackZonebar=document.getElementById('rackZonebar');
+  if(rackZonebar) rackZonebar.classList.toggle('visible',mode==='rack');
   const usersView=document.getElementById('usersView');
   if(usersView) usersView.classList.remove('active');
   const usersBtn=document.getElementById('usersModeBtn');
@@ -6324,7 +6377,7 @@ function startAutoStockRefresh(){
 
 const refreshBtn=document.getElementById('refreshStockBtn');
 if(refreshBtn){
-  refreshBtn.onclick=async()=>{
+  if(refreshBtn) refreshBtn.onclick=async()=>{
     refreshBtn.disabled=true;
     const prev=refreshBtn.textContent;
     refreshBtn.textContent='Actualizando…';
