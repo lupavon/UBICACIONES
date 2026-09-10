@@ -5287,7 +5287,10 @@ function renderProductivityMonthChart(month,daysData){
     if(p.avg===null)return;
     const px=x(i),dd=Number(p.day.slice(8,10));
     const z=(p.zones||'Sin zona');
-    const zShort=z.length>13?z.slice(0,12)+'…':z;
+    // En el eje inferior mostrar solo la zona principal, sin porcentaje ni zonas secundarias.
+    // Ej.: "MFCS 85% · MFCQ 15%" -> "MFCS" / "MFCS (VOL) 100%" -> "MFCS (VOL)".
+    const zMain=String(z).split(' · ')[0].replace(/\s+\d+(?:[.,]\d+)?%.*$/,'').trim()||'Sin zona';
+    const zShort=zMain.length>13?zMain.slice(0,12)+'…':zMain;
     svg+=`<line x1="${px}" y1="${H-PB+3}" x2="${px}" y2="${H-PB+9}" stroke="currentColor" opacity=".28"/>`;
     svg+=`<text x="${px}" y="${H-56}" text-anchor="middle" fill="currentColor" font-size="10" font-weight="900">${dd}</text>`;
     svg+=`<text x="${px}" y="${H-39}" text-anchor="middle" fill="#9fc9ea" font-size="9" font-weight="800"><title>${esc(z)}</title>${esc(zShort)}</text>`;
