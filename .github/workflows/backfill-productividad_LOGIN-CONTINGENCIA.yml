@@ -231,12 +231,17 @@ jobs:
                   return None
 
           def prod_hour(row):
-              dt = parse_dt(field(row, "fecharegistro", "FechaRegistro", "fechaRegistro"))
-              if dt:
-                  return dt.hour
-              raw = sval(row, "horaregistro", "HoraRegistro", "horaRegistro", "Hora", "hora")
+              # Misma lógica que el workflow operativo que ya genera tiempos.json correctamente.
+              # En Productividad, FechaRegistro puede venir con hora 00:00:00 y NO debe
+              # usarse para calcular la franja horaria. La hora real está en Hora / HoraRegistro.
+              raw = field(row, "hora", "Hora")
               try:
-                  return int(raw.split(":", 1)[0])
+                  return int(float(raw))
+              except Exception:
+                  pass
+              hr = sval(row, "horaregistro", "HoraRegistro", "horaRegistro")
+              try:
+                  return int(hr[0:2])
               except Exception:
                   return -1
 
