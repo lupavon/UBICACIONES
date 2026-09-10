@@ -507,6 +507,19 @@ jobs:
 
           git commit -m "Backfill Productividad y Líneas Picking ${{ github.event.inputs.desde }} a ${{ github.event.inputs.hasta }}"
 
-          # Por si main cambió mientras corría el backfill.
-          git pull --rebase origin main
+          # Main puede cambiar mientras el backfill descarga datos.
+          # Rehacemos el commit sobre el main más reciente, conservando como
+          # fuente de verdad únicamente los 3 directorios generados por este job.
+          BACKFILL_COMMIT=$(git rev-parse HEAD)
+          git fetch origin main
+          git reset --hard origin/main
+          git checkout "$BACKFILL_COMMIT" -- datos/productividad datos/lineas-picking datos/productividad-resumen
+          git add datos/productividad datos/lineas-picking datos/productividad-resumen
+
+          if git diff --cached --quiet; then
+            echo "Main ya contiene estos históricos."
+            exit 0
+          fi
+
+          git commit -m "Backfill Productividad y Líneas Picking ${{ github.event.inputs.desde }} a ${{ github.event.inputs.hasta }}"
           git push origin HEAD:main
