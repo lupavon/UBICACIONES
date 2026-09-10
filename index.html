@@ -5456,9 +5456,10 @@ function timeTodayISO(){return timeLocalISO(new Date());}
 function timeInitDate(){
   const t=$('timeDateFilter'),p=$('productivityDateFilter');
   [t,p].filter(Boolean).forEach(inp=>{inp.max=timeTodayISO();if(!inp.value)inp.value=timeYesterdayISO();});
-  const chosen=(p?.value||t?.value||timeYesterdayISO());
-  if(t)t.value=chosen;if(p)p.value=chosen;
-  productivityCalendarAnchor=chosen.slice(0,7);
+  // Cada vista conserva su propia fecha. No sincronizar Tiempos y Productividad acá,
+  // porque al navegar con las flechas una fecha podía pisar a la otra.
+  const chosen=(displayMode==='times' ? (t?.value||timeYesterdayISO()) : (p?.value||timeYesterdayISO()));
+  productivityCalendarAnchor=(p?.value||chosen).slice(0,7);
   renderProductivityCalendar();
 }
 function timeFileForDate(iso){return './datos/tiempos/'+String(iso||'').replaceAll('-','')+'.json';}
@@ -5499,16 +5500,21 @@ function timeShiftDate(days){
   timeInitDate();
   const [y,m,d]=inp.value.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+days);
   const next=timeLocalISO(dt); if(next>timeTodayISO())return;
-  inp.value=next; TIME_LOADED=false; buildTimesPanel(true);
+  inp.value=next; TIME_LOADED=false; buildTimesPanel(true,next);
 }
 async function buildTimesPanel(force=false,requestedDate=''){
   const st=$('timeStatus'),pst=$('productivityStatus');
   timeInitDate();
-  const selected=requestedDate||$('productivityDateFilter')?.value||$('timeDateFilter')?.value||timeYesterdayISO();
-  if($('timeDateFilter'))$('timeDateFilter').value=selected;
-  if($('productivityDateFilter'))$('productivityDateFilter').value=selected;
-  productivityCalendarAnchor=selected.slice(0,7);
-  renderProductivityCalendar();
+  const selected=requestedDate || (displayMode==='times'
+    ? ($('timeDateFilter')?.value||timeYesterdayISO())
+    : ($('productivityDateFilter')?.value||timeYesterdayISO()));
+  if(displayMode==='times'){
+    if($('timeDateFilter'))$('timeDateFilter').value=selected;
+  }else{
+    if($('productivityDateFilter'))$('productivityDateFilter').value=selected;
+    productivityCalendarAnchor=selected.slice(0,7);
+    renderProductivityCalendar();
+  }
   if(TIME_LOADED&&!force&&TIME_SELECTED_DATE===selected){renderTimes();return;}
   try{
     if(st){st.className='processStatus';st.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';} if(pst){pst.className='processStatus';pst.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';}
