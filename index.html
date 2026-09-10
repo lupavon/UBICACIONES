@@ -2247,6 +2247,9 @@ body.heatSplit .layoutHeatGrid{
           <select id="productivityMonthPicker" class="select" style="display:block;margin-top:3px;min-width:220px"></select>
         </label>
         <button class="btn" id="productivityMonthRefreshBtn" type="button">↻ Mes</button>
+        <button class="btn" id="productivityDownloadProdBtn" type="button">⬇ Productividad</button>
+        <button class="btn" id="productivityDownloadPickBtn" type="button">⬇ Líneas de picking</button>
+        <button class="btn" id="productivityDownloadSummaryBtn" type="button">⬇ Resumen</button>
       </div>
     </div>
     <div style="padding:10px 12px 4px">
@@ -5038,9 +5041,9 @@ function fmtDur(mins){
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 function timeNormName(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
-function timeIsExcluded(r){return timeNormName(r?.Nombres)==='nestor diaz';}
+function timeIsExcluded(r){return timeNormName(r?.Nombres||r?.Picker)==='nestor diaz';}
 function timeRawZone(r){
-  return String(r?.ZonaPiso||r?.zonapiso||r?.Zona||r?.zona||'').trim().toUpperCase();
+  return String(r?.ZonaLineaPicking||r?.ZonaPrincipal||r?.Zona||r?.ZonaPiso||r?.zonapiso||r?.zona||'').trim().toUpperCase();
 }
 function timeZoneCategory(v){
   const z=String(v||'').trim().toUpperCase().replace(/\s+/g,'');
@@ -5145,7 +5148,7 @@ let PRODUCTIVITY_MONTH_CACHE={};
 let PRODUCTIVITY_MONTH_LOADING=false;
 
 function productivityPickerNameFromRow(r){
-  return String(r?.Nombres||r?.Empleado||'Sin nombre').trim();
+  return String(r?.Picker||r?.Nombres||r?.Empleado||'Sin nombre').trim();
 }
 
 function productivityUpdateMonthPicker(pickers){
@@ -5181,11 +5184,10 @@ async function productivityLoadMonth(iso,force=false){
       if(day>today)break;
       tasks.push((async()=>{
         try{
-          let res=await fetch(timeFileForDate(day)+'?month='+Date.now(),{cache:'no-store'});
-          if(!res.ok && day===today)res=await fetch('./tiempos.json?month='+Date.now(),{cache:'no-store'});
+          let res=await fetch(productivitySummaryFileForDate(day)+'?month='+Date.now(),{cache:'no-store'});
           if(!res.ok)return {day,rows:[]};
           const payload=await res.json();
-          const rows=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
+          const rows=productivitySummaryRowsToTime(payload).filter(r=>!timeIsExcluded(r));
           return {day,rows};
         }catch(e){return {day,rows:[]};}
       })());
@@ -5392,6 +5394,59 @@ function exportTimeControlXls(){
   }
 }
 
+async function collectProductivityMonthlyExport(kind){
+  const selected=$('productivityDateFilter')?.value||TIME_SELECTED_DATE||timeYesterdayISO();
+  const month=selected.slice(0,7);
+  const [y,m]=month.split('-').map(Number);
+  const lastDay=new Date(y,m,0).getDate();
+  const today=timeTodayISO();
+  const out=[];
+  for(let d=1;d<=lastDay;d++){
+    const day=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if(day>today)break;
+    let url='';
+    if(kind==='productividad') url=productivityRawFileForDate(day);
+    else if(kind==='picking') url=pickingRawFileForDate(day);
+    else url=productivitySummaryFileForDate(day);
+    const r=await fetch(url+'?xls='+Date.now(),{cache:'no-store'}).catch(()=>null);
+    if(!r?.ok) continue;
+    const p=await r.json();
+    if(kind==='resumen'){
+      (p.pickers||[]).forEach(row=>out.push({
+        ...row,
+        Fecha:row.Fecha||day,
+        Zonas:typeof row.Zonas==='object'?Object.entries(row.Zonas).map(([z,n])=>z+': '+n).join(' | '):row.Zonas
+      }));
+    }else{
+      (Array.isArray(p)?p:(p.rows||[])).forEach(row=>out.push({Fecha:day,...row}));
+    }
+  }
+  return {month,rows:out};
+}
+
+async function exportProductivityMonthlyFile(kind,buttonId){
+  const btn=$(buttonId), oldText=btn?btn.textContent:'';
+  const cfg={
+    productividad:{label:'Productividad',sheet:'PRODUCTIVIDAD',file:'Productividad'},
+    picking:{label:'Líneas de picking',sheet:'LINEAS_PICKING',file:'Lineas_Picking'},
+    resumen:{label:'Resumen',sheet:'RESUMEN_PICKERS',file:'Resumen_Pickers'}
+  }[kind];
+  try{
+    if(typeof XLSX==='undefined') throw new Error('No se pudo cargar el exportador Excel.');
+    if(btn){btn.disabled=true;btn.textContent='Preparando…';}
+    const {month,rows}=await collectProductivityMonthlyExport(kind);
+    if(!rows.length) throw new Error('No encontré datos de '+cfg.label+' para '+month);
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb,ws,cfg.sheet);
+    XLSX.writeFile(wb,cfg.file+'_'+month.replace('-','')+'.xlsx',{compression:true});
+  }catch(e){
+    alert('No se pudo descargar '+cfg.label+': '+(e.message||e));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=oldText;}
+  }
+}
+
 function timeLocalISO(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${da}`;
@@ -5407,6 +5462,18 @@ function timeInitDate(){
   renderProductivityCalendar();
 }
 function timeFileForDate(iso){return './datos/tiempos/'+String(iso||'').replaceAll('-','')+'.json';}
+function productivitySummaryFileForDate(iso){return './datos/productividad-resumen/'+String(iso||'').replaceAll('-','')+'.json';}
+function productivityRawFileForDate(iso){return './datos/productividad/'+String(iso||'').replaceAll('-','')+'.json';}
+function pickingRawFileForDate(iso){return './datos/lineas-picking/'+String(iso||'').replaceAll('-','')+'.json';}
+function productivitySummaryRowsToTime(payload){
+  const rows=Array.isArray(payload)?payload:(payload?.rows||[]);
+  return rows.map(r=>({
+    Empleado:r.IdEmpleado||r.Empleado||'', Nombres:r.Picker||r.Nombres||r.Empleado||'Sin nombre',
+    Hora:Number(r.Hora), FechaRegistro:r.FechaRegistro||'', HoraRegistro:r.HoraRegistro||'',
+    Estado:r.Estado||'', Proceso:'Picking', Picking:r.Picking||'', Pedido:r.Pedido||'', SKU:r.SKU||'',
+    Zona:r.ZonaLineaPicking||r.ZonaPrincipal||'', ZonaLineaPicking:r.ZonaLineaPicking||r.ZonaPrincipal||'', CruceZona:r.CruceZona||''
+  }));
+}
 
 async function timeFindLastOperationalDate(startISO=null,maxDays=10){
   const start=startISO||timeYesterdayISO();
@@ -5445,10 +5512,11 @@ async function buildTimesPanel(force=false,requestedDate=''){
   if(TIME_LOADED&&!force&&TIME_SELECTED_DATE===selected){renderTimes();return;}
   try{
     if(st){st.className='processStatus';st.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';} if(pst){pst.className='processStatus';pst.textContent='Cargando Productividad del '+selected.split('-').reverse().join('/')+'…';}
-    let url=timeFileForDate(selected)+'?ts='+Date.now();
+    const isProductivityView=(displayMode==='productivity');
+    let url=(isProductivityView?productivitySummaryFileForDate(selected):timeFileForDate(selected))+'?ts='+Date.now();
     let res=await fetch(url,{cache:'no-store'});
-    // Compatibilidad: para hoy, si todavía no existe el histórico fechado, usar tiempos.json.
-    if(!res.ok && selected===timeTodayISO())res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
+    // Tiempos conserva compatibilidad con tiempos.json; Productividad usa exclusivamente la nueva base resumen.
+    if(!res.ok && !isProductivityView && selected===timeTodayISO())res=await fetch('./tiempos.json?ts='+Date.now(),{cache:'no-store'});
     if(!res.ok){
       if(res.status===404){
         const last=await timeFindLastOperationalDate(selected,10);
@@ -5468,7 +5536,7 @@ async function buildTimesPanel(force=false,requestedDate=''){
       throw new Error('HTTP '+res.status);
     }
     const payload=await res.json();
-    TIME_ROWS=(Array.isArray(payload)?payload:(payload.rows||[])).filter(r=>!timeIsExcluded(r));
+    TIME_ROWS=(isProductivityView?productivitySummaryRowsToTime(payload):(Array.isArray(payload)?payload:(payload.rows||[]))).filter(r=>!timeIsExcluded(r));
     TIME_LOADED=true; TIME_SELECTED_DATE=selected;
     if($('timeUpdated'))$('timeUpdated').textContent=payload.fecha?('Día '+payload.fecha):('Día '+selected.split('-').reverse().join('/')); if($('productivityUpdated'))$('productivityUpdated').textContent='Día '+selected.split('-').reverse().join('/');
     if(st){st.className='processStatus';st.textContent='Fuente: Copérnico Productividad · Picking · Confirmadas + Negadas · '+TIME_ROWS.length+' líneas 06–14 · histórico '+selected.split('-').reverse().join('/');} if(pst){pst.className='processStatus';pst.textContent='Fuente: Copérnico Productividad · '+TIME_ROWS.length+' líneas · histórico '+selected.split('-').reverse().join('/');}
@@ -5990,6 +6058,9 @@ document.querySelectorAll('[data-productivity-sort]').forEach(th=>{th.style.curs
 $('productivityRefreshBtn').onclick=()=>buildTimesPanel(true,$('productivityDateFilter').value);
 $('productivityMonthPicker').onchange=()=>productivityLoadMonth($('productivityDateFilter')?.value||timeYesterdayISO(),false);
 $('productivityMonthRefreshBtn').onclick=()=>productivityLoadMonth($('productivityDateFilter')?.value||timeYesterdayISO(),true);
+$('productivityDownloadProdBtn')?.addEventListener('click',()=>exportProductivityMonthlyFile('productividad','productivityDownloadProdBtn'));
+$('productivityDownloadPickBtn')?.addEventListener('click',()=>exportProductivityMonthlyFile('picking','productivityDownloadPickBtn'));
+$('productivityDownloadSummaryBtn')?.addEventListener('click',()=>exportProductivityMonthlyFile('resumen','productivityDownloadSummaryBtn'));
 $('productivityDateFilter').onchange=()=>productivitySelectDate($('productivityDateFilter').value);
 $('productivityPrevDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()-1);productivitySelectDate(timeLocalISO(dt));};
 $('productivityNextDay').onclick=()=>{const v=$('productivityDateFilter').value;const [y,m,d]=v.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+1);productivitySelectDate(timeLocalISO(dt));};
