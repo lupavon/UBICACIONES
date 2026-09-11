@@ -6001,25 +6001,35 @@ function progressSectorAreaName(sector){
   if(u.includes('SECO')||u.includes('UNITARIO'))return 'Unitarios secos';
   return sector;
 }
+function progressCurrentPlanSheetName(){
+  // La Planilla de Preparación usa pestañas DD-MM (ej. 11-09).
+  // Siempre se toma únicamente la pestaña correspondiente al día calendario actual.
+  const now=new Date();
+  return `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
 async function progressImportDailyPlanFile(file,date){
   const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false});
-  const all=[];
-  for(const sn of wb.SheetNames)all.push(...progressFindDailySectorsInSheet(wb.Sheets[sn],sn));
-  if(!all.length)throw new Error('No encontré sectores con las columnas Tienda, Pedido ERP, Picking, Líneas y Unidades.');
+  const wantedSheet=progressCurrentPlanSheetName();
+  const realSheet=wb.SheetNames.find(sn=>String(sn).trim()===wantedSheet);
+  if(!realSheet){
+    throw new Error(`No encontré la pestaña ${wantedSheet}, que corresponde al día de hoy. Pestañas disponibles: ${wb.SheetNames.join(' · ')}`);
+  }
+  const all=progressFindDailySectorsInSheet(wb.Sheets[realSheet],realSheet);
+  if(!all.length)throw new Error(`En la pestaña ${realSheet} no encontré sectores con las columnas Tienda, Pedido ERP, Picking, Líneas y Unidades.`);
   const merged={};
   all.forEach(sec=>{
     const key=sec.name.trim();
-    if(!merged[key])merged[key]={name:key,sheetName:sec.sheetName,rows:[]};
+    if(!merged[key])merged[key]={name:key,sheetName:realSheet,rows:[]};
     merged[key].rows.push(...sec.rows);
   });
   const sectors=Object.values(merged);
   const st=progressLoadStore();st.days[date]=st.days[date]||{rows:[]};
-  st.days[date].dailyPlanilla={fileName:file.name,loadedAt:new Date().toISOString(),sectors};
+  st.days[date].dailyPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),sectors};
   // Compatibilidad con versiones anteriores: si existe Unitario Seco también queda disponible aquí.
   const unit=sectors.find(x=>progressNormalizeSectorKey(x.name).includes('UNITARIO SECO'));
-  if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:unit.sheetName,loadedAt:new Date().toISOString(),rows:unit.rows};
+  if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),rows:unit.rows};
   progressSaveStore(st);await progressRemoteSave(st);
-  return {sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name)};
+  return {sheetName:realSheet,sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name)};
 }
 function progressDailyPlan(date){const st=progressLoadStore();return st.days?.[date]?.dailyPlanilla||null}
 function progressDailyUnitario(date){const st=progressLoadStore();return st.days?.[date]?.unitarioPlanilla||null}
@@ -6308,8 +6318,8 @@ if(progressDailyDrop&&progressDailyInput){
   progressDailyDrop.onclick=()=>progressDailyInput.click();
   ['dragenter','dragover'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.add('drag')}));
   ['dragleave','drop'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.remove('drag')}));
-  progressDailyDrop.addEventListener('drop',async e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada: '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}});
-  progressDailyInput.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada: '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}finally{e.target.value=''}};
+  progressDailyDrop.addEventListener('drop',async e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}});
+  progressDailyInput.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}finally{e.target.value=''}};
 }
 if($('progressZoneFilter'))$('progressZoneFilter').onchange=()=>progressRenderUnitarioPanel();
 if($('progressSectorFilter'))$('progressSectorFilter').onchange=()=>{if($('progressZoneFilter'))$('progressZoneFilter').value='__ALL__';progressRenderUnitarioPanel();};
