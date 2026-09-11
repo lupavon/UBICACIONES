@@ -5931,10 +5931,23 @@ async function progressImportPlanFile(file,date){
     if(x.product){g.ZoneProducts[zone]=g.ZoneProducts[zone]||{};g.ZoneProducts[zone][x.product]=(g.ZoneProducts[zone][x.product]||0)+1}
   });
   const st=progressLoadStore();
-  st.days[date]={fileName:file.name,loadedAt:new Date().toISOString(),sourceRows:validRows.length,excludedRows:excludedDestination38,excludedDestination38,filterMode:'EXCLUIR DESTINO 38',rows:Object.values(groups)};
+  const previousDay=(st.days&&st.days[date])?st.days[date]:{};
+  st.days[date]={
+    ...previousDay,
+    fileName:file.name,
+    loadedAt:new Date().toISOString(),
+    sourceRows:validRows.length,
+    excludedRows:excludedDestination38,
+    excludedDestination38,
+    filterMode:'EXCLUIR DESTINO 38',
+    rows:Object.values(groups)
+  };
   progressSaveStore(st);
-  await progressRemoteSave(st);
-  return {sourceRows:validRows.length,groups:Object.keys(groups).length,excludedDestination38};
+  let remoteSaved=false;
+  try{await progressRemoteSave(st);remoteSaved=true}catch(e){
+    console.warn('Detalle TRs guardado localmente; base compartida no disponible',e);
+  }
+  return {sourceRows:validRows.length,groups:Object.keys(groups).length,excludedDestination38,remoteSaved};
 }
 
 function progressNormHeader(v){return String(v??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ')}
@@ -6274,19 +6287,109 @@ async function progressLoadMicroPickers(date,force=false){
     PROGRESS_MICRO_PICKERS_CACHE[date]=result;return result;
   }catch(e){console.warn('Microsector pickers',e);PROGRESS_MICRO_PICKERS_CACHE[date]={};return {};}
 }
+function progressDailyNormalizeState(v){
+  return String(v||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function progressDailyIsProcessedState(v){
+  const s=progressDailyNormalizeState(v);
+  // Regla operativa del dashboard: Confirmadas + Negadas = línea procesada.
+  return s.includes('CONFIRM')||s.includes('NEGAD');
+}
+function progressDailyIsDeniedState(v){
+  return progressDailyNormalizeState(v).includes('NEGAD');
+}
+function progressDailyDetailBridge(row){
+  const date=progressSelectedDate(),pedido=String(row?.Pedido||'').trim();
+  if(!pedido)return {pickings:[],planZones:{}};
+  const day=progressLoadStore().days?.[date]||{};
+  const details=Array.isArray(day.rows)?day.rows.filter(r=>String(r?.Pedido||'').trim()===pedido):[];
+  const pickings=[...new Set(details.flatMap(r=>{
+    const a=[];
+    if(r?.Picking)a.push(String(r.Picking).trim());
+    if(r?.TR)a.push(String(r.TR).trim());
+    return a.filter(Boolean);
+  }))];
+  const planZones={};
+  details.forEach(r=>Object.entries(r?.PlanZones||{}).forEach(([z,n])=>{
+    const zone=progressExactZone(z);
+    if(zone&&zone!=='SIN ZONA')planZones[zone]=(planZones[zone]||0)+Number(n||0);
+  }));
+  return {pickings,planZones};
+}
+function progressDailyRawMatches(row){
+  const pedido=String(row?.Pedido||'').trim();
+  const planPicking=String(row?.Picking||row?.TR||'').trim();
+  const bridge=progressDailyDetailBridge(row);
+  const bridgePickings=new Set(bridge.pickings.map(String));
+  const raw=Array.isArray(ORDER_PROGRESS_LIVE_ROWS)?ORDER_PROGRESS_LIVE_ROWS:[];
+  let matches=raw.filter(r=>pedido&&String(r?.Pedido||'').trim()===pedido);
+  if(!matches.length&&planPicking)matches=raw.filter(r=>progressLivePicking(r)===planPicking);
+  if(!matches.length&&bridgePickings.size)matches=raw.filter(r=>bridgePickings.has(progressLivePicking(r)));
+  return {matches,bridge};
+}
 function progressDailyLiveForPlanRow(row){
   const pedido=String(row?.Pedido||'').trim(),picking=String(row?.Picking||row?.TR||'').trim();
   if(!pedido&&!picking)return null;
-  let matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&(!picking||progressLivePicking(r)===picking));
-  if(!matches.length&&pedido)matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido);
+
+  const rawInfo=progressDailyRawMatches(row);
+  const raw=rawInfo.matches;
+
+  // avance-pedidos.json actual publica una fila por línea de picking.
+  // Por eso el cálculo se hace contando estados, no leyendo campos Procesadas/Pendientes
+  // que no existen en esas filas crudas.
+  if(raw.length){
+    const denied=raw.filter(r=>progressDailyIsDeniedState(r?.Estado)).length;
+    const processed=raw.filter(r=>progressDailyIsProcessedState(r?.Estado)).length;
+    const pendingRows=raw.filter(r=>!progressDailyIsProcessedState(r?.Estado));
+    const pendingByZone={};
+    pendingRows.forEach(r=>{
+      const z=progressExactZone(r?.Zona||r?.ZonaPiso||r?.zonapiso||'');
+      if(z)pendingByZone[z]=(pendingByZone[z]||0)+1;
+    });
+    return {
+      Pedido:pedido,
+      Picking:picking,
+      Pickings:[...new Set(raw.map(progressLivePicking).filter(Boolean))],
+      TotalLineas:raw.length,
+      Procesadas:processed,
+      Confirmadas:Math.max(0,processed-denied),
+      Negadas:denied,
+      Pendientes:Math.max(0,raw.length-processed),
+      PendientesPorZona:pendingByZone,
+      Zonas:[...new Set(raw.map(r=>progressExactZone(r?.Zona||r?.ZonaPiso||r?.zonapiso||'')).filter(Boolean))],
+      _rawLineMode:true,
+      _matchedRows:raw.length
+    };
+  }
+
+  // Compatibilidad con cualquier payload agregado anterior.
+  let matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r?.Pedido||'').trim()===pedido&&(!picking||progressLivePicking(r)===picking));
+  if(!matches.length&&pedido)matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r?.Pedido||'').trim()===pedido);
   return matches.length?progressAggregateLive(matches):null;
 }
 function progressDailyOrderView(row){
   const live=progressDailyLiveForPlanRow(row),total=Math.max(0,Number(row?.TotalLineas||0));
   const processed=Math.min(total,Math.max(0,Number(live?.Procesadas||0)));
   const pending=Math.max(0,total-processed),pct=total?processed/total*100:0;
-  const map=live?.PendientesPorZona||{};
-  const streets=Object.entries(map).map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0)})).filter(x=>x.zone&&x.pending>0).sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+
+  let map=live?.PendientesPorZona||{};
+  let streets=Object.entries(map)
+    .map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0)}))
+    .filter(x=>x.zone&&x.pending>0)
+    .sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+
+  // Si todavía no hubo coincidencia con el reporte de Líneas de Picking,
+  // Detalle TRs se usa solamente como puente Pedido ERP -> TR/códigos.
+  // No inventamos avance; pero sí podemos mostrar las calles planificadas
+  // como referencia cuando el pedido está 0%.
+  if(!streets.length&&pending>0&&processed===0){
+    const bridge=progressDailyDetailBridge(row);
+    streets=Object.entries(bridge.planZones||{})
+      .map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0),planned:true}))
+      .filter(x=>x.zone&&x.pending>0)
+      .sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+  }
+
   return {live,total,processed,pending,pct,streets};
 }
 function xcmp(a,b){return String(a||'').localeCompare(String(b||''),'es',{numeric:true})}
@@ -6303,7 +6406,7 @@ function progressRenderUnitarioPanel(){
     const advance='<div class="progressDailyAdvance"><b>'+Number(v.pct||0).toFixed(1)+'%</b><div class="progressBar"><i style="width:'+progressPct(v.pct)+'%"></i></div><small>'+progressFmt(v.processed)+' de '+progressFmt(v.total)+' líneas</small></div>';
     let streets='';
     if(v.pending===0)streets='<span class="progressDailyStreet done">✓ Completo</span>';
-    else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
+    else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet" title="'+(z.planned?'Calle/código planificado según Detalle TRs':'Líneas pendientes informadas por Copérnico')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
     else streets='<span class="progressDailyNoDetail">Sin detalle de calle pendiente</span>';
     return '<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(v.total)+'</td><td>'+advance+'</td><td>'+streets+'</td></tr>';
   }).join(''):'<tr><td colspan="7" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
@@ -6366,7 +6469,7 @@ async function buildOrderProgressPanel(force=false){
 function progressInitDate(){const d=$('progressPlanDate');if(d&&!d.value)d.value=progressTodayISO()}
 progressInitDate();
 if(ORDER_PROGRESS_STALL_TIMER)clearInterval(ORDER_PROGRESS_STALL_TIMER);ORDER_PROGRESS_STALL_TIMER=setInterval(()=>{if(displayMode==='progress')progressRefreshStallCounters()},10000);
-$('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Planificación cargada: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos'+(r.excludedDestination38?' · '+progressFmt(r.excludedDestination38)+' líneas de Warehouse_Destino_Id 38 excluidas':'')+'.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
+$('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Detalle TRs cargado: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos'+(r.excludedDestination38?' · '+progressFmt(r.excludedDestination38)+' líneas de Warehouse_Destino_Id 38 excluidas':'')+(r.remoteSaved?'':'\n⚠ Base compartida sin conexión: quedó guardado localmente en este navegador.')+'.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
 const progressDailyDrop=$('progressDailyDrop'),progressDailyInput=$('progressDailyPlanFile');
 if(progressDailyDrop&&progressDailyInput){
   progressDailyDrop.onclick=()=>progressDailyInput.click();
