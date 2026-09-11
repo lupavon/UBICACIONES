@@ -1728,10 +1728,50 @@ body.heatSplit .layoutHeatGrid{
 
 
 <style>
-/* v44 · Productividad mensual: evolución y detalle horario por día */
+/* v45 · Productividad mensual: disposición solicitada */
+.productivityMonthLayout{
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(300px,.95fr);
+  gap:20px;
+  align-items:stretch;
+  padding:18px 18px 12px;
+  border-top:1px solid #27313b;
+}
+.productivityMonthChart{
+  min-width:0;
+  min-height:315px;
+  overflow-x:auto;
+  display:flex;
+  align-items:flex-start;
+}
+.productivityMonthChart svg{display:block;max-width:none}
+.productivityMonthSummary{min-width:0}
+.productivityMonthKpis{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  height:100%;
+}
+.productivityMonthKpi{
+  min-height:94px;
+  margin:0!important;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.productivityMonthKpi b{font-size:28px}
 #productivityMonthHourlyBody td,#productivityMonthHourlyBody th{font-variant-numeric:tabular-nums}
 #productivityMonthHourlyBody tr:hover td{background:#151e27}
 #productivityMonthHourlyBody td:first-child{white-space:nowrap;color:#eef5ff}
+@media(max-width:1050px){
+  .productivityMonthLayout{grid-template-columns:1fr}
+  .productivityMonthKpis{grid-template-columns:repeat(3,minmax(150px,1fr))}
+  .productivityMonthKpi{min-height:82px}
+}
+@media(max-width:700px){
+  .productivityMonthLayout{padding:12px 10px 8px;gap:12px}
+  .productivityMonthKpis{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -2282,9 +2322,9 @@ body.heatSplit .layoutHeatGrid{
         <button class="btn" id="productivityDownloadSummaryBtn" type="button">⬇ Resumen</button>
       </div>
     </div>
-    <div style="padding:10px 12px 4px">
-      <div id="productivityMonthSummary"></div>
-      <div id="productivityMonthChart" style="min-height:260px;overflow-x:auto"></div>
+    <div class="productivityMonthLayout">
+      <div id="productivityMonthChart" class="productivityMonthChart"></div>
+      <div id="productivityMonthSummary" class="productivityMonthSummary"></div>
     </div>
   </div>
 
@@ -5347,18 +5387,18 @@ function renderProductivityMonthChart(month,daysData){
   const zoneText=p=>p.zones||'Sin zona';
 
   sum.innerHTML=
-    '<div style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:10px;margin:4px 0 12px">'+
-      '<div class="processKpi" style="min-height:82px">'+
+    '<div class="productivityMonthKpis">'+
+      '<div class="processKpi productivityMonthKpi">'+
         '<small>PROMEDIO MENSUAL</small>'+
         '<b>'+avg.toFixed(1)+'</b>'+
         '<span>líneas/h · '+active.length+' días con actividad</span>'+
       '</div>'+
-      '<div class="processKpi" style="min-height:82px">'+
+      '<div class="processKpi productivityMonthKpi">'+
         '<small>MEJOR DÍA</small>'+
         '<b>'+best.avg.toFixed(1)+'</b>'+
         '<span>'+fmtDay(best)+' · '+esc(zoneText(best))+'</span>'+
       '</div>'+
-      '<div class="processKpi" style="min-height:82px">'+
+      '<div class="processKpi productivityMonthKpi">'+
         '<small>PEOR DÍA</small>'+
         '<b>'+worst.avg.toFixed(1)+'</b>'+
         '<span>'+fmtDay(worst)+' · '+esc(zoneText(worst))+'</span>'+
