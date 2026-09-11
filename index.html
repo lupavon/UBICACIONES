@@ -5757,6 +5757,7 @@ async function buildTimesPanel(force=false,requestedDate=''){
 let ORDER_PROGRESS_ROWS=[],ORDER_PROGRESS_AREAS=[],ORDER_PROGRESS_TIMER=null,ORDER_PROGRESS_STALL_TIMER=null,ORDER_PROGRESS_LIVE_ROWS=[];
 let PROGRESS_SORT={key:'avance',dir:-1};
 const PROGRESS_PLAN_STORE_KEY='ubicaciones_progress_planning_v2';
+const PROGRESS_DAILY_PLAN_PARSER_VERSION=3;
 // Reemplazar por la URL real del Worker después de desplegar worker.js.
 const PROGRESS_GLOBAL_API='https://ubicaciones-api.pavonlucas-m.workers.dev';
 let PROGRESS_SHARED_LOADED=false,PROGRESS_SHARED_STORE=null;
@@ -5775,7 +5776,15 @@ function progressLoadStore(){
     const x=(local&&typeof local==='object')?local:progressEmptyStore();
     x.version=4;x.days=x.days||{};x.snapshots=x.snapshots||{};x.cancellations=x.cancellations||{};
     if(PROGRESS_SHARED_STORE){
+      // La base compartida manda para TRs/histórico, pero no debe pisar una planilla diaria
+      // recién cargada en este navegador con una versión vieja guardada en el Worker.
+      const localDays=JSON.parse(JSON.stringify(x.days||{}));
       x.days=JSON.parse(JSON.stringify(PROGRESS_SHARED_STORE.days||{}));
+      Object.entries(localDays).forEach(([d,ld])=>{
+        const lp=ld?.dailyPlanilla, rp=x.days?.[d]?.dailyPlanilla;
+        const lt=Date.parse(lp?.loadedAt||0)||0, rt=Date.parse(rp?.loadedAt||0)||0;
+        if(lp&&lt>rt){x.days[d]=x.days[d]||{};x.days[d].dailyPlanilla=lp;if(ld.unitarioPlanilla)x.days[d].unitarioPlanilla=ld.unitarioPlanilla;}
+      });
       x.cancellations=JSON.parse(JSON.stringify(PROGRESS_SHARED_STORE.cancellations||{}));
     }
     return x;
@@ -6023,16 +6032,29 @@ async function progressImportDailyPlanFile(file,date){
     merged[key].rows.push(...sec.rows);
   });
   const sectors=Object.values(merged);
+  // Protección extra: en una pestaña diaria cada encabezado de sector debe quedar aislado.
+  // Si un sector enorme absorbe otras secciones, abortamos en vez de guardar datos contaminados.
+  const suspicious=sectors.find(sec=>sec.rows.length>80);
+  if(suspicious)throw new Error('El sector '+suspicious.name+' quedó con '+suspicious.rows.length+' pedidos; se abortó la carga porque parece haber mezcla de bloques.');
   const st=progressLoadStore();st.days[date]=st.days[date]||{rows:[]};
-  st.days[date].dailyPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),sectors};
+  st.days[date].dailyPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),parserVersion:PROGRESS_DAILY_PLAN_PARSER_VERSION,sectors};
   // Compatibilidad con versiones anteriores: si existe Unitario Seco también queda disponible aquí.
   const unit=sectors.find(x=>progressNormalizeSectorKey(x.name).includes('UNITARIO SECO'));
-  if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),rows:unit.rows};
+  if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),parserVersion:PROGRESS_DAILY_PLAN_PARSER_VERSION,rows:unit.rows};
   progressSaveStore(st);await progressRemoteSave(st);
   return {sheetName:realSheet,sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name)};
 }
-function progressDailyPlan(date){const st=progressLoadStore();return st.days?.[date]?.dailyPlanilla||null}
-function progressDailyUnitario(date){const st=progressLoadStore();return st.days?.[date]?.unitarioPlanilla||null}
+function progressDailyPlan(date){
+  const st=progressLoadStore(),p=st.days?.[date]?.dailyPlanilla||null;
+  if(!p)return null;
+  // Invalida automáticamente imports generados por parsers viejos que mezclaban pestañas.
+  const expected=progressCurrentPlanSheetName();
+  if(Number(p.parserVersion||0)!==PROGRESS_DAILY_PLAN_PARSER_VERSION)return null;
+  if(String(p.sheetName||'').trim()!==expected)return null;
+  if(!Array.isArray(p.sectors)||!p.sectors.length)return null;
+  return p;
+}
+function progressDailyUnitario(date){const st=progressLoadStore(),p=st.days?.[date]?.unitarioPlanilla||null;return Number(p?.parserVersion||0)===PROGRESS_DAILY_PLAN_PARSER_VERSION?p:null}
 function progressSelectedDailySector(date){
   const daily=progressDailyPlan(date),sel=$('progressSectorFilter');
   if(!daily?.sectors?.length)return null;
@@ -6260,7 +6282,12 @@ function progressRenderUnitarioPanel(){
   body.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.UnidadesPlanificadas||0)+'</td></tr>').join(''):'<tr><td colspan="6" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
   const totalLines=rows.reduce((s,r)=>s+Number(r.TotalLineas||0),0),totalUnits=rows.reduce((s,r)=>s+Number(r.UnidadesPlanificadas||0),0);
   $('progressUnitarioLines').textContent=progressFmt(totalLines);$('progressUnitarioUnits').textContent=progressFmt(totalUnits);$('progressUnitarioMeta').textContent=rows.length+' pedidos · '+progressFmt(totalLines)+' líneas';
-  const dm=$('progressDailyDropMeta');if(dm)dm.textContent=daily?(daily.fileName+' · '+(daily.sectors?.length||0)+' sectores · '+daily.sectors.reduce((a,s)=>a+s.rows.length,0)+' pedidos'):'Sin planilla diaria cargada · mostrando base detallada';
+  const dm=$('progressDailyDropMeta');if(dm){
+    const raw=progressLoadStore().days?.[date]?.dailyPlanilla||null;
+    if(daily) dm.textContent=daily.fileName+' · pestaña '+daily.sheetName+' · '+(daily.sectors?.length||0)+' sectores · '+daily.sectors.reduce((a,s)=>a+s.rows.length,0)+' pedidos';
+    else if(raw) dm.textContent='⚠ Planilla anterior invalidada. Volvé a arrastrar el Excel para leer únicamente la pestaña '+progressCurrentPlanSheetName()+'.';
+    else dm.textContent='Sin planilla diaria cargada · arrastrá el Excel del día';
+  }
 
   const zones=progressZonePlan(detailed),pickers=PROGRESS_MICRO_PICKERS_CACHE['zones:'+date]||{};
   progressUpdateZoneFilter(Object.keys(zones));
