@@ -1669,11 +1669,11 @@ body.heatSplit .layoutHeatGrid{
 .progressPlanPanel{margin:12px 0;padding:12px;border:1px solid #303a47;border-radius:10px;background:#111820}.progressPlanControls{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.progressPlanControls label>small{display:block;color:#8d98a5;font-size:9px;margin-bottom:4px}.progressPlanControls input[type=date]{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:8px 10px}.progressPlanMeta{margin-top:8px;color:#9eabb9;font-size:10px}.progressPlanKpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin-top:10px}.progressPlanKpi{border:1px solid #293441;background:#0d131a;border-radius:8px;padding:9px}.progressPlanKpi small{display:block;color:#8d98a5;font-size:8px;text-transform:uppercase}.progressPlanKpi b{display:block;font-size:18px;margin-top:2px}.progressStateBadge{display:inline-block;border:1px solid #3b4655;border-radius:999px;padding:3px 7px;font-size:8px;font-weight:900;white-space:nowrap}.progressStateBadge.done{color:#78dfaa;border-color:#315c48}.progressStateBadge.active{color:#75c8ff;border-color:#355b70}.progressStateBadge.carry{color:#f5c96c;border-color:#6b5830}.progressStateBadge.cancel{color:#ff8e98;border-color:#71333a}.progressActionBtn{font-size:9px;padding:5px 7px}.progressDeletePlanBtn{border-color:#71333a!important;color:#ff9aa3!important;background:#251318!important}.progressDeletePlanBtn:hover{background:#35181e!important;border-color:#a94854!important}.progressOrigin{display:block;color:#8d98a5;font-size:8px;margin-top:3px}.progressPendingZones{font-size:9px;line-height:1.35;display:flex;gap:4px;flex-wrap:wrap;max-width:360px}.progressPendingZones .zoneChip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid #354252;border-radius:999px;background:#121a23;color:#eef1f5;font-weight:800;white-space:nowrap}.progressPendingZones .zoneChip em{font-style:normal;color:#f5c96c}.progressPendingZones .zoneHint{display:block;width:100%;color:#8d98a5;font-size:8px;margin-top:1px}.progressStall{font-size:9px;font-weight:800;white-space:nowrap}.progressStall.running{color:#f5c96c}.progressStall.fresh{color:#78dfaa}.progressStall.idle{color:#8d98a5}.progressStall.hot{color:#ff8e98}@media(max-width:900px){.progressPlanKpis{grid-template-columns:repeat(2,minmax(120px,1fr))}}
 
 /* v46 · Unitario Seco + avance por microsector */
-.progressUnitarioSplit{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,.8fr);gap:12px;margin:12px 0 14px;align-items:stretch}
-.progressUnitarioPanel,.progressMicroPanel{border:1px solid #303a47;border-radius:10px;background:#0d131a;overflow:hidden;min-width:0}
+.progressUnitarioSplit{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:12px 0 14px;align-items:stretch}
+.progressUnitarioPanel,.progressMicroPanel{border:1px solid #303a47;border-radius:10px;background:#0d131a;overflow:hidden;min-width:0}.progressMicroPanel{display:none!important}
 .progressUnitarioHead,.progressMicroHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:11px 12px;border-bottom:1px solid #2a3440;background:#111820}
 .progressUnitarioHead b,.progressMicroHead b{font-size:12px;color:#eef3f8}.progressUnitarioHead small,.progressMicroHead small{display:block;margin-top:3px;color:#8d98a5;font-size:9px;line-height:1.35}
-.progressUnitarioTableWrap{overflow:auto;max-height:365px}.progressUnitarioTable{width:100%;border-collapse:collapse;min-width:690px}.progressUnitarioTable th{position:sticky;top:0;z-index:1;background:#171e27;color:#95a5b7;font-size:9px;text-align:left;padding:8px 9px;border-bottom:1px solid #394452}.progressUnitarioTable td{font-size:10px;padding:8px 9px;border-bottom:1px solid #242d38}.progressUnitarioTable .num{text-align:right;font-variant-numeric:tabular-nums}.progressUnitarioTable tfoot td{position:sticky;bottom:0;background:#171e27;font-weight:900;border-top:1px solid #394452;border-bottom:0}
+.progressUnitarioTableWrap{overflow:auto;max-height:520px}.progressUnitarioTable{width:100%;border-collapse:collapse;min-width:980px}.progressUnitarioTable th{position:sticky;top:0;z-index:1;background:#171e27;color:#95a5b7;font-size:9px;text-align:left;padding:8px 9px;border-bottom:1px solid #394452}.progressUnitarioTable td{font-size:10px;padding:8px 9px;border-bottom:1px solid #242d38}.progressUnitarioTable .num{text-align:right;font-variant-numeric:tabular-nums}.progressUnitarioTable tfoot td{position:sticky;bottom:0;background:#171e27;font-weight:900;border-top:1px solid #394452;border-bottom:0}.progressDailyAdvance{min-width:190px}.progressDailyAdvance .progressBar{height:7px;margin:4px 0 2px}.progressDailyAdvance b{font-size:12px}.progressDailyAdvance small{color:#8d98a5;font-size:8px}.progressDailyStreets{display:flex;gap:5px;flex-wrap:wrap;min-width:300px}.progressDailyStreet{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:1px solid #3b4b5d;border-radius:999px;background:#111a23;color:#eef3f8;font-size:9px;font-weight:900;white-space:nowrap}.progressDailyStreet em{font-style:normal;color:#f5c96c}.progressDailyStreet.done{color:#78dfaa;border-color:#315c48;background:#101a16}.progressDailyNoDetail{color:#8d98a5;font-size:9px}
 .progressMicroGrid{display:grid;grid-template-columns:1fr;gap:9px;padding:10px}.progressMicroCard{border:1px solid #2d3946;background:#111820;border-radius:9px;padding:10px 11px}.progressMicroTop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.progressMicroName{font-size:12px;font-weight:900}.progressMicroPct{font-size:22px;font-weight:900;line-height:1}.progressMicroCard .progressBar{height:9px;margin:9px 0 7px}.progressMicroStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:7px 0}.progressMicroStat{background:#0c1218;border:1px solid #27313d;border-radius:7px;padding:6px 7px}.progressMicroStat small{display:block;color:#7f8c99;font-size:7px;text-transform:uppercase}.progressMicroStat b{display:block;margin-top:2px;font-size:11px}.progressMicroPicker{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #26303b;padding-top:8px;margin-top:7px}.progressMicroPicker b{font-size:10px}.progressMicroPicker span{font-size:9px;color:#8d98a5}.progressMicroRank{font-size:8px;font-weight:900;border:1px solid #3a4655;border-radius:999px;padding:3px 6px;white-space:nowrap}.progressMicroRank.fast{color:#78dfaa;border-color:#315c48}.progressMicroRank.slow{color:#ff9aa3;border-color:#71333a}.progressMicroRank.mid{color:#75c8ff;border-color:#355b70}.progressMicroNote{padding:0 11px 11px;color:#7f8c99;font-size:8px;line-height:1.35}
 @media(max-width:1100px){.progressUnitarioSplit{grid-template-columns:1fr}.progressMicroGrid{grid-template-columns:repeat(3,minmax(210px,1fr));overflow-x:auto}.progressMicroCard{min-width:210px}}
 @media(max-width:700px){.progressMicroGrid{grid-template-columns:1fr}.progressMicroCard{min-width:0}}
@@ -2245,12 +2245,12 @@ body.heatSplit .layoutHeatGrid{
   </div>
   <div class="progressUnitarioSplit">
     <section class="progressUnitarioPanel">
-      <div class="progressUnitarioHead"><div><b id="progressSectorTitle">SECTOR</b><small>Planificación del día · líneas y unidades por tienda / pedido</small></div><div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label style="font-size:8px;color:#8d98a5;font-weight:800">Sector<br><select id="progressSectorFilter" style="margin-top:3px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:6px;padding:6px 8px;min-width:180px"><option value="">Sin planilla</option></select></label><small id="progressUnitarioMeta">—</small></div></div>
+      <div class="progressUnitarioHead"><div><b id="progressSectorTitle">SECTOR</b><small>Avance por pedido medido en líneas · calles que todavía tienen líneas pendientes</small></div><div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label style="font-size:8px;color:#8d98a5;font-weight:800">Sector<br><select id="progressSectorFilter" style="margin-top:3px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:6px;padding:6px 8px;min-width:180px"><option value="">Sin planilla</option></select></label><small id="progressUnitarioMeta">—</small></div></div>
       <div class="progressUnitarioTableWrap">
         <table class="progressUnitarioTable">
-          <thead><tr><th style="width:42px">#</th><th>TIENDA</th><th>Pedido ERP</th><th>Picking</th><th class="num">Líneas</th><th class="num">Unidades</th></tr></thead>
+          <thead><tr><th style="width:42px">#</th><th>TIENDA</th><th>Pedido ERP</th><th>Picking</th><th class="num">Líneas</th><th>Avance</th><th>Calles pendientes</th></tr></thead>
           <tbody id="progressUnitarioBody"></tbody>
-          <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="progressUnitarioLines">0</td><td class="num" id="progressUnitarioUnits">0</td></tr></tfoot>
+          <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="progressUnitarioLines">0</td><td id="progressUnitarioAdvance">—</td><td>—</td></tr></tfoot>
         </table>
       </div>
     </section>
@@ -6041,8 +6041,18 @@ async function progressImportDailyPlanFile(file,date){
   // Compatibilidad con versiones anteriores: si existe Unitario Seco también queda disponible aquí.
   const unit=sectors.find(x=>progressNormalizeSectorKey(x.name).includes('UNITARIO SECO'));
   if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),parserVersion:PROGRESS_DAILY_PLAN_PARSER_VERSION,rows:unit.rows};
-  progressSaveStore(st);await progressRemoteSave(st);
-  return {sheetName:realSheet,sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name)};
+  // Guardar primero en el navegador. La carga de la planilla NO debe depender
+  // de que la base compartida/Worker esté disponible.
+  progressSaveStore(st);
+  let remoteSaved=false;
+  try{
+    await progressRemoteSave(st);
+    remoteSaved=true;
+  }catch(e){
+    console.warn('Planilla guardada localmente; no se pudo sincronizar la base compartida:',e);
+    progressGlobalStatus('Base compartida: sin conexión · planilla guardada localmente',true);
+  }
+  return {sheetName:realSheet,sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name),remoteSaved};
 }
 function progressDailyPlan(date){
   const st=progressLoadStore(),p=st.days?.[date]?.dailyPlanilla||null;
@@ -6264,40 +6274,57 @@ async function progressLoadMicroPickers(date,force=false){
     PROGRESS_MICRO_PICKERS_CACHE[date]=result;return result;
   }catch(e){console.warn('Microsector pickers',e);PROGRESS_MICRO_PICKERS_CACHE[date]={};return {};}
 }
+function progressDailyLiveForPlanRow(row){
+  const pedido=String(row?.Pedido||'').trim(),picking=String(row?.Picking||row?.TR||'').trim();
+  if(!pedido&&!picking)return null;
+  let matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&(!picking||progressLivePicking(r)===picking));
+  if(!matches.length&&pedido)matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido);
+  return matches.length?progressAggregateLive(matches):null;
+}
+function progressDailyOrderView(row){
+  const live=progressDailyLiveForPlanRow(row),total=Math.max(0,Number(row?.TotalLineas||0));
+  const processed=Math.min(total,Math.max(0,Number(live?.Procesadas||0)));
+  const pending=Math.max(0,total-processed),pct=total?processed/total*100:0;
+  const map=live?.PendientesPorZona||{};
+  const streets=Object.entries(map).map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0)})).filter(x=>x.zone&&x.pending>0).sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+  return {live,total,processed,pending,pct,streets};
+}
+function xcmp(a,b){return String(a||'').localeCompare(String(b||''),'es',{numeric:true})}
 function progressRenderUnitarioPanel(){
-  const body=$('progressUnitarioBody'),grid=$('progressMicroGrid');if(!body||!grid)return;
+  const body=$('progressUnitarioBody'),grid=$('progressMicroGrid');if(!body)return;
   const date=progressSelectedDate();
   progressUpdateSectorFilter(date);
-  const sec=progressSelectedDailySector(date),sectorName=sec?.name||'SECTOR',areaName=progressSectorAreaName(sectorName);
+  const sec=progressSelectedDailySector(date),sectorName=sec?.name||'SECTOR';
   const daily=progressDailyPlan(date);
-  let detailed=ORDER_PROGRESS_ROWS.filter(r=>r.Area===areaName&&r.Estado!=='No preparar').slice();
-  // Fallback: si no existe un área exactamente mapeada, cruza por pedidos/pickings del sector cargado.
-  if(!detailed.length&&sec?.rows?.length){
-    const peds=new Set(sec.rows.map(r=>String(r.Pedido||''))), picks=new Set(sec.rows.map(r=>String(r.Picking||r.TR||'')));
-    detailed=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'&&(peds.has(String(r.Pedido||''))||picks.has(String(r.Picking||r.TR||''))));
-  }
-  detailed.sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
-  const rows=(sec?.rows?.length?sec.rows:detailed).slice().sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
+  const rows=(sec?.rows||[]).slice().sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
+  const views=rows.map(r=>({r,v:progressDailyOrderView(r)}));
   if($('progressSectorTitle'))$('progressSectorTitle').textContent=sectorName.toUpperCase();
-  body.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.UnidadesPlanificadas||0)+'</td></tr>').join(''):'<tr><td colspan="6" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
-  const totalLines=rows.reduce((s,r)=>s+Number(r.TotalLineas||0),0),totalUnits=rows.reduce((s,r)=>s+Number(r.UnidadesPlanificadas||0),0);
-  $('progressUnitarioLines').textContent=progressFmt(totalLines);$('progressUnitarioUnits').textContent=progressFmt(totalUnits);$('progressUnitarioMeta').textContent=rows.length+' pedidos · '+progressFmt(totalLines)+' líneas';
+  body.innerHTML=views.length?views.map(({r,v},i)=>{
+    const advance='<div class="progressDailyAdvance"><b>'+Number(v.pct||0).toFixed(1)+'%</b><div class="progressBar"><i style="width:'+progressPct(v.pct)+'%"></i></div><small>'+progressFmt(v.processed)+' de '+progressFmt(v.total)+' líneas</small></div>';
+    let streets='';
+    if(v.pending===0)streets='<span class="progressDailyStreet done">✓ Completo</span>';
+    else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
+    else streets='<span class="progressDailyNoDetail">Sin detalle de calle pendiente</span>';
+    return '<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(v.total)+'</td><td>'+advance+'</td><td>'+streets+'</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
+  const totalLines=views.reduce((s,x)=>s+x.v.total,0),processed=views.reduce((s,x)=>s+x.v.processed,0),pct=totalLines?processed/totalLines*100:0;
+  $('progressUnitarioLines').textContent=progressFmt(totalLines);
+  if($('progressUnitarioAdvance'))$('progressUnitarioAdvance').innerHTML='<div class="progressDailyAdvance"><b>'+pct.toFixed(1)+'%</b><div class="progressBar"><i style="width:'+progressPct(pct)+'%"></i></div><small>'+progressFmt(processed)+' de '+progressFmt(totalLines)+' líneas</small></div>';
+  $('progressUnitarioMeta').textContent=rows.length+' pedidos · '+progressFmt(totalLines)+' líneas';
   const dm=$('progressDailyDropMeta');if(dm){
     const raw=progressLoadStore().days?.[date]?.dailyPlanilla||null;
     if(daily) dm.textContent=daily.fileName+' · pestaña '+daily.sheetName+' · '+(daily.sectors?.length||0)+' sectores · '+daily.sectors.reduce((a,s)=>a+s.rows.length,0)+' pedidos';
     else if(raw) dm.textContent='⚠ Planilla anterior invalidada. Volvé a arrastrar el Excel para leer únicamente la pestaña '+progressCurrentPlanSheetName()+'.';
     else dm.textContent='Sin planilla diaria cargada · arrastrá el Excel del día';
   }
-
-  const zones=progressZonePlan(detailed),pickers=PROGRESS_MICRO_PICKERS_CACHE['zones:'+date]||{};
-  progressUpdateZoneFilter(Object.keys(zones));
-  const selected=$('progressZoneFilter')?.value||'__ALL__';
-  let vals=Object.values(zones).filter(x=>x.total>0);if(selected!=='__ALL__')vals=vals.filter(x=>x.key===selected);
-  const ranked=Object.values(zones).filter(x=>x.total>0).slice().sort((a,b)=>b.pct-a.pct),rank={};ranked.forEach((x,i)=>rank[x.key]=ranked.length===1?'mid':i===0?'fast':i===ranked.length-1?'slow':'mid');
-  grid.innerHTML=vals.length?vals.map(x=>{const pk=pickers[x.key],rcls=rank[x.key]||'mid',rtext=ranked.length<2?'Zona':rcls==='fast'?'Más adelantado':rcls==='slow'?'Más atrasado':'Intermedio';return '<div class="progressMicroCard"><div class="progressMicroTop"><div><div class="progressMicroName">'+esc(x.key)+'</div><div class="muted" style="font-size:8px;margin-top:2px">'+(x.estimated?'pendiente parcialmente estimado':'pendiente por zona')+'</div></div><div class="progressMicroPct">'+Number(x.pct||0).toFixed(1)+'%</div></div><div class="progressBar"><i style="width:'+progressPct(x.pct)+'%"></i></div><div class="progressMicroStats"><div class="progressMicroStat"><small>Procesadas</small><b>'+progressFmt(Math.round(x.processed))+'</b></div><div class="progressMicroStat"><small>Total</small><b>'+progressFmt(x.total)+'</b></div><div class="progressMicroStat"><small>Pendientes</small><b>'+progressFmt(Math.round(x.pending))+'</b></div></div><div class="progressMicroPicker"><div><b>'+(pk?esc(pk.name):'Picker sin identificar')+'</b><span>'+(pk?progressFmt(pk.count)+' líneas · '+pk.rate.toFixed(1)+' lín/h':'sin actividad detectada')+'</span></div><span class="progressMicroRank '+rcls+'">'+rtext+'</span></div></div>'}).join(''):'<div class="muted" style="padding:12px">No hay detalle de zonas/microsectores para '+esc(sectorName)+' en la base de avance.</div>';
-  $('progressMicroUpdated').textContent=date.split('-').reverse().join('/');
-  const estimated=Object.values(zones).some(x=>x.estimated);$('progressMicroNote').textContent=(estimated?'ℹ Algunas líneas pendientes no llegaron desglosadas por zona y se distribuyeron proporcionalmente al plan. ':'')+'Sector: '+sectorName+'. Usá el filtro de zona para aislar un microsector; el picker corresponde a quien más confirmaciones registró allí durante el día.';
+  // El panel lateral anterior queda oculto. Conservamos sus nodos para no romper listeners existentes.
+  if(grid)grid.innerHTML='';
+  if($('progressMicroUpdated'))$('progressMicroUpdated').textContent=date.split('-').reverse().join('/');
+  if($('progressMicroNote'))$('progressMicroNote').textContent='';
+  if($('progressZoneFilter'))$('progressZoneFilter').innerHTML='<option value="__ALL__">Todas las zonas</option>';
+  if($('progressZoneCount'))$('progressZoneCount').textContent='';
 }
+
 function renderOrderProgress(){
   progressRenderUnitarioPanel();
   const grid=$('progressAreaGrid'),active=$('progressAreaFilter')?.value||'__ALL__';
@@ -6345,8 +6372,8 @@ if(progressDailyDrop&&progressDailyInput){
   progressDailyDrop.onclick=()=>progressDailyInput.click();
   ['dragenter','dragover'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.add('drag')}));
   ['dragleave','drop'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.remove('drag')}));
-  progressDailyDrop.addEventListener('drop',async e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}});
-  progressDailyInput.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}finally{e.target.value=''}};
+  progressDailyDrop.addEventListener('drop',async e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.'+(r.remoteSaved?'':'\n⚠ Base compartida sin conexión: quedó guardada localmente en este navegador.')+'\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}});
+  progressDailyInput.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada desde pestaña '+r.sheetName+': '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.'+(r.remoteSaved?'':'\n⚠ Base compartida sin conexión: quedó guardada localmente en este navegador.')+'\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}finally{e.target.value=''}};
 }
 if($('progressZoneFilter'))$('progressZoneFilter').onchange=()=>progressRenderUnitarioPanel();
 if($('progressSectorFilter'))$('progressSectorFilter').onchange=()=>{if($('progressZoneFilter'))$('progressZoneFilter').value='__ALL__';progressRenderUnitarioPanel();};
