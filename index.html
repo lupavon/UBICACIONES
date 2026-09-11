@@ -6399,7 +6399,7 @@ function progressRenderUnitarioPanel(){
   progressUpdateSectorFilter(date);
   const sec=progressSelectedDailySector(date),sectorName=sec?.name||'SECTOR';
   const daily=progressDailyPlan(date);
-  const rows=(sec?.rows||[]).slice().sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
+  const rows=(sec?.rows||[]).slice(); // respetar exactamente el orden original de la PREPA
   const views=rows.map(r=>({r,v:progressDailyOrderView(r)}));
   if($('progressSectorTitle'))$('progressSectorTitle').textContent=sectorName.toUpperCase();
   body.innerHTML=views.length?views.map(({r,v},i)=>{
