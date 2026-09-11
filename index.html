@@ -1726,6 +1726,13 @@ body.heatSplit .layoutHeatGrid{
 }
 </style>
 
+
+<style>
+/* v44 · Productividad mensual: evolución y detalle horario por día */
+#productivityMonthHourlyBody td,#productivityMonthHourlyBody th{font-variant-numeric:tabular-nums}
+#productivityMonthHourlyBody tr:hover td{background:#151e27}
+#productivityMonthHourlyBody td:first-child{white-space:nowrap;color:#eef5ff}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2259,30 +2266,6 @@ body.heatSplit .layoutHeatGrid{
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:minmax(260px,330px) 1fr;gap:14px;margin-top:14px;align-items:start">
-    <div class="receiptSupplierCard" style="margin-top:0">
-      <div class="receiptSupplierHead"><div><b>Calendario</b><small>Elegí un día para consultar productividad</small></div><div style="display:flex;gap:5px"><button class="btn" id="productivityPrevMonth">←</button><button class="btn" id="productivityNextMonth">→</button></div></div>
-      <div id="productivityCalendarTitle" style="text-align:center;font-weight:900;padding:8px 8px 3px"></div>
-      <div id="productivityCalendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:10px"></div>
-    </div>
-    <div>
-      <div class="processKpis" style="grid-template-columns:repeat(3,minmax(170px,1fr));margin-top:0;margin-bottom:14px">
-        <div class="processKpi"><small>LÍNEAS DEL DÍA</small><b id="productivityTotalLines">0</b><span>Confirmadas + Negadas</span></div>
-        <div class="processKpi"><small>PICKERS</small><b id="productivityPickerCount">0</b><span>con actividad</span></div>
-        <div class="processKpi"><small>PROMEDIO GENERAL</small><b id="productivityGeneralAvg">0.0</b><span>líneas/h por picker</span></div>
-      </div>
-      <div class="receiptSupplierCard" style="margin-top:0">
-        <div class="receiptSupplierHead"><div><b>Promedio diario por picker</b><small>Resultado del día seleccionado</small></div><small id="productivityUpdated"></small></div>
-        <div class="receiptSupplierWrap" style="overflow:auto">
-          <table class="receiptSupplierTable">
-            <thead><tr><th data-productivity-sort="name">Picker <span class="sortMark">↕</span></th><th data-productivity-sort="total">Líneas del día <span class="sortMark">↕</span></th><th data-productivity-sort="avg">Promedio líneas/h <span class="sortMark">↕</span></th><th data-productivity-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
-            <tbody id="productivityDailyBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead" style="gap:12px;flex-wrap:wrap">
       <div>
@@ -2307,14 +2290,49 @@ body.heatSplit .layoutHeatGrid{
 
 
   <div class="receiptSupplierCard" style="margin-top:14px">
-    <div class="receiptSupplierHead"><div><b>Líneas preparadas por hora</b><small>Confirmadas + Negadas</small></div><small id="timeUpdated"></small></div>
+    <div class="receiptSupplierHead">
+      <div><b>Líneas preparadas por hora</b><small>Cada fila representa un día del mes para el picker seleccionado arriba</small></div>
+      <small id="productivityMonthHourlyUpdated"></small>
+    </div>
     <div class="receiptSupplierWrap" style="overflow:auto">
-      <table class="receiptSupplierTable">
-        <thead><tr><th data-time-hour-sort="name">Picker <span class="sortMark">↕</span></th><th data-time-hour-sort="h0">06–07 <span class="sortMark">↕</span></th><th data-time-hour-sort="h1">07–08 <span class="sortMark">↕</span></th><th data-time-hour-sort="h2">08–09 <span class="sortMark">↕</span></th><th data-time-hour-sort="h3">09–10 <span class="sortMark">↕</span></th><th data-time-hour-sort="h4">10–11 <span class="sortMark">↕</span></th><th data-time-hour-sort="h5">11–12 <span class="sortMark">↕</span></th><th data-time-hour-sort="h6">12–13 <span class="sortMark">↕</span></th><th data-time-hour-sort="h7">13–14 <span class="sortMark">↕</span></th><th data-time-hour-sort="total">Total <span class="sortMark">↕</span></th><th data-time-hour-sort="avg">Promedio por hora <span class="sortMark">↕</span></th><th data-time-hour-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
-        <tbody id="timeHourlyBody"></tbody>
+      <table class="receiptSupplierTable" style="min-width:1050px">
+        <thead><tr>
+          <th>Día</th>
+          <th>06–07</th><th>07–08</th><th>08–09</th><th>09–10</th>
+          <th>10–11</th><th>11–12</th><th>12–13</th><th>13–14</th>
+          <th>Total</th><th>Promedio líneas/h</th><th>Zona</th>
+        </tr></thead>
+        <tbody id="productivityMonthHourlyBody"></tbody>
       </table>
+      <div id="productivityMonthHourlyEmpty" class="receiptSupplierEmpty" style="display:none">No hay actividad del picker seleccionado en este mes.</div>
     </div>
   </div>
+
+  <div style="display:grid;grid-template-columns:minmax(260px,330px) 1fr;gap:14px;margin-top:14px;align-items:start">
+    <div class="receiptSupplierCard" style="margin-top:0">
+      <div class="receiptSupplierHead"><div><b>Calendario</b><small>Elegí un día para consultar productividad</small></div><div style="display:flex;gap:5px"><button class="btn" id="productivityPrevMonth">←</button><button class="btn" id="productivityNextMonth">→</button></div></div>
+      <div id="productivityCalendarTitle" style="text-align:center;font-weight:900;padding:8px 8px 3px"></div>
+      <div id="productivityCalendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:10px"></div>
+    </div>
+    <div>
+      <div class="processKpis" style="grid-template-columns:repeat(3,minmax(170px,1fr));margin-top:0;margin-bottom:14px">
+        <div class="processKpi"><small>LÍNEAS DEL DÍA</small><b id="productivityTotalLines">0</b><span>Confirmadas + Negadas</span></div>
+        <div class="processKpi"><small>PICKERS</small><b id="productivityPickerCount">0</b><span>con actividad</span></div>
+        <div class="processKpi"><small>PROMEDIO GENERAL</small><b id="productivityGeneralAvg">0.0</b><span>líneas/h por picker</span></div>
+      </div>
+      <div class="receiptSupplierCard" style="margin-top:0">
+        <div class="receiptSupplierHead"><div><b>Promedio diario por picker</b><small>Resultado del día seleccionado</small></div><small id="productivityUpdated"></small></div>
+        <div class="receiptSupplierWrap" style="overflow:auto">
+          <table class="receiptSupplierTable">
+            <thead><tr><th data-productivity-sort="name">Picker <span class="sortMark">↕</span></th><th data-productivity-sort="total">Líneas del día <span class="sortMark">↕</span></th><th data-productivity-sort="avg">Promedio líneas/h <span class="sortMark">↕</span></th><th data-productivity-sort="zone">Zona <span class="sortMark">↕</span></th></tr></thead>
+            <tbody id="productivityDailyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div class="receiptToolbar" style="margin-top:14px">
     <input id="productivitySearch" placeholder="Buscar picker..."/>
     <button class="btn" id="productivityRefreshBtn">↻ Actualizar</button>
@@ -5160,7 +5178,6 @@ function renderTimes(){
     return (av-bv)*hd || a.name.localeCompare(b.name,'es');
   });
   document.querySelectorAll('[data-time-hour-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.timeHourSort===hk?(hd===1?'↑':'↓'):'↕';});
-  if($('timeHourlyBody'))$('timeHourlyBody').innerHTML=hourlyPickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+((p.rows.length/6.5).toFixed(1))+'</b></td><td><b>'+esc(timePickerZones(p.rows))+'</b></td></tr>').join('');
   renderProductivityDaily(hourlyPickers);
   const deadRows=pickers.map(p=>{const dates=p.rows.map(r=>timeDate(r)).filter(Boolean).sort((a,b)=>a-b),first=dates[0]||null;const startDead=first?Math.max(0,minsOfDay(first)-360):null;const bd=dates.filter(d=>minsOfDay(d)<=470),ad=dates.filter(d=>minsOfDay(d)>=480);const beforeBreakfast=bd.length?bd[bd.length-1]:null,afterBreakfast=ad.length?ad[0]:null;const breakfast=(beforeBreakfast&&afterBreakfast)?Math.max(0,(afterBreakfast-beforeBreakfast)/60000):null;const beforeLunch=dates.length?dates[dates.length-1]:null,lunch=beforeLunch?Math.max(0,840-minsOfDay(beforeLunch)):null,total=[startDead,breakfast,lunch].every(v=>v!==null)?startDead+breakfast+lunch:null;return{p,first,startDead,beforeBreakfast,afterBreakfast,breakfast,beforeLunch,lunch,total};});
   const k=TIME_DEAD_SORT.key,d=TIME_DEAD_SORT.dir,getVal=x=>({name:x.p.name.toLowerCase(),ingreso:21600,inicio:timeSortValue(x.first),arranque:x.startDead,antesDesayuno:timeSortValue(x.beforeBreakfast),despuesDesayuno:timeSortValue(x.afterBreakfast),tmDesayuno:x.breakfast,antesAlmuerzo:timeSortValue(x.beforeLunch),salida:50400,tmAlmuerzo:x.lunch,totalMuerto:x.total})[k];
@@ -5216,12 +5233,24 @@ function productivityUpdateMonthPicker(pickers){
   }
 }
 
+function productivityUpdateMonthPickerFromMonth(daysData){
+  const sel=$('productivityMonthPicker'); if(!sel)return;
+  const current=sel.value;
+  const names=[...new Set((daysData||[]).flatMap(x=>(x.rows||[]).map(productivityPickerNameFromRow)).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'es'));
+  if(!names.length)return;
+  sel.innerHTML=names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  if(current && names.includes(current)) sel.value=current;
+  else sel.value=names[0];
+}
+
 async function productivityLoadMonth(iso,force=false){
   const chart=$('productivityMonthChart'),sum=$('productivityMonthSummary'),sel=$('productivityMonthPicker');
   if(!chart||!sum||!sel)return;
   const month=(iso||$('productivityDateFilter')?.value||timeYesterdayISO()).slice(0,7);
   if(PRODUCTIVITY_MONTH_LOADING)return;
   if(!force && PRODUCTIVITY_MONTH_CACHE[month]){
+    productivityUpdateMonthPickerFromMonth(PRODUCTIVITY_MONTH_CACHE[month]);
     renderProductivityMonthChart(month,PRODUCTIVITY_MONTH_CACHE[month]);
     return;
   }
@@ -5247,6 +5276,7 @@ async function productivityLoadMonth(iso,force=false){
     }
     const result=await Promise.all(tasks);
     PRODUCTIVITY_MONTH_CACHE[month]=result;
+    productivityUpdateMonthPickerFromMonth(result);
     renderProductivityMonthChart(month,result);
   }finally{
     PRODUCTIVITY_MONTH_LOADING=false;
@@ -5279,8 +5309,34 @@ function renderProductivityMonthChart(month,daysData){
   if(!active.length){
     chart.innerHTML='<div class="processEmpty">No hay actividad de '+esc(picker)+' en este mes.</div>';
     sum.textContent='Sin días con actividad en '+month.split('-').reverse().join('/');
+    if($('productivityMonthHourlyBody'))$('productivityMonthHourlyBody').innerHTML='';
+    if($('productivityMonthHourlyEmpty'))$('productivityMonthHourlyEmpty').style.display='block';
+    if($('productivityMonthHourlyUpdated'))$('productivityMonthHourlyUpdated').textContent=picker+' · '+month.split('-').reverse().join('/');
     return;
   }
+
+  const hourlyBody=$('productivityMonthHourlyBody');
+  const hourlyEmpty=$('productivityMonthHourlyEmpty');
+  const hourlyUpdated=$('productivityMonthHourlyUpdated');
+  const hourlyRows=(daysData||[]).map(x=>{
+    const rows=(x.rows||[]).filter(r=>timeNormName(productivityPickerNameFromRow(r))===norm);
+    if(!rows.length)return null;
+    const hours=Array(8).fill(0);
+    rows.forEach(r=>{
+      const h=Number(r.Hora);
+      if(h>=6&&h<14)hours[h-6]++;
+    });
+    return {day:x.day,rows,hours,total:rows.length,avg:rows.length/6.5,zone:timePickerZones(rows)};
+  }).filter(Boolean);
+  if(hourlyBody){
+    hourlyBody.innerHTML=hourlyRows.map(x=>
+      '<tr><td><b>'+esc(x.day.split('-').reverse().join('/'))+'</b></td>'+ 
+      x.hours.map(n=>'<td><b>'+n+'</b></td>').join('')+
+      '<td><b>'+x.total+'</b></td><td><b>'+x.avg.toFixed(1)+'</b></td><td>'+esc(x.zone)+'</td></tr>'
+    ).join('');
+  }
+  if(hourlyEmpty)hourlyEmpty.style.display=hourlyRows.length?'none':'block';
+  if(hourlyUpdated)hourlyUpdated.textContent=picker+' · '+month.split('-').reverse().join('/');
 
   const vals=active.map(p=>p.avg);
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
