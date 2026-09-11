@@ -1667,6 +1667,16 @@ body.heatSplit .layoutHeatGrid{
 .progressLive{display:flex;align-items:center;gap:6px;font-size:10px;color:#8d98a5}.progressLive .dot{width:8px;height:8px;border-radius:50%;background:#55d892;box-shadow:0 0 8px #55d89288}
 @media(max-width:1100px){.progressAreaGrid{grid-template-columns:repeat(2,minmax(190px,1fr))}}@media(max-width:650px){.progressAreaGrid{grid-template-columns:1fr}}
 .progressPlanPanel{margin:12px 0;padding:12px;border:1px solid #303a47;border-radius:10px;background:#111820}.progressPlanControls{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.progressPlanControls label>small{display:block;color:#8d98a5;font-size:9px;margin-bottom:4px}.progressPlanControls input[type=date]{background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:8px 10px}.progressPlanMeta{margin-top:8px;color:#9eabb9;font-size:10px}.progressPlanKpis{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:8px;margin-top:10px}.progressPlanKpi{border:1px solid #293441;background:#0d131a;border-radius:8px;padding:9px}.progressPlanKpi small{display:block;color:#8d98a5;font-size:8px;text-transform:uppercase}.progressPlanKpi b{display:block;font-size:18px;margin-top:2px}.progressStateBadge{display:inline-block;border:1px solid #3b4655;border-radius:999px;padding:3px 7px;font-size:8px;font-weight:900;white-space:nowrap}.progressStateBadge.done{color:#78dfaa;border-color:#315c48}.progressStateBadge.active{color:#75c8ff;border-color:#355b70}.progressStateBadge.carry{color:#f5c96c;border-color:#6b5830}.progressStateBadge.cancel{color:#ff8e98;border-color:#71333a}.progressActionBtn{font-size:9px;padding:5px 7px}.progressDeletePlanBtn{border-color:#71333a!important;color:#ff9aa3!important;background:#251318!important}.progressDeletePlanBtn:hover{background:#35181e!important;border-color:#a94854!important}.progressOrigin{display:block;color:#8d98a5;font-size:8px;margin-top:3px}.progressPendingZones{font-size:9px;line-height:1.35;display:flex;gap:4px;flex-wrap:wrap;max-width:360px}.progressPendingZones .zoneChip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid #354252;border-radius:999px;background:#121a23;color:#eef1f5;font-weight:800;white-space:nowrap}.progressPendingZones .zoneChip em{font-style:normal;color:#f5c96c}.progressPendingZones .zoneHint{display:block;width:100%;color:#8d98a5;font-size:8px;margin-top:1px}.progressStall{font-size:9px;font-weight:800;white-space:nowrap}.progressStall.running{color:#f5c96c}.progressStall.fresh{color:#78dfaa}.progressStall.idle{color:#8d98a5}.progressStall.hot{color:#ff8e98}@media(max-width:900px){.progressPlanKpis{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+
+/* v46 · Unitario Seco + avance por microsector */
+.progressUnitarioSplit{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,.8fr);gap:12px;margin:12px 0 14px;align-items:stretch}
+.progressUnitarioPanel,.progressMicroPanel{border:1px solid #303a47;border-radius:10px;background:#0d131a;overflow:hidden;min-width:0}
+.progressUnitarioHead,.progressMicroHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:11px 12px;border-bottom:1px solid #2a3440;background:#111820}
+.progressUnitarioHead b,.progressMicroHead b{font-size:12px;color:#eef3f8}.progressUnitarioHead small,.progressMicroHead small{display:block;margin-top:3px;color:#8d98a5;font-size:9px;line-height:1.35}
+.progressUnitarioTableWrap{overflow:auto;max-height:365px}.progressUnitarioTable{width:100%;border-collapse:collapse;min-width:690px}.progressUnitarioTable th{position:sticky;top:0;z-index:1;background:#171e27;color:#95a5b7;font-size:9px;text-align:left;padding:8px 9px;border-bottom:1px solid #394452}.progressUnitarioTable td{font-size:10px;padding:8px 9px;border-bottom:1px solid #242d38}.progressUnitarioTable .num{text-align:right;font-variant-numeric:tabular-nums}.progressUnitarioTable tfoot td{position:sticky;bottom:0;background:#171e27;font-weight:900;border-top:1px solid #394452;border-bottom:0}
+.progressMicroGrid{display:grid;grid-template-columns:1fr;gap:9px;padding:10px}.progressMicroCard{border:1px solid #2d3946;background:#111820;border-radius:9px;padding:10px 11px}.progressMicroTop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.progressMicroName{font-size:12px;font-weight:900}.progressMicroPct{font-size:22px;font-weight:900;line-height:1}.progressMicroCard .progressBar{height:9px;margin:9px 0 7px}.progressMicroStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:7px 0}.progressMicroStat{background:#0c1218;border:1px solid #27313d;border-radius:7px;padding:6px 7px}.progressMicroStat small{display:block;color:#7f8c99;font-size:7px;text-transform:uppercase}.progressMicroStat b{display:block;margin-top:2px;font-size:11px}.progressMicroPicker{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #26303b;padding-top:8px;margin-top:7px}.progressMicroPicker b{font-size:10px}.progressMicroPicker span{font-size:9px;color:#8d98a5}.progressMicroRank{font-size:8px;font-weight:900;border:1px solid #3a4655;border-radius:999px;padding:3px 6px;white-space:nowrap}.progressMicroRank.fast{color:#78dfaa;border-color:#315c48}.progressMicroRank.slow{color:#ff9aa3;border-color:#71333a}.progressMicroRank.mid{color:#75c8ff;border-color:#355b70}.progressMicroNote{padding:0 11px 11px;color:#7f8c99;font-size:8px;line-height:1.35}
+@media(max-width:1100px){.progressUnitarioSplit{grid-template-columns:1fr}.progressMicroGrid{grid-template-columns:repeat(3,minmax(210px,1fr));overflow-x:auto}.progressMicroCard{min-width:210px}}
+@media(max-width:700px){.progressMicroGrid{grid-template-columns:1fr}.progressMicroCard{min-width:0}}
 </style>
 
 
@@ -1773,6 +1783,18 @@ body.heatSplit .layoutHeatGrid{
   .productivityMonthKpis{grid-template-columns:1fr}
 }
 </style>
+
+<style id="progress-planilla-zone-v47">
+/* v47 · Planilla diaria + todas las zonas con filtro */
+.progressDailyDrop{margin:10px 0 0;border:1px dashed #4a5a6d;border-radius:10px;background:#0c1218;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:.12s}
+.progressDailyDrop:hover,.progressDailyDrop.drag{border-color:#75c8ff;background:#101a24;box-shadow:0 0 0 1px #75c8ff22 inset}
+.progressDailyDropMain{display:flex;align-items:center;gap:10px;min-width:0}.progressDailyDropIcon{font-size:24px}.progressDailyDropText b{display:block;font-size:11px}.progressDailyDropText small{display:block;color:#8d98a5;font-size:9px;margin-top:3px;line-height:1.35}.progressDailyDropMeta{font-size:9px;color:#9eabb9;text-align:right;max-width:360px}
+.progressZoneFilterBar{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid #26303b;background:#0f161e;flex-wrap:wrap}.progressZoneFilterBar label{font-size:9px;color:#8d98a5;font-weight:800}.progressZoneFilterBar select{background:#0b1117;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:7px 9px;min-width:180px}.progressZoneCount{margin-left:auto;font-size:8px;color:#7f8c99}
+.progressMicroGrid.zoneMode{grid-template-columns:repeat(2,minmax(210px,1fr));align-content:start;max-height:365px;overflow:auto}
+@media(max-width:1100px){.progressMicroGrid.zoneMode{grid-template-columns:repeat(3,minmax(210px,1fr));max-height:none}.progressDailyDrop{align-items:flex-start}.progressDailyDropMeta{text-align:left}}
+@media(max-width:700px){.progressMicroGrid.zoneMode{grid-template-columns:1fr}.progressDailyDrop{flex-direction:column}.progressZoneCount{margin-left:0;width:100%}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2208,6 +2230,11 @@ body.heatSplit .layoutHeatGrid{
       <label class="filelabel">⬆ Restaurar backup<input accept=".json" id="progressPlanImportFile" type="file"/></label><span id="progressGlobalStatus" class="muted" style="font-size:9px;padding:7px 2px">Base compartida: conectando…</span>
     </div>
     <div class="progressPlanMeta" id="progressPlanMeta">Sin planificación cargada para esta fecha.</div>
+    <div class="progressDailyDrop" id="progressDailyDrop" title="Arrastrá la Planilla de Preparación o hacé clic para seleccionarla">
+      <div class="progressDailyDropMain"><div class="progressDailyDropIcon">📥</div><div class="progressDailyDropText"><b>Planilla de Preparación del día</b><small>Arrastrá acá el Excel diario. Detecta automáticamente todos los sectores de la planilla (Unitarios secos, Unitarios químicos, Masterbox, PM, etc.) y toma Tienda · Pedido ERP · Picking · Líneas · Unidades.</small></div></div>
+      <div class="progressDailyDropMeta" id="progressDailyDropMeta">Sin planilla diaria cargada</div>
+      <input accept=".xlsx,.xls" id="progressDailyPlanFile" type="file" hidden>
+    </div>
     <div class="progressPlanKpis">
       <div class="progressPlanKpi"><small>Planificado hoy</small><b id="progressPlanToday">0</b><span class="muted">líneas</span></div>
       <div class="progressPlanKpi"><small>Arrastre anterior</small><b id="progressPlanCarry">0</b><span class="muted">líneas pendientes</span></div>
@@ -2215,6 +2242,24 @@ body.heatSplit .layoutHeatGrid{
       <div class="progressPlanKpi"><small>Procesadas acum.</small><b id="progressPlanProcessed">0</b><span class="muted">líneas</span></div>
       <div class="progressPlanKpi"><small>Pendientes</small><b id="progressPlanPending">0</b><span class="muted">líneas</span></div>
     </div>
+  </div>
+  <div class="progressUnitarioSplit">
+    <section class="progressUnitarioPanel">
+      <div class="progressUnitarioHead"><div><b id="progressSectorTitle">SECTOR</b><small>Planificación del día · líneas y unidades por tienda / pedido</small></div><div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label style="font-size:8px;color:#8d98a5;font-weight:800">Sector<br><select id="progressSectorFilter" style="margin-top:3px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:6px;padding:6px 8px;min-width:180px"><option value="">Sin planilla</option></select></label><small id="progressUnitarioMeta">—</small></div></div>
+      <div class="progressUnitarioTableWrap">
+        <table class="progressUnitarioTable">
+          <thead><tr><th style="width:42px">#</th><th>TIENDA</th><th>Pedido ERP</th><th>Picking</th><th class="num">Líneas</th><th class="num">Unidades</th></tr></thead>
+          <tbody id="progressUnitarioBody"></tbody>
+          <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="progressUnitarioLines">0</td><td class="num" id="progressUnitarioUnits">0</td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+    <section class="progressMicroPanel">
+      <div class="progressMicroHead"><div><b>Avance por microsector / zona</b><small>Se adapta al sector seleccionado · compará avance y ritmo del picker</small></div><small id="progressMicroUpdated">—</small></div>
+      <div class="progressZoneFilterBar"><label for="progressZoneFilter">Zona</label><select id="progressZoneFilter"><option value="__ALL__">Todas las zonas</option></select><span class="progressZoneCount" id="progressZoneCount">0 zonas</span></div>
+      <div class="progressMicroGrid zoneMode" id="progressMicroGrid"></div>
+      <div class="progressMicroNote" id="progressMicroNote">Seleccioná un sector de la planilla. A la derecha se muestran sus zonas/microsectores y el picker predominante por confirmaciones del día.</div>
+    </section>
   </div>
   <div class="progressAreaGrid" id="progressAreaGrid"></div>
   <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido, picking o TR…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="OPEN" selected>Abiertos</option><option value="CLOSED">Cerrados</option><option value="__ALL__">Todos</option></select></div><div class="muted" style="margin:5px 0 8px">Abiertos = pedidos iniciados con líneas pendientes. Orden inicial: mayor avance → menor avance.</div>
@@ -5857,6 +5902,7 @@ async function progressImportPlanFile(file,date){
     if(warehouseDestino==='38'||Number(warehouseDestino)===38){excludedDestination38++;return}
     validRows.push({
       raw:r,pedido,picking,
+      tienda:String(progressPlanValue(r,['TIENDA','Tienda','tienda','NOMBRE TIENDA','Nombre Tienda','Sucursal','SUCURSAL'])||'').trim(),
       qty:Number(String(progressPlanValue(r,['Q_Ordered','Q Ordered','Cantidad','QTY'])||0).replace(',','.'))||0,
       area:progressAreaFromPlan(r),zone:progressPlanZone(r),product:progressProductKey(r)
     });
@@ -5869,7 +5915,8 @@ async function progressImportPlanFile(file,date){
   const groups={};
   validRows.forEach(x=>{
     const area=orderArea[x.pedido+'¦'+x.picking]||x.area,k=progressKey(x.pedido,x.picking,area);
-    if(!groups[k])groups[k]={Key:k,Pedido:x.pedido,Picking:x.picking,TR:x.picking,Area:area,TotalLineas:0,UnidadesPlanificadas:0,PlanZones:{},ZoneProducts:{}};
+    if(!groups[k])groups[k]={Key:k,Pedido:x.pedido,Picking:x.picking,TR:x.picking,Tienda:x.tienda||'',Area:area,TotalLineas:0,UnidadesPlanificadas:0,PlanZones:{},ZoneProducts:{}};
+    else if(!groups[k].Tienda&&x.tienda)groups[k].Tienda=x.tienda;
     const g=groups[k];g.TotalLineas+=1;g.UnidadesPlanificadas+=x.qty;
     const zone=x.zone||'SIN ZONA';g.PlanZones[zone]=(g.PlanZones[zone]||0)+1;
     if(x.product){g.ZoneProducts[zone]=g.ZoneProducts[zone]||{};g.ZoneProducts[zone][x.product]=(g.ZoneProducts[zone][x.product]||0)+1}
@@ -5880,6 +5927,149 @@ async function progressImportPlanFile(file,date){
   await progressRemoteSave(st);
   return {sourceRows:validRows.length,groups:Object.keys(groups).length,excludedDestination38};
 }
+
+function progressNormHeader(v){return String(v??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ')}
+function progressDailyCell(row,idx){return idx>=0?row[idx]:''}
+function progressCleanSectorName(v){
+  let x=String(v||'').trim().replace(/\s+/g,' ');
+  if(!x)return '';
+  const u=progressNormHeader(x);
+  if(['TIENDA','PEDIDO ERP','PEDIDO','PICKING','LINEAS','UNIDADES','ESTADO','CARGUE','TOTAL'].includes(u))return '';
+  if(/^\d+$/.test(u))return '';
+  return x;
+}
+function progressFindSectorName(matrix,header){
+  for(let i=header-1;i>=Math.max(0,header-6);i--){
+    const vals=(matrix[i]||[]).map(progressCleanSectorName).filter(Boolean);
+    if(!vals.length)continue;
+    // Títulos de sector suelen ocupar una sola celda o repetirse por celdas combinadas.
+    const uniq=[...new Set(vals.map(v=>v.trim()))];
+    const candidate=uniq.find(v=>{
+      const u=progressNormHeader(v);
+      return /(UNITARIO|MASTER|PM|RUTEO|FRIO|REFRIG|CONGEL|QUIM|MASCOT|SECO|CIGARR|BEBIDA|PERFUM|ALMACEN|FULL|CASE)/.test(u);
+    });
+    if(candidate)return candidate;
+    if(uniq.length===1&&uniq[0].length<=60)return uniq[0];
+  }
+  return 'SECTOR SIN NOMBRE';
+}
+function progressFindDailySectorsInSheet(ws,sheetName){
+  const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+  const headers=[];
+  for(let i=0;i<matrix.length;i++){
+    const vals=(matrix[i]||[]).map(progressNormHeader);
+    const find=(alts)=>vals.findIndex(v=>alts.some(a=>v===a||v.includes(a)));
+    const tienda=find(['TIENDA']);
+    const pedido=find(['PEDIDO ERP','PEDIDO']);
+    const picking=find(['PICKING']);
+    const lineas=find(['LINEAS']);
+    const unidades=find(['UNIDADES']);
+    if(tienda>=0&&pedido>=0&&picking>=0&&lineas>=0&&unidades>=0){
+      headers.push({row:i,cols:{tienda,pedido,picking,lineas,unidades},name:progressFindSectorName(matrix,i)});
+    }
+  }
+  const sectors=[];
+  headers.forEach((h,idx)=>{
+    const limit=idx+1<headers.length?headers[idx+1].row:matrix.length;
+    const out=[];let blanks=0;
+    for(let i=h.row+1;i<limit;i++){
+      const row=matrix[i]||[], joined=row.map(progressNormHeader).join(' ');
+      const pedido=String(progressDailyCell(row,h.cols.pedido)||'').trim();
+      const tienda=String(progressDailyCell(row,h.cols.tienda)||'').trim();
+      const picking=String(progressDailyCell(row,h.cols.picking)||'').trim();
+      const lineas=Number(String(progressDailyCell(row,h.cols.lineas)||'').replace(/\./g,'').replace(',','.'))||0;
+      const unidades=Number(String(progressDailyCell(row,h.cols.unidades)||'').replace(/\./g,'').replace(',','.'))||0;
+      if(!pedido&&!tienda&&!picking&&!lineas&&!unidades){blanks++; if(out.length&&blanks>=3)break; continue}else blanks=0;
+      if(joined.includes('TOTAL')&&!pedido)continue;
+      if(!pedido||!picking)continue;
+      out.push({Tienda:tienda,Pedido:pedido,Picking:picking,TR:picking,TotalLineas:lineas,UnidadesPlanificadas:unidades});
+    }
+    if(out.length)sectors.push({name:h.name,sheetName,rows:out});
+  });
+  return sectors;
+}
+function progressNormalizeSectorKey(v){return progressNormHeader(v).replace(/[^A-Z0-9]+/g,' ').trim()}
+function progressSectorAreaName(sector){
+  const u=progressNormalizeSectorKey(sector);
+  if(u.includes('QUIM'))return 'Unitarios químicos';
+  if(u.includes('MASTER')||u.includes('FULL CASE')||u.includes('FULLCASE'))return 'Masterbox';
+  if(/(^| )PM( |$)/.test(u))return 'PM';
+  if(u.includes('CONGEL'))return 'Congelados';
+  if(u.includes('REFRIG')||u.includes('FRIO'))return 'Refrigerados';
+  if(u.includes('CIGARR'))return 'Cigarrillos';
+  if(u.includes('MASCOT'))return 'Unitarios secos';
+  if(u.includes('SECO')||u.includes('UNITARIO'))return 'Unitarios secos';
+  return sector;
+}
+async function progressImportDailyPlanFile(file,date){
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false});
+  const all=[];
+  for(const sn of wb.SheetNames)all.push(...progressFindDailySectorsInSheet(wb.Sheets[sn],sn));
+  if(!all.length)throw new Error('No encontré sectores con las columnas Tienda, Pedido ERP, Picking, Líneas y Unidades.');
+  const merged={};
+  all.forEach(sec=>{
+    const key=sec.name.trim();
+    if(!merged[key])merged[key]={name:key,sheetName:sec.sheetName,rows:[]};
+    merged[key].rows.push(...sec.rows);
+  });
+  const sectors=Object.values(merged);
+  const st=progressLoadStore();st.days[date]=st.days[date]||{rows:[]};
+  st.days[date].dailyPlanilla={fileName:file.name,loadedAt:new Date().toISOString(),sectors};
+  // Compatibilidad con versiones anteriores: si existe Unitario Seco también queda disponible aquí.
+  const unit=sectors.find(x=>progressNormalizeSectorKey(x.name).includes('UNITARIO SECO'));
+  if(unit)st.days[date].unitarioPlanilla={fileName:file.name,sheetName:unit.sheetName,loadedAt:new Date().toISOString(),rows:unit.rows};
+  progressSaveStore(st);await progressRemoteSave(st);
+  return {sectors:sectors.length,rows:sectors.reduce((a,s)=>a+s.rows.length,0),lineas:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.TotalLineas||0),0),0),unidades:sectors.reduce((a,s)=>a+s.rows.reduce((x,r)=>x+Number(r.UnidadesPlanificadas||0),0),0),names:sectors.map(s=>s.name)};
+}
+function progressDailyPlan(date){const st=progressLoadStore();return st.days?.[date]?.dailyPlanilla||null}
+function progressDailyUnitario(date){const st=progressLoadStore();return st.days?.[date]?.unitarioPlanilla||null}
+function progressSelectedDailySector(date){
+  const daily=progressDailyPlan(date),sel=$('progressSectorFilter');
+  if(!daily?.sectors?.length)return null;
+  const wanted=sel?.value||daily.sectors[0].name;
+  return daily.sectors.find(s=>s.name===wanted)||daily.sectors[0];
+}
+function progressUpdateSectorFilter(date){
+  const sel=$('progressSectorFilter'),daily=progressDailyPlan(date);if(!sel)return;
+  const prior=sel.value;
+  const sectors=daily?.sectors||[];
+  sel.innerHTML=sectors.length?sectors.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+'</option>').join(''):'<option value="">Sin planilla</option>';
+  if(sectors.some(s=>s.name===prior))sel.value=prior;
+  else if(sectors.length){const pref=sectors.find(s=>progressNormalizeSectorKey(s.name).includes('UNITARIO SECO'))||sectors[0];sel.value=pref.name;}
+}
+function progressExactZone(v){return String(v||'').trim().toUpperCase().replace(/\s+/g,' ')}
+function progressZonePlan(rows){
+  const out={};
+  const ensure=k=>out[k]||(out[k]={key:k,total:0,pending:0,processed:0,pct:0,estimated:false});
+  (rows||[]).filter(r=>r.Estado!=='No preparar').forEach(r=>{
+    const rowTotals={};
+    Object.entries(r.PlanZones||{}).forEach(([z,n])=>{const k=progressExactZone(z);if(!k||k==='SIN ZONA')return;const v=Number(n||0);rowTotals[k]=(rowTotals[k]||0)+v;ensure(k).total+=v});
+    const mapped={};let mappedSum=0;
+    Object.entries(r.PendientesPorZona||{}).forEach(([z,n])=>{const k=progressExactZone(z);if(!k)return;const v=Number(n||0);mapped[k]=(mapped[k]||0)+v;mappedSum+=v;ensure(k).pending+=v});
+    const unknown=Math.max(0,Number(r.Pendientes||0)-mappedSum),allocTotal=Object.values(rowTotals).reduce((a,v)=>a+v,0);
+    if(unknown>0&&allocTotal>0)Object.entries(rowTotals).forEach(([k,v])=>{if(v>0){ensure(k).pending+=unknown*(v/allocTotal);ensure(k).estimated=true}});
+  });
+  Object.values(out).forEach(x=>{x.pending=Math.min(x.total,Math.max(0,x.pending));x.processed=Math.max(0,x.total-x.pending);x.pct=x.total?x.processed/x.total*100:0});
+  return out;
+}
+async function progressLoadZonePickers(date,force=false){
+  const ck='zones:'+date;if(!force&&PROGRESS_MICRO_PICKERS_CACHE[ck])return PROGRESS_MICRO_PICKERS_CACHE[ck];
+  try{
+    const url=(typeof productivitySummaryFileForDate==='function'?productivitySummaryFileForDate(date):('./datos/productividad-resumen/'+progressCompactDate(date)+'.json'))+'?zones='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json(),rows=progressMicroPickerRows(payload),by={};
+    rows.forEach(r=>{const z=progressExactZone(typeof timeRawZone==='function'?timeRawZone(r):(r.ZonaLineaPicking||r.ZonaPrincipal||r.Zona||''));if(!z)return;const name=String(r.Picker||r.Nombres||r.Empleado||'Sin nombre').trim();if(!name)return;by[z]=by[z]||{};by[z][name]=(by[z][name]||0)+1});
+    const result={};Object.entries(by).forEach(([z,names])=>{const arr=Object.entries(names).map(([name,count])=>({name,count,rate:progressMicroPickerRate(count,date)})).sort((a,b)=>b.count-a.count);result[z]=arr[0]||null});
+    PROGRESS_MICRO_PICKERS_CACHE[ck]=result;return result;
+  }catch(e){console.warn('Pickers por zona',e);PROGRESS_MICRO_PICKERS_CACHE[ck]={};return {}}
+}
+function progressUpdateZoneFilter(zones){
+  const sel=$('progressZoneFilter');if(!sel)return;const prior=sel.value||'__ALL__';
+  const ordered=[...zones].sort((a,b)=>String(a).localeCompare(String(b),'es',{numeric:true}));
+  sel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+ordered.map(z=>'<option value="'+esc(z)+'">'+esc(z)+'</option>').join('');
+  sel.value=ordered.includes(prior)?prior:'__ALL__';$('progressZoneCount').textContent=ordered.length+' zonas';
+}
+
 function progressDatesUntil(st,date){return Object.keys(st.days||{}).filter(d=>d<=date).sort()}
 function progressSnapshotBefore(st,key,date,inclusive=true){
   const dates=Object.keys(st.snapshots||{}).filter(d=>inclusive?d<=date:d<date).sort().reverse();
@@ -5992,7 +6182,87 @@ function progressUpdateSortMarks(){
   });
 }
 function progressStatusBadge(r){const cls=r.Estado==='Completo'?'done':r.Estado==='Pendiente anterior'?'carry':r.Estado==='No preparar'?'cancel':'active';return '<span class="progressStateBadge '+cls+'">'+esc(r.Estado||'')+'</span>'+(r.Carry?'<span class="progressOrigin">desde '+esc(String(r.OriginDate||'').split('-').reverse().join('/'))+'</span>':'')+(r.CancelReason?'<span class="progressOrigin">'+esc(r.CancelReason)+'</span>':'')}
+
+let PROGRESS_MICRO_PICKERS_CACHE={};
+function progressMicroKey(zone){
+  const z=String(zone||'').trim().toUpperCase().replace(/[\s_\-]/g,'');
+  if(/^MFCA/.test(z))return 'MFCA';
+  if(/^MFCB/.test(z))return 'MFCB';
+  if(/^MFCC/.test(z)||z==='AR'||z==='BR'||/^AR[LR]?$/.test(z)||/^BR[LR]?$/.test(z))return 'MFCC / AR / BR';
+  return '';
+}
+function progressMicroSectorPlan(rows){
+  const keys=['MFCA','MFCB','MFCC / AR / BR'];
+  const out=Object.fromEntries(keys.map(k=>[k,{key:k,total:0,pending:0,processed:0,estimated:false}]));
+  (rows||[]).filter(r=>r.Area==='Unitarios secos'&&r.Estado!=='No preparar').forEach(r=>{
+    const rowTotals={MFCA:0,MFCB:0,'MFCC / AR / BR':0};
+    Object.entries(r.PlanZones||{}).forEach(([z,n])=>{const k=progressMicroKey(z);if(k){const v=Number(n||0);rowTotals[k]+=v;out[k].total+=v;}});
+    const mappedPending={MFCA:0,MFCB:0,'MFCC / AR / BR':0};
+    let mapped=0;
+    Object.entries(r.PendientesPorZona||{}).forEach(([z,n])=>{const k=progressMicroKey(z);if(k){const v=Number(n||0);mappedPending[k]+=v;mapped+=v;}});
+    keys.forEach(k=>out[k].pending+=mappedPending[k]);
+    const rowPending=Math.max(0,Number(r.Pendientes||0));
+    const unknown=Math.max(0,rowPending-mapped);
+    const allocTotal=keys.reduce((a,k)=>a+rowTotals[k],0);
+    if(unknown>0&&allocTotal>0){
+      keys.forEach(k=>{if(rowTotals[k]>0){out[k].pending+=unknown*(rowTotals[k]/allocTotal);out[k].estimated=true;}});
+    }
+  });
+  keys.forEach(k=>{const x=out[k];x.pending=Math.min(x.total,Math.max(0,x.pending));x.processed=Math.max(0,x.total-x.pending);x.pct=x.total?x.processed/x.total*100:0;});
+  return out;
+}
+function progressMicroPickerRows(payload){return (Array.isArray(payload)?payload:(payload?.rows||[])).filter(r=>!(typeof timeIsExcluded==='function'&&timeIsExcluded(r)));}
+function progressMicroPickerRate(count,date){
+  let hours=6.5;
+  if(date===progressTodayISO()){
+    const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate(),6,0,0,0);
+    hours=Math.max(.5,Math.min(6.5,(now-start)/3600000));
+  }
+  return hours>0?count/hours:0;
+}
+async function progressLoadMicroPickers(date,force=false){
+  if(!force&&PROGRESS_MICRO_PICKERS_CACHE[date])return PROGRESS_MICRO_PICKERS_CACHE[date];
+  try{
+    const url=(typeof productivitySummaryFileForDate==='function'?productivitySummaryFileForDate(date):('./datos/productividad-resumen/'+progressCompactDate(date)+'.json'))+'?micro='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json(),rows=progressMicroPickerRows(payload),by={MFCA:{},MFCB:{},'MFCC / AR / BR':{}};
+    rows.forEach(r=>{const k=progressMicroKey(typeof timeRawZone==='function'?timeRawZone(r):(r.ZonaLineaPicking||r.ZonaPrincipal||r.Zona||''));if(!k)return;const name=String(r.Picker||r.Nombres||r.Empleado||'Sin nombre').trim();if(!name)return;by[k][name]=(by[k][name]||0)+1;});
+    const result={};
+    Object.entries(by).forEach(([k,names])=>{const arr=Object.entries(names).map(([name,count])=>({name,count,rate:progressMicroPickerRate(count,date)})).sort((a,b)=>b.count-a.count);result[k]=arr[0]||null;});
+    PROGRESS_MICRO_PICKERS_CACHE[date]=result;return result;
+  }catch(e){console.warn('Microsector pickers',e);PROGRESS_MICRO_PICKERS_CACHE[date]={};return {};}
+}
+function progressRenderUnitarioPanel(){
+  const body=$('progressUnitarioBody'),grid=$('progressMicroGrid');if(!body||!grid)return;
+  const date=progressSelectedDate();
+  progressUpdateSectorFilter(date);
+  const sec=progressSelectedDailySector(date),sectorName=sec?.name||'SECTOR',areaName=progressSectorAreaName(sectorName);
+  const daily=progressDailyPlan(date);
+  let detailed=ORDER_PROGRESS_ROWS.filter(r=>r.Area===areaName&&r.Estado!=='No preparar').slice();
+  // Fallback: si no existe un área exactamente mapeada, cruza por pedidos/pickings del sector cargado.
+  if(!detailed.length&&sec?.rows?.length){
+    const peds=new Set(sec.rows.map(r=>String(r.Pedido||''))), picks=new Set(sec.rows.map(r=>String(r.Picking||r.TR||'')));
+    detailed=ORDER_PROGRESS_ROWS.filter(r=>r.Estado!=='No preparar'&&(peds.has(String(r.Pedido||''))||picks.has(String(r.Picking||r.TR||''))));
+  }
+  detailed.sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
+  const rows=(sec?.rows?.length?sec.rows:detailed).slice().sort((a,b)=>String(a.Tienda||'').localeCompare(String(b.Tienda||''),'es',{numeric:true})||String(a.Pedido||'').localeCompare(String(b.Pedido||''),'es',{numeric:true}));
+  if($('progressSectorTitle'))$('progressSectorTitle').textContent=sectorName.toUpperCase();
+  body.innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.UnidadesPlanificadas||0)+'</td></tr>').join(''):'<tr><td colspan="6" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
+  const totalLines=rows.reduce((s,r)=>s+Number(r.TotalLineas||0),0),totalUnits=rows.reduce((s,r)=>s+Number(r.UnidadesPlanificadas||0),0);
+  $('progressUnitarioLines').textContent=progressFmt(totalLines);$('progressUnitarioUnits').textContent=progressFmt(totalUnits);$('progressUnitarioMeta').textContent=rows.length+' pedidos · '+progressFmt(totalLines)+' líneas';
+  const dm=$('progressDailyDropMeta');if(dm)dm.textContent=daily?(daily.fileName+' · '+(daily.sectors?.length||0)+' sectores · '+daily.sectors.reduce((a,s)=>a+s.rows.length,0)+' pedidos'):'Sin planilla diaria cargada · mostrando base detallada';
+
+  const zones=progressZonePlan(detailed),pickers=PROGRESS_MICRO_PICKERS_CACHE['zones:'+date]||{};
+  progressUpdateZoneFilter(Object.keys(zones));
+  const selected=$('progressZoneFilter')?.value||'__ALL__';
+  let vals=Object.values(zones).filter(x=>x.total>0);if(selected!=='__ALL__')vals=vals.filter(x=>x.key===selected);
+  const ranked=Object.values(zones).filter(x=>x.total>0).slice().sort((a,b)=>b.pct-a.pct),rank={};ranked.forEach((x,i)=>rank[x.key]=ranked.length===1?'mid':i===0?'fast':i===ranked.length-1?'slow':'mid');
+  grid.innerHTML=vals.length?vals.map(x=>{const pk=pickers[x.key],rcls=rank[x.key]||'mid',rtext=ranked.length<2?'Zona':rcls==='fast'?'Más adelantado':rcls==='slow'?'Más atrasado':'Intermedio';return '<div class="progressMicroCard"><div class="progressMicroTop"><div><div class="progressMicroName">'+esc(x.key)+'</div><div class="muted" style="font-size:8px;margin-top:2px">'+(x.estimated?'pendiente parcialmente estimado':'pendiente por zona')+'</div></div><div class="progressMicroPct">'+Number(x.pct||0).toFixed(1)+'%</div></div><div class="progressBar"><i style="width:'+progressPct(x.pct)+'%"></i></div><div class="progressMicroStats"><div class="progressMicroStat"><small>Procesadas</small><b>'+progressFmt(Math.round(x.processed))+'</b></div><div class="progressMicroStat"><small>Total</small><b>'+progressFmt(x.total)+'</b></div><div class="progressMicroStat"><small>Pendientes</small><b>'+progressFmt(Math.round(x.pending))+'</b></div></div><div class="progressMicroPicker"><div><b>'+(pk?esc(pk.name):'Picker sin identificar')+'</b><span>'+(pk?progressFmt(pk.count)+' líneas · '+pk.rate.toFixed(1)+' lín/h':'sin actividad detectada')+'</span></div><span class="progressMicroRank '+rcls+'">'+rtext+'</span></div></div>'}).join(''):'<div class="muted" style="padding:12px">No hay detalle de zonas/microsectores para '+esc(sectorName)+' en la base de avance.</div>';
+  $('progressMicroUpdated').textContent=date.split('-').reverse().join('/');
+  const estimated=Object.values(zones).some(x=>x.estimated);$('progressMicroNote').textContent=(estimated?'ℹ Algunas líneas pendientes no llegaron desglosadas por zona y se distribuyeron proporcionalmente al plan. ':'')+'Sector: '+sectorName+'. Usá el filtro de zona para aislar un microsector; el picker corresponde a quien más confirmaciones registró allí durante el día.';
+}
 function renderOrderProgress(){
+  progressRenderUnitarioPanel();
   const grid=$('progressAreaGrid'),active=$('progressAreaFilter')?.value||'__ALL__';
   grid.innerHTML=ORDER_PROGRESS_AREAS.map(a=>'<div class="progressAreaCard '+(active===a.Area?'active':'')+'" data-area="'+esc(a.Area)+'"><div class="head"><b>'+esc(a.Area)+'</b><span class="pct">'+Number(a.Avance||0).toFixed(1)+'%</span></div><div class="progressBar"><i style="width:'+progressPct(a.Avance)+'%"></i></div><div class="progressMeta"><span>'+progressFmt(a.Procesadas)+' / '+progressFmt(a.TotalLineas)+' líneas</span><span>'+progressFmt(a.Pendientes)+' pendientes</span></div><div class="progressMeta" style="margin-top:5px"><span>'+progressFmt(a.Pedidos)+' pedidos</span><span>'+progressFmt(a.PedidosCompletos)+' completos</span></div></div>').join('');
   grid.querySelectorAll('[data-area]').forEach(c=>c.onclick=()=>{$('progressAreaFilter').value=c.dataset.area;renderOrderProgress();});
@@ -6022,6 +6292,7 @@ async function buildOrderProgressPanel(force=false){
     const sel=$('progressAreaFilter'),cur=sel.value||'__ALL__',areas=ORDER_PROGRESS_AREAS.map(x=>x.Area);sel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+areas.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');sel.value=areas.includes(cur)?cur:'__ALL__';
     const upd=payload.updated_at?new Date(payload.updated_at):null;$('progressUpdated').textContent=upd&&!isNaN(upd)?'Actualizado '+upd.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Actualizado';
     const missingLive=hasAnyPlan?ORDER_PROGRESS_ROWS.filter(x=>!x.LiveMatched&&x.Estado!=='No preparar').length:0;$('progressStatus').className='processStatus';$('progressStatus').textContent=(hasAnyPlan?'Planificación cargada + ':'')+'Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos vigentes'+(missingLive?' · '+missingLive+' sin cruce Copérnico':'')+' · fecha '+date.split('-').reverse().join('/')+(date===progressTodayISO()?' · actualización automática cada minuto':' · histórico');renderOrderProgress();
+    await progressLoadMicroPickers(date,force);await progressLoadZonePickers(date,force);progressRenderUnitarioPanel();
     if(ORDER_PROGRESS_TIMER)clearInterval(ORDER_PROGRESS_TIMER);ORDER_PROGRESS_TIMER=null;if(date===progressTodayISO())ORDER_PROGRESS_TIMER=setInterval(()=>{if(displayMode==='progress'&&progressSelectedDate()===progressTodayISO())buildOrderProgressPanel(true)},60000);
   }catch(e){
     ORDER_PROGRESS_LIVE_ROWS=[];const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;ORDER_PROGRESS_ROWS=hasAnyPlan?progressBuildPlannedRows(date):[];ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);renderOrderProgress();
@@ -6032,6 +6303,16 @@ function progressInitDate(){const d=$('progressPlanDate');if(d&&!d.value)d.value
 progressInitDate();
 if(ORDER_PROGRESS_STALL_TIMER)clearInterval(ORDER_PROGRESS_STALL_TIMER);ORDER_PROGRESS_STALL_TIMER=setInterval(()=>{if(displayMode==='progress')progressRefreshStallCounters()},10000);
 $('progressPlanFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportPlanFile(f,progressSelectedDate());alert('Planificación cargada: '+progressFmt(r.sourceRows)+' líneas · '+progressFmt(r.groups)+' segmentos'+(r.excludedDestination38?' · '+progressFmt(r.excludedDestination38)+' líneas de Warehouse_Destino_Id 38 excluidas':'')+'.');await buildOrderProgressPanel(true)}catch(err){alert('No se pudo cargar el Detalle TRs: '+(err.message||err))}finally{e.target.value=''}};
+const progressDailyDrop=$('progressDailyDrop'),progressDailyInput=$('progressDailyPlanFile');
+if(progressDailyDrop&&progressDailyInput){
+  progressDailyDrop.onclick=()=>progressDailyInput.click();
+  ['dragenter','dragover'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.add('drag')}));
+  ['dragleave','drop'].forEach(ev=>progressDailyDrop.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();progressDailyDrop.classList.remove('drag')}));
+  progressDailyDrop.addEventListener('drop',async e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada: '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}});
+  progressDailyInput.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const r=await progressImportDailyPlanFile(f,progressSelectedDate());alert('Planilla diaria cargada: '+r.sectors+' sectores · '+r.rows+' pedidos · '+progressFmt(r.lineas)+' líneas · '+progressFmt(r.unidades)+' unidades.\n\nSectores: '+r.names.join(' · '));await buildOrderProgressPanel(true)}catch(err){alert('No se pudo leer la Planilla de Preparación: '+(err.message||err))}finally{e.target.value=''}};
+}
+if($('progressZoneFilter'))$('progressZoneFilter').onchange=()=>progressRenderUnitarioPanel();
+if($('progressSectorFilter'))$('progressSectorFilter').onchange=()=>{if($('progressZoneFilter'))$('progressZoneFilter').value='__ALL__';progressRenderUnitarioPanel();};
 $('progressPlanDate').onchange=()=>buildOrderProgressPanel(true);
 $('progressPlanClearBtn').onclick=async()=>{const date=progressSelectedDate(),st=progressLoadStore();if(!st.days[date])return alert('No hay TRs cargadas para esta fecha.');const label=date.split('-').reverse().join('/');if(!confirm('¿Borrar TODAS las TRs cargadas del '+label+'?\n\nEsta acción elimina la planificación compartida para todos los usuarios. El histórico de avance de Copérnico no se borra.'))return;delete st.days[date];progressSaveStore(st);try{await progressRemoteSave(st);alert('TRs del '+label+' borradas correctamente para todos los usuarios.')}catch(e){alert(e.message||e);return}buildOrderProgressPanel(true)};
 $('progressPlanExportBtn').onclick=()=>{const st=progressLoadStore(),blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avance_pedidos_historial_'+progressTodayISO().replaceAll('-','')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
