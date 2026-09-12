@@ -5763,7 +5763,7 @@ const PROGRESS_GLOBAL_API='https://ubicaciones-api.pavonlucas-m.workers.dev';
 let PROGRESS_SHARED_LOADED=false,PROGRESS_SHARED_STORE=null;
 function progressFmt(n){return Number(n||0).toLocaleString('es-AR')}
 function progressPct(v){return Math.max(0,Math.min(100,Number(v)||0))}
-function progressAreaOrder(a){const i=['Masterbox','Refrigerados','Congelados','Carnes','Cigarrillos','Unitarios secos','Unitarios químicos','PM','Otras'].indexOf(a);return i<0?99:i}
+function progressAreaOrder(a){const i=['Masterbox','Refrigerados','Congelados','Carnes','Cigarrillos','Unitarios secos','Unitarios químicos','Unitarios mascotas','PM','Otras'].indexOf(a);return i<0?99:i}
 function progressLocalISO(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${da}`}
 function progressTodayISO(){return progressLocalISO(new Date())}
 function progressSelectedDate(){return $('progressPlanDate')?.value||progressTodayISO()}
@@ -6013,9 +6013,12 @@ function progressFindDailySectorsInSheet(ws,sheetName){
 function progressNormalizeSectorKey(v){return progressNormHeader(v).replace(/[^A-Z0-9]+/g,' ').trim()}
 function progressSectorAreaName(sector){
   const u=progressNormalizeSectorKey(sector);
+  // PM debe evaluarse antes que QUIMICOS: algunas cabeceras de la planilla
+  // contienen texto adicional y, si aparece QUIM, terminaban mezclándose.
+  const compact=u.replace(/\s+/g,'');
+  if(/(^| )PM( |$)/.test(u)||compact==='PM'||u==='P M'||u.startsWith('PM ')||u.endsWith(' PM'))return 'PM';
   if(u.includes('QUIM'))return 'Unitarios químicos';
   if(u.includes('MASTER')||u.includes('FULL CASE')||u.includes('FULLCASE'))return 'Masterbox';
-  if(/(^| )PM( |$)/.test(u))return 'PM';
   if(u.includes('CONGEL'))return 'Congelados';
   if(u.includes('REFRIG')||u.includes('FRIO'))return 'Refrigerados';
   if(u.includes('CIGARR'))return 'Cigarrillos';
