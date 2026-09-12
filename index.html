@@ -2262,7 +2262,7 @@ body.heatSplit .layoutHeatGrid{
     </section>
   </div>
   <div class="progressAreaGrid" id="progressAreaGrid"></div>
-  <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido, picking o TR…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="OPEN" selected>Abiertos</option><option value="CLOSED">Cerrados</option><option value="__ALL__">Todos</option></select></div><div class="muted" style="margin:5px 0 8px">Abiertos = pedidos iniciados con líneas pendientes. Orden inicial: mayor avance → menor avance.</div>
+  <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido, picking o TR…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="OPEN" selected>Abiertos</option><option value="CLOSED">Cerrados</option><option value="__ALL__">Todos</option></select></div><div class="muted" style="margin:5px 0 8px">Abiertos = pedidos iniciados con líneas pendientes. El avance se calcula línea por línea desde Copérnico; Confirmadas + Negadas = procesadas. Orden inicial: mayor avance → menor avance.</div>
   <div class="processStatus" id="progressStatus">Cargando avance…</div>
   <div class="progressTableWrap"><table class="progressTable"><thead><tr><th data-progress-sort="area">Área <span class="sortMark">↕</span></th><th data-progress-sort="pedido">Pedido <span class="sortMark">↕</span></th><th data-progress-sort="picking">Picking <span class="sortMark">↕</span></th><th data-progress-sort="tr">TR <span class="sortMark">↕</span></th><th data-progress-sort="estado">Estado <span class="sortMark">↕</span></th><th class="num" data-progress-sort="total">Total líneas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="procesadas">Procesadas <span class="sortMark">↕</span></th><th class="num" data-progress-sort="pendientes">Pendientes <span class="sortMark">↕</span></th><th class="num" data-progress-sort="negadas">Negadas <span class="sortMark">↕</span></th><th data-progress-sort="avance">Avance <span class="sortMark">↓</span></th><th data-progress-sort="zonas">Zonas pendientes <span class="sortMark">↕</span></th><th data-progress-sort="stall">Sin movimiento <span class="sortMark">↕</span></th><th>Acción</th></tr></thead><tbody id="progressBody"></tbody></table><div class="processEmpty" id="progressEmpty" style="display:none">No hay pedidos para los filtros seleccionados.</div></div>
 </div>
@@ -6179,6 +6179,47 @@ function progressBuildPlannedRows(date){
   progressSaveStore(st);return out;
 }
 function progressBuildFallbackRows(){return ORDER_PROGRESS_LIVE_ROWS.map(r=>({...r,Picking:progressLivePicking(r),Estado:Number(r.Pendientes||0)===0?'Completo':Number(r.Procesadas||0)>0?'En preparación':'Sin iniciar',FaltanZonas:[],PlannedToday:true,Carry:false,Key:progressKey(r.Pedido,progressLivePicking(r),r.Area)}))}
+function progressBuildDailyOverviewRows(date){
+  const daily=progressDailyPlan(date);
+  if(!daily?.sectors?.length)return null;
+  const out=[];
+  daily.sectors.forEach(sec=>{
+    const area=progressSectorAreaName(sec.name)||sec.name||'Otras';
+    (sec.rows||[]).forEach((r,idx)=>{
+      const v=progressDailyOrderView(r),live=v.live||{};
+      const denied=Math.min(v.processed,Math.max(0,Number(live.Negadas||0)));
+      const pendingMap={};
+      (v.streets||[]).filter(z=>!z.planned).forEach(z=>{if(z.zone)pendingMap[z.zone]=(pendingMap[z.zone]||0)+Number(z.pending||0)});
+      const pickings=Array.isArray(live.Pickings)&&live.Pickings.length?live.Pickings.map(String):[String(r.Picking||r.TR||'')].filter(Boolean);
+      const estado=v.pending===0?'Completo':v.processed>0?'En preparación':'Sin iniciar';
+      const rr={
+        ...r,
+        Area:area,
+        SectorPlanilla:sec.name,
+        Picking:String(r.Picking||r.TR||''),
+        TR:String(r.TR||r.Picking||''),
+        Pickings:pickings,
+        TotalLineas:v.total,
+        Procesadas:v.processed,
+        Confirmadas:Math.max(0,v.processed-denied),
+        Negadas:denied,
+        Pendientes:v.pending,
+        Avance:v.pct,
+        PendientesPorZona:pendingMap,
+        Zonas:[...new Set((v.streets||[]).filter(z=>!z.planned).map(z=>z.zone).filter(Boolean))],
+        FaltanZonas:(v.streets||[]).map(z=>({zone:z.zone,pending:Number(z.pending||0),exact:!z.planned})),
+        UltimaLineaEpoch:Number(live.UltimaLineaEpoch||0),
+        PlannedToday:true,
+        Carry:false,
+        Estado:estado,
+        LiveMatched:!!v.live,
+        Key:progressKey(r.Pedido,r.Picking||r.TR,area)+'¦'+idx
+      };
+      out.push(rr);
+    });
+  });
+  return out;
+}
 function progressMakeAreas(rows){
   const m={};rows.filter(r=>r.Estado!=='No preparar').forEach(r=>{const a=r.Area||'Otras';if(!m[a])m[a]={Area:a,PedidosSet:new Set(),CompleteSet:new Set(),TotalLineas:0,Procesadas:0,Pendientes:0};const x=m[a];x.PedidosSet.add(String(r.Pedido));if(Number(r.Pendientes||0)===0)x.CompleteSet.add(String(r.Pedido));x.TotalLineas+=Number(r.TotalLineas||0);x.Procesadas+=Number(r.Procesadas||0);x.Pendientes+=Number(r.Pendientes||0)});
   return Object.values(m).map(x=>({Area:x.Area,Pedidos:x.PedidosSet.size,PedidosCompletos:x.CompleteSet.size,TotalLineas:x.TotalLineas,Procesadas:x.Procesadas,Pendientes:x.Pendientes,Avance:x.TotalLineas?x.Procesadas/x.TotalLineas*100:0})).sort((a,b)=>progressAreaOrder(a.Area)-progressAreaOrder(b.Area));
@@ -6455,14 +6496,14 @@ async function buildOrderProgressPanel(force=false){
     const res=await fetch(progressHistoryUrl(date)+'?v='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const payload=await res.json();
     ORDER_PROGRESS_LIVE_ROWS=Array.isArray(payload.rows)?payload.rows:[];
     const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;
-    ORDER_PROGRESS_ROWS=hasAnyPlan?progressBuildPlannedRows(date):progressBuildFallbackRows();ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);
+    const dailyOverview=progressBuildDailyOverviewRows(date);ORDER_PROGRESS_ROWS=dailyOverview|| (hasAnyPlan?progressBuildPlannedRows(date):progressBuildFallbackRows());ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);
     const sel=$('progressAreaFilter'),cur=sel.value||'__ALL__',areas=ORDER_PROGRESS_AREAS.map(x=>x.Area);sel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+areas.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');sel.value=areas.includes(cur)?cur:'__ALL__';
     const upd=payload.updated_at?new Date(payload.updated_at):null;$('progressUpdated').textContent=upd&&!isNaN(upd)?'Actualizado '+upd.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Actualizado';
     const missingLive=hasAnyPlan?ORDER_PROGRESS_ROWS.filter(x=>!x.LiveMatched&&x.Estado!=='No preparar').length:0;$('progressStatus').className='processStatus';$('progressStatus').textContent=(hasAnyPlan?'Planificación cargada + ':'')+'Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos vigentes'+(missingLive?' · '+missingLive+' sin cruce Copérnico':'')+' · fecha '+date.split('-').reverse().join('/')+(date===progressTodayISO()?' · actualización automática cada minuto':' · histórico');renderOrderProgress();
     await progressLoadMicroPickers(date,force);await progressLoadZonePickers(date,force);progressRenderUnitarioPanel();
     if(ORDER_PROGRESS_TIMER)clearInterval(ORDER_PROGRESS_TIMER);ORDER_PROGRESS_TIMER=null;if(date===progressTodayISO())ORDER_PROGRESS_TIMER=setInterval(()=>{if(displayMode==='progress'&&progressSelectedDate()===progressTodayISO())buildOrderProgressPanel(true)},60000);
   }catch(e){
-    ORDER_PROGRESS_LIVE_ROWS=[];const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;ORDER_PROGRESS_ROWS=hasAnyPlan?progressBuildPlannedRows(date):[];ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);renderOrderProgress();
+    ORDER_PROGRESS_LIVE_ROWS=[];const st=progressLoadStore(),hasAnyPlan=progressDatesUntil(st,date).length>0;const dailyOverview=progressBuildDailyOverviewRows(date);ORDER_PROGRESS_ROWS=dailyOverview||(hasAnyPlan?progressBuildPlannedRows(date):[]);ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);renderOrderProgress();
     $('progressStatus').className='processStatus '+(hasAnyPlan?'':'bad');$('progressStatus').textContent=hasAnyPlan?'Planificación disponible, pero no se pudo cargar el histórico Copérnico de '+date.split('-').reverse().join('/')+': '+String(e.message||e):'No se pudo cargar el avance de pedidos: '+String(e.message||e);
   }
 }
