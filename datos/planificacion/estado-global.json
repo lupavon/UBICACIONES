@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "updatedAt": "2026-09-11T14:25:05.546Z",
+  "updatedAt": "2026-09-12T13:27:49.998Z",
   "days": {
     "2026-09-11": {
       "rows": [],
@@ -1829,6 +1829,1759 @@
             "TR": "71580",
             "TotalLineas": 127,
             "UnidadesPlanificadas": 808
+          }
+        ]
+      }
+    },
+    "2026-09-12": {
+      "rows": [],
+      "dailyPlanilla": {
+        "fileName": "Planilla Preparacion Septiembre (1) (6).xlsx",
+        "sheetName": "12-09",
+        "loadedAt": "2026-09-12T13:27:49.439Z",
+        "parserVersion": 3,
+        "sectors": [
+          {
+            "name": "PM SECO/QUIMICO",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491413",
+                "Picking": "71984",
+                "TR": "71984",
+                "TotalLineas": 21,
+                "UnidadesPlanificadas": 2184
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491418",
+                "Picking": "71992",
+                "TR": "71992",
+                "TotalLineas": 19,
+                "UnidadesPlanificadas": 6932
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491409",
+                "Picking": "71979",
+                "TR": "71979",
+                "TotalLineas": 26,
+                "UnidadesPlanificadas": 8432
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491408",
+                "Picking": "72013",
+                "TR": "72013",
+                "TotalLineas": 29,
+                "UnidadesPlanificadas": 3226
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491412",
+                "Picking": "72014",
+                "TR": "72014",
+                "TotalLineas": 24,
+                "UnidadesPlanificadas": 2702
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491411",
+                "Picking": "71981",
+                "TR": "71981",
+                "TotalLineas": 24,
+                "UnidadesPlanificadas": 5076
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491414",
+                "Picking": "71986",
+                "TR": "71986",
+                "TotalLineas": 21,
+                "UnidadesPlanificadas": 2142
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491426",
+                "Picking": "72018",
+                "TR": "72018",
+                "TotalLineas": 17,
+                "UnidadesPlanificadas": 1708
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491410",
+                "Picking": "72026",
+                "TR": "72026",
+                "TotalLineas": 24,
+                "UnidadesPlanificadas": 1810
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491419",
+                "Picking": "71994",
+                "TR": "71994",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 914
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491420",
+                "Picking": "72019",
+                "TR": "72019",
+                "TotalLineas": 16,
+                "UnidadesPlanificadas": 1460
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491423",
+                "Picking": "72015",
+                "TR": "72015",
+                "TotalLineas": 16,
+                "UnidadesPlanificadas": 1234
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491416",
+                "Picking": "71983",
+                "TR": "71983",
+                "TotalLineas": 19,
+                "UnidadesPlanificadas": 2112
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491422",
+                "Picking": "71985",
+                "TR": "71985",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 1534
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491425",
+                "Picking": "72024",
+                "TR": "72024",
+                "TotalLineas": 22,
+                "UnidadesPlanificadas": 1738
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491415",
+                "Picking": "71982",
+                "TR": "71982",
+                "TotalLineas": 28,
+                "UnidadesPlanificadas": 1862
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491417",
+                "Picking": "72021",
+                "TR": "72021",
+                "TotalLineas": 17,
+                "UnidadesPlanificadas": 1436
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491424",
+                "Picking": "72017",
+                "TR": "72017",
+                "TotalLineas": 15,
+                "UnidadesPlanificadas": 768
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491427",
+                "Picking": "72020",
+                "TR": "72020",
+                "TotalLineas": 12,
+                "UnidadesPlanificadas": 560
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491421",
+                "Picking": "71988",
+                "TR": "71988",
+                "TotalLineas": 12,
+                "UnidadesPlanificadas": 614
+              }
+            ]
+          },
+          {
+            "name": "MASTERBOX SECO",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491342",
+                "Picking": "71938",
+                "TR": "71938",
+                "TotalLineas": 122,
+                "UnidadesPlanificadas": 1220
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491330",
+                "Picking": "71913",
+                "TR": "71913",
+                "TotalLineas": 135,
+                "UnidadesPlanificadas": 1481
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491329",
+                "Picking": "71917",
+                "TR": "71917",
+                "TotalLineas": 202,
+                "UnidadesPlanificadas": 3007
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491333",
+                "Picking": "71915",
+                "TR": "71915",
+                "TotalLineas": 242,
+                "UnidadesPlanificadas": 3937
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491335",
+                "Picking": "71916",
+                "TR": "71916",
+                "TotalLineas": 158,
+                "UnidadesPlanificadas": 2192
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491332",
+                "Picking": "71914",
+                "TR": "71914",
+                "TotalLineas": 151,
+                "UnidadesPlanificadas": 1867
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491337",
+                "Picking": "71931",
+                "TR": "71931",
+                "TotalLineas": 148,
+                "UnidadesPlanificadas": 1737
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491336",
+                "Picking": "71940",
+                "TR": "71940",
+                "TotalLineas": 98,
+                "UnidadesPlanificadas": 1183
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491341",
+                "Picking": "71937",
+                "TR": "71937",
+                "TotalLineas": 90,
+                "UnidadesPlanificadas": 894
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491340",
+                "Picking": "71920",
+                "TR": "71920",
+                "TotalLineas": 95,
+                "UnidadesPlanificadas": 996
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491334",
+                "Picking": "71921",
+                "TR": "71921",
+                "TotalLineas": 116,
+                "UnidadesPlanificadas": 1424
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491347",
+                "Picking": "71933",
+                "TR": "71933",
+                "TotalLineas": 106,
+                "UnidadesPlanificadas": 1191
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491331",
+                "Picking": "71926",
+                "TR": "71926",
+                "TotalLineas": 131,
+                "UnidadesPlanificadas": 1684
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491339",
+                "Picking": "71932",
+                "TR": "71932",
+                "TotalLineas": 122,
+                "UnidadesPlanificadas": 1286
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491338",
+                "Picking": "71919",
+                "TR": "71919",
+                "TotalLineas": 115,
+                "UnidadesPlanificadas": 1429
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491328",
+                "Picking": "71912",
+                "TR": "71912",
+                "TotalLineas": 123,
+                "UnidadesPlanificadas": 1475
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491344",
+                "Picking": "71922",
+                "TR": "71922",
+                "TotalLineas": 122,
+                "UnidadesPlanificadas": 1478
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491346",
+                "Picking": "71927",
+                "TR": "71927",
+                "TotalLineas": 80,
+                "UnidadesPlanificadas": 874
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491345",
+                "Picking": "71924",
+                "TR": "71924",
+                "TotalLineas": 74,
+                "UnidadesPlanificadas": 857
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491343",
+                "Picking": "71918",
+                "TR": "71918",
+                "TotalLineas": 53,
+                "UnidadesPlanificadas": 525
+              }
+            ]
+          },
+          {
+            "name": "UNITARIO QUIMICOS",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491372",
+                "Picking": "71987",
+                "TR": "71987",
+                "TotalLineas": 55,
+                "UnidadesPlanificadas": 256
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491379",
+                "Picking": "72022",
+                "TR": "72022",
+                "TotalLineas": 37,
+                "UnidadesPlanificadas": 113
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491371",
+                "Picking": "71942",
+                "TR": "71942",
+                "TotalLineas": 98,
+                "UnidadesPlanificadas": 406
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491374",
+                "Picking": "71961",
+                "TR": "71961",
+                "TotalLineas": 99,
+                "UnidadesPlanificadas": 373
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491373",
+                "Picking": "71956",
+                "TR": "71956",
+                "TotalLineas": 55,
+                "UnidadesPlanificadas": 187
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491368",
+                "Picking": "72004",
+                "TR": "72004",
+                "TotalLineas": 67,
+                "UnidadesPlanificadas": 254
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491385",
+                "Picking": "71993",
+                "TR": "71993",
+                "TotalLineas": 64,
+                "UnidadesPlanificadas": 257
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491369",
+                "Picking": "71997",
+                "TR": "71997",
+                "TotalLineas": 39,
+                "UnidadesPlanificadas": 161
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491380",
+                "Picking": "71963",
+                "TR": "71963",
+                "TotalLineas": 39,
+                "UnidadesPlanificadas": 135
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491381",
+                "Picking": "71950",
+                "TR": "71950",
+                "TotalLineas": 25,
+                "UnidadesPlanificadas": 97
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491386",
+                "Picking": "71964",
+                "TR": "71964",
+                "TotalLineas": 40,
+                "UnidadesPlanificadas": 125
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491384",
+                "Picking": "71946",
+                "TR": "71946",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 72
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491377",
+                "Picking": "71962",
+                "TR": "71962",
+                "TotalLineas": 57,
+                "UnidadesPlanificadas": 204
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491370",
+                "Picking": "71954",
+                "TR": "71954",
+                "TotalLineas": 38,
+                "UnidadesPlanificadas": 110
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491376",
+                "Picking": "71951",
+                "TR": "71951",
+                "TotalLineas": 46,
+                "UnidadesPlanificadas": 201
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491375",
+                "Picking": "71990",
+                "TR": "71990",
+                "TotalLineas": 42,
+                "UnidadesPlanificadas": 150
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491378",
+                "Picking": "71955",
+                "TR": "71955",
+                "TotalLineas": 51,
+                "UnidadesPlanificadas": 183
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491382",
+                "Picking": "71941",
+                "TR": "71941",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 110
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491387",
+                "Picking": "71965",
+                "TR": "71965",
+                "TotalLineas": 33,
+                "UnidadesPlanificadas": 116
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491383",
+                "Picking": "71957",
+                "TR": "71957",
+                "TotalLineas": 15,
+                "UnidadesPlanificadas": 53
+              }
+            ]
+          },
+          {
+            "name": "UNITARIO SECO",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491407",
+                "Picking": "71977",
+                "TR": "71977",
+                "TotalLineas": 131,
+                "UnidadesPlanificadas": 1076
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491391",
+                "Picking": "71968",
+                "TR": "71968",
+                "TotalLineas": 136,
+                "UnidadesPlanificadas": 1465
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491394",
+                "Picking": "71970",
+                "TR": "71970",
+                "TotalLineas": 197,
+                "UnidadesPlanificadas": 1979
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491393",
+                "Picking": "71972",
+                "TR": "71972",
+                "TotalLineas": 221,
+                "UnidadesPlanificadas": 2164
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491403",
+                "Picking": "72016",
+                "TR": "72016",
+                "TotalLineas": 143,
+                "UnidadesPlanificadas": 1188
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491389",
+                "Picking": "71966",
+                "TR": "71966",
+                "TotalLineas": 150,
+                "UnidadesPlanificadas": 1783
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491390",
+                "Picking": "71967",
+                "TR": "71967",
+                "TotalLineas": 158,
+                "UnidadesPlanificadas": 1474
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491402",
+                "Picking": "71973",
+                "TR": "71973",
+                "TotalLineas": 116,
+                "UnidadesPlanificadas": 993
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491396",
+                "Picking": "71969",
+                "TR": "71969",
+                "TotalLineas": 102,
+                "UnidadesPlanificadas": 813
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491401",
+                "Picking": "71974",
+                "TR": "71974",
+                "TotalLineas": 73,
+                "UnidadesPlanificadas": 586
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491392",
+                "Picking": "72011",
+                "TR": "72011",
+                "TotalLineas": 127,
+                "UnidadesPlanificadas": 1407
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491398",
+                "Picking": "71975",
+                "TR": "71975",
+                "TotalLineas": 89,
+                "UnidadesPlanificadas": 928
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491388",
+                "Picking": "72006",
+                "TR": "72006",
+                "TotalLineas": 168,
+                "UnidadesPlanificadas": 1665
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491397",
+                "Picking": "72009",
+                "TR": "72009",
+                "TotalLineas": 120,
+                "UnidadesPlanificadas": 1264
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491406",
+                "Picking": "71976",
+                "TR": "71976",
+                "TotalLineas": 103,
+                "UnidadesPlanificadas": 776
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491404",
+                "Picking": "71978",
+                "TR": "71978",
+                "TotalLineas": 109,
+                "UnidadesPlanificadas": 753
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491395",
+                "Picking": "71971",
+                "TR": "71971",
+                "TotalLineas": 162,
+                "UnidadesPlanificadas": 1924
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491399",
+                "Picking": "72012",
+                "TR": "72012",
+                "TotalLineas": 86,
+                "UnidadesPlanificadas": 881
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491405",
+                "Picking": "71980",
+                "TR": "71980",
+                "TotalLineas": 85,
+                "UnidadesPlanificadas": 676
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491400",
+                "Picking": "72025",
+                "TR": "72025",
+                "TotalLineas": 50,
+                "UnidadesPlanificadas": 663
+              }
+            ]
+          },
+          {
+            "name": "UNITARIO MASCOTAS",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491355",
+                "Picking": "71947",
+                "TR": "71947",
+                "TotalLineas": 5,
+                "UnidadesPlanificadas": 16
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491351",
+                "Picking": "71936",
+                "TR": "71936",
+                "TotalLineas": 7,
+                "UnidadesPlanificadas": 23
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491365",
+                "Picking": "71960",
+                "TR": "71960",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 6
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491364",
+                "Picking": "71948",
+                "TR": "71948",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 20
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491356",
+                "Picking": "71949",
+                "TR": "71949",
+                "TotalLineas": 9,
+                "UnidadesPlanificadas": 26
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491366",
+                "Picking": "71959",
+                "TR": "71959",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 13
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491350",
+                "Picking": "71928",
+                "TR": "71928",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 16
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491348",
+                "Picking": "71930",
+                "TR": "71930",
+                "TotalLineas": 4,
+                "UnidadesPlanificadas": 14
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491367",
+                "Picking": "71945",
+                "TR": "71945",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 15
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491353",
+                "Picking": "71929",
+                "TR": "71929",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 9
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491352",
+                "Picking": "71925",
+                "TR": "71925",
+                "TotalLineas": 7,
+                "UnidadesPlanificadas": 19
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491362",
+                "Picking": "71923",
+                "TR": "71923",
+                "TotalLineas": 5,
+                "UnidadesPlanificadas": 11
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491349",
+                "Picking": "71935",
+                "TR": "71935",
+                "TotalLineas": 12,
+                "UnidadesPlanificadas": 36
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491361",
+                "Picking": "71953",
+                "TR": "71953",
+                "TotalLineas": 7,
+                "UnidadesPlanificadas": 20
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491354",
+                "Picking": "71943",
+                "TR": "71943",
+                "TotalLineas": 5,
+                "UnidadesPlanificadas": 16
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491357",
+                "Picking": "71952",
+                "TR": "71952",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 13
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491358",
+                "Picking": "71944",
+                "TR": "71944",
+                "TotalLineas": 17,
+                "UnidadesPlanificadas": 51
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491359",
+                "Picking": "72000",
+                "TR": "72000",
+                "TotalLineas": 4,
+                "UnidadesPlanificadas": 13
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491360",
+                "Picking": "71939",
+                "TR": "71939",
+                "TotalLineas": 9,
+                "UnidadesPlanificadas": 33
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491363",
+                "Picking": "71958",
+                "TR": "71958",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              }
+            ]
+          },
+          {
+            "name": "CIGARRILLOS",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4800005039",
+                "Picking": "71908",
+                "TR": "71908",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 1
+              },
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491300",
+                "Picking": "71874",
+                "TR": "71874",
+                "TotalLineas": 7,
+                "UnidadesPlanificadas": 66
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491301",
+                "Picking": "71875",
+                "TR": "71875",
+                "TotalLineas": 10,
+                "UnidadesPlanificadas": 80
+              },
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491303",
+                "Picking": "71877",
+                "TR": "71877",
+                "TotalLineas": 16,
+                "UnidadesPlanificadas": 152
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4800005033",
+                "Picking": "71902",
+                "TR": "71902",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491288",
+                "Picking": "71863",
+                "TR": "71863",
+                "TotalLineas": 26,
+                "UnidadesPlanificadas": 282
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4800005042",
+                "Picking": "71911",
+                "TR": "71911",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491302",
+                "Picking": "71876",
+                "TR": "71876",
+                "TotalLineas": 15,
+                "UnidadesPlanificadas": 150
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4800005041",
+                "Picking": "71910",
+                "TR": "71910",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 1
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491299",
+                "Picking": "71873",
+                "TR": "71873",
+                "TotalLineas": 12,
+                "UnidadesPlanificadas": 103
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491295",
+                "Picking": "71869",
+                "TR": "71869",
+                "TotalLineas": 21,
+                "UnidadesPlanificadas": 210
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4800005036",
+                "Picking": "71905",
+                "TR": "71905",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491297",
+                "Picking": "71871",
+                "TR": "71871",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 11
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4800005035",
+                "Picking": "71904",
+                "TR": "71904",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 1
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491290",
+                "Picking": "71865",
+                "TR": "71865",
+                "TotalLineas": 8,
+                "UnidadesPlanificadas": 80
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491304",
+                "Picking": "71878",
+                "TR": "71878",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 23
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491289",
+                "Picking": "71862",
+                "TR": "71862",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 103
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491287",
+                "Picking": "71861",
+                "TR": "71861",
+                "TotalLineas": 12,
+                "UnidadesPlanificadas": 139
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4800005037",
+                "Picking": "71906",
+                "TR": "71906",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491293",
+                "Picking": "71867",
+                "TR": "71867",
+                "TotalLineas": 15,
+                "UnidadesPlanificadas": 174
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491292",
+                "Picking": "71866",
+                "TR": "71866",
+                "TotalLineas": 9,
+                "UnidadesPlanificadas": 106
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491291",
+                "Picking": "71864",
+                "TR": "71864",
+                "TotalLineas": 5,
+                "UnidadesPlanificadas": 54
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4800005038",
+                "Picking": "71907",
+                "TR": "71907",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491294",
+                "Picking": "71868",
+                "TR": "71868",
+                "TotalLineas": 8,
+                "UnidadesPlanificadas": 55
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491305",
+                "Picking": "71879",
+                "TR": "71879",
+                "TotalLineas": 8,
+                "UnidadesPlanificadas": 82
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4800005034",
+                "Picking": "71903",
+                "TR": "71903",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 1
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491296",
+                "Picking": "71870",
+                "TR": "71870",
+                "TotalLineas": 6,
+                "UnidadesPlanificadas": 23
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4800005040",
+                "Picking": "71909",
+                "TR": "71909",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 4
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491298",
+                "Picking": "71872",
+                "TR": "71872",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 11
+              }
+            ]
+          },
+          {
+            "name": "REFRIGERADO",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491430",
+                "Picking": "72001",
+                "TR": "72001",
+                "TotalLineas": 72,
+                "UnidadesPlanificadas": 517
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491445",
+                "Picking": "72033",
+                "TR": "72033",
+                "TotalLineas": 63,
+                "UnidadesPlanificadas": 412
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491431",
+                "Picking": "71996",
+                "TR": "71996",
+                "TotalLineas": 72,
+                "UnidadesPlanificadas": 430
+              },
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491434",
+                "Picking": "71991",
+                "TR": "71991",
+                "TotalLineas": 53,
+                "UnidadesPlanificadas": 260
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491444",
+                "Picking": "72031",
+                "TR": "72031",
+                "TotalLineas": 9,
+                "UnidadesPlanificadas": 36
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491443",
+                "Picking": "72027",
+                "TR": "72027",
+                "TotalLineas": 19,
+                "UnidadesPlanificadas": 118
+              },
+              {
+                "Tienda": "Lomas de Zamora",
+                "Pedido": "4600491441",
+                "Picking": "71998",
+                "TR": "71998",
+                "TotalLineas": 30,
+                "UnidadesPlanificadas": 196
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491429",
+                "Picking": "72023",
+                "TR": "72023",
+                "TotalLineas": 68,
+                "UnidadesPlanificadas": 534
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491439",
+                "Picking": "71999",
+                "TR": "71999",
+                "TotalLineas": 35,
+                "UnidadesPlanificadas": 225
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491432",
+                "Picking": "71989",
+                "TR": "71989",
+                "TotalLineas": 59,
+                "UnidadesPlanificadas": 329
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491428",
+                "Picking": "72008",
+                "TR": "72008",
+                "TotalLineas": 56,
+                "UnidadesPlanificadas": 374
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491435",
+                "Picking": "72007",
+                "TR": "72007",
+                "TotalLineas": 64,
+                "UnidadesPlanificadas": 405
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491442",
+                "Picking": "72028",
+                "TR": "72028",
+                "TotalLineas": 43,
+                "UnidadesPlanificadas": 296
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491433",
+                "Picking": "72010",
+                "TR": "72010",
+                "TotalLineas": 35,
+                "UnidadesPlanificadas": 210
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491437",
+                "Picking": "71995",
+                "TR": "71995",
+                "TotalLineas": 46,
+                "UnidadesPlanificadas": 295
+              },
+              {
+                "Tienda": "NORDELTA",
+                "Pedido": "4600491447",
+                "Picking": "72029",
+                "TR": "72029",
+                "TotalLineas": 19,
+                "UnidadesPlanificadas": 104
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491440",
+                "Picking": "72005",
+                "TR": "72005",
+                "TotalLineas": 44,
+                "UnidadesPlanificadas": 194
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491436",
+                "Picking": "72003",
+                "TR": "72003",
+                "TotalLineas": 45,
+                "UnidadesPlanificadas": 269
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491438",
+                "Picking": "72002",
+                "TR": "72002",
+                "TotalLineas": 55,
+                "UnidadesPlanificadas": 318
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491448",
+                "Picking": "72032",
+                "TR": "72032",
+                "TotalLineas": 39,
+                "UnidadesPlanificadas": 193
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491446",
+                "Picking": "72030",
+                "TR": "72030",
+                "TotalLineas": 24,
+                "UnidadesPlanificadas": 120
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491449",
+                "Picking": "72034",
+                "TR": "72034",
+                "TotalLineas": 37,
+                "UnidadesPlanificadas": 195
+              }
+            ]
+          },
+          {
+            "name": "CONGELADOS",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491319",
+                "Picking": "71893",
+                "TR": "71893",
+                "TotalLineas": 52,
+                "UnidadesPlanificadas": 360
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491327",
+                "Picking": "71901",
+                "TR": "71901",
+                "TotalLineas": 35,
+                "UnidadesPlanificadas": 237
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491323",
+                "Picking": "71897",
+                "TR": "71897",
+                "TotalLineas": 44,
+                "UnidadesPlanificadas": 287
+              },
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491314",
+                "Picking": "71888",
+                "TR": "71888",
+                "TotalLineas": 34,
+                "UnidadesPlanificadas": 276
+              },
+              {
+                "Tienda": "AVELLANEDA",
+                "Pedido": "4600491326",
+                "Picking": "71900",
+                "TR": "71900",
+                "TotalLineas": 5,
+                "UnidadesPlanificadas": 29
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491306",
+                "Picking": "71880",
+                "TR": "71880",
+                "TotalLineas": 8,
+                "UnidadesPlanificadas": 67
+              },
+              {
+                "Tienda": "Lomas de Zamora",
+                "Pedido": "4600491312",
+                "Picking": "71886",
+                "TR": "71886",
+                "TotalLineas": 32,
+                "UnidadesPlanificadas": 229
+              },
+              {
+                "Tienda": "BAEZ",
+                "Pedido": "4600491307",
+                "Picking": "71881",
+                "TR": "71881",
+                "TotalLineas": 45,
+                "UnidadesPlanificadas": 418
+              },
+              {
+                "Tienda": "FOREST",
+                "Pedido": "4600491324",
+                "Picking": "71898",
+                "TR": "71898",
+                "TotalLineas": 32,
+                "UnidadesPlanificadas": 200
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491320",
+                "Picking": "71894",
+                "TR": "71894",
+                "TotalLineas": 34,
+                "UnidadesPlanificadas": 238
+              },
+              {
+                "Tienda": "CENTENERA",
+                "Pedido": "4600491309",
+                "Picking": "71885",
+                "TR": "71885",
+                "TotalLineas": 37,
+                "UnidadesPlanificadas": 340
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491313",
+                "Picking": "71887",
+                "TR": "71887",
+                "TotalLineas": 29,
+                "UnidadesPlanificadas": 211
+              },
+              {
+                "Tienda": "San Juan",
+                "Pedido": "4600491311",
+                "Picking": "71884",
+                "TR": "71884",
+                "TotalLineas": 17,
+                "UnidadesPlanificadas": 165
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491315",
+                "Picking": "71889",
+                "TR": "71889",
+                "TotalLineas": 16,
+                "UnidadesPlanificadas": 98
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491316",
+                "Picking": "71890",
+                "TR": "71890",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 138
+              },
+              {
+                "Tienda": "NORDELTA",
+                "Pedido": "4600491317",
+                "Picking": "71891",
+                "TR": "71891",
+                "TotalLineas": 10,
+                "UnidadesPlanificadas": 68
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491325",
+                "Picking": "71899",
+                "TR": "71899",
+                "TotalLineas": 21,
+                "UnidadesPlanificadas": 121
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491321",
+                "Picking": "71895",
+                "TR": "71895",
+                "TotalLineas": 23,
+                "UnidadesPlanificadas": 150
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491308",
+                "Picking": "71882",
+                "TR": "71882",
+                "TotalLineas": 35,
+                "UnidadesPlanificadas": 262
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491310",
+                "Picking": "71883",
+                "TR": "71883",
+                "TotalLineas": 21,
+                "UnidadesPlanificadas": 129
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491322",
+                "Picking": "71896",
+                "TR": "71896",
+                "TotalLineas": 10,
+                "UnidadesPlanificadas": 67
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491318",
+                "Picking": "71892",
+                "TR": "71892",
+                "TotalLineas": 17,
+                "UnidadesPlanificadas": 125
+              }
+            ]
+          },
+          {
+            "name": "CARNES",
+            "sheetName": "12-09",
+            "rows": [
+              {
+                "Tienda": "BELGRANO",
+                "Pedido": "4600491272",
+                "Picking": "71846",
+                "TR": "71846",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 6
+              },
+              {
+                "Tienda": "PALERMO",
+                "Pedido": "4600491283",
+                "Picking": "71857",
+                "TR": "71857",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 4
+              },
+              {
+                "Tienda": "Las Heras",
+                "Pedido": "4600491284",
+                "Picking": "71858",
+                "TR": "71858",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 4
+              },
+              {
+                "Tienda": "Monserrat",
+                "Pedido": "4600491286",
+                "Picking": "71860",
+                "TR": "71860",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "LANUS",
+                "Pedido": "4600491276",
+                "Picking": "71850",
+                "TR": "71850",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "Lomas de Zamora",
+                "Pedido": "4600491271",
+                "Picking": "71845",
+                "TR": "71845",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "SAN MARTIN",
+                "Pedido": "4600491285",
+                "Picking": "71859",
+                "TR": "71859",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "Rivadavia",
+                "Pedido": "4600491270",
+                "Picking": "71844",
+                "TR": "71844",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "SAN NICOLAS",
+                "Pedido": "4600491281",
+                "Picking": "71855",
+                "TR": "71855",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "PERON",
+                "Pedido": "4600491275",
+                "Picking": "71849",
+                "TR": "71849",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "NORDELTA",
+                "Pedido": "4600491280",
+                "Picking": "71854",
+                "TR": "71854",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "BECCAR",
+                "Pedido": "4600491282",
+                "Picking": "71856",
+                "TR": "71856",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 6
+              },
+              {
+                "Tienda": "VICENTE LOPEZ",
+                "Pedido": "4600491273",
+                "Picking": "71847",
+                "TR": "71847",
+                "TotalLineas": 4,
+                "UnidadesPlanificadas": 8
+              },
+              {
+                "Tienda": "Villa Martelli",
+                "Pedido": "4600491278",
+                "Picking": "71852",
+                "TR": "71852",
+                "TotalLineas": 1,
+                "UnidadesPlanificadas": 2
+              },
+              {
+                "Tienda": "Villa Lynch",
+                "Pedido": "4600491279",
+                "Picking": "71853",
+                "TR": "71853",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 4
+              },
+              {
+                "Tienda": "MORON",
+                "Pedido": "4600491274",
+                "Picking": "71848",
+                "TR": "71848",
+                "TotalLineas": 3,
+                "UnidadesPlanificadas": 6
+              },
+              {
+                "Tienda": "Ramos",
+                "Pedido": "4600491277",
+                "Picking": "71851",
+                "TR": "71851",
+                "TotalLineas": 2,
+                "UnidadesPlanificadas": 4
+              }
+            ]
+          }
+        ]
+      },
+      "unitarioPlanilla": {
+        "fileName": "Planilla Preparacion Septiembre (1) (6).xlsx",
+        "sheetName": "12-09",
+        "loadedAt": "2026-09-12T13:27:49.439Z",
+        "parserVersion": 3,
+        "rows": [
+          {
+            "Tienda": "Monserrat",
+            "Pedido": "4600491407",
+            "Picking": "71977",
+            "TR": "71977",
+            "TotalLineas": 131,
+            "UnidadesPlanificadas": 1076
+          },
+          {
+            "Tienda": "SAN MARTIN",
+            "Pedido": "4600491391",
+            "Picking": "71968",
+            "TR": "71968",
+            "TotalLineas": 136,
+            "UnidadesPlanificadas": 1465
+          },
+          {
+            "Tienda": "BELGRANO",
+            "Pedido": "4600491394",
+            "Picking": "71970",
+            "TR": "71970",
+            "TotalLineas": 197,
+            "UnidadesPlanificadas": 1979
+          },
+          {
+            "Tienda": "BAEZ",
+            "Pedido": "4600491393",
+            "Picking": "71972",
+            "TR": "71972",
+            "TotalLineas": 221,
+            "UnidadesPlanificadas": 2164
+          },
+          {
+            "Tienda": "Las Heras",
+            "Pedido": "4600491403",
+            "Picking": "72016",
+            "TR": "72016",
+            "TotalLineas": 143,
+            "UnidadesPlanificadas": 1188
+          },
+          {
+            "Tienda": "CENTENERA",
+            "Pedido": "4600491389",
+            "Picking": "71966",
+            "TR": "71966",
+            "TotalLineas": 150,
+            "UnidadesPlanificadas": 1783
+          },
+          {
+            "Tienda": "PALERMO",
+            "Pedido": "4600491390",
+            "Picking": "71967",
+            "TR": "71967",
+            "TotalLineas": 158,
+            "UnidadesPlanificadas": 1474
+          },
+          {
+            "Tienda": "VICENTE LOPEZ",
+            "Pedido": "4600491402",
+            "Picking": "71973",
+            "TR": "71973",
+            "TotalLineas": 116,
+            "UnidadesPlanificadas": 993
+          },
+          {
+            "Tienda": "FOREST",
+            "Pedido": "4600491396",
+            "Picking": "71969",
+            "TR": "71969",
+            "TotalLineas": 102,
+            "UnidadesPlanificadas": 813
+          },
+          {
+            "Tienda": "SAN NICOLAS",
+            "Pedido": "4600491401",
+            "Picking": "71974",
+            "TR": "71974",
+            "TotalLineas": 73,
+            "UnidadesPlanificadas": 586
+          },
+          {
+            "Tienda": "Villa Martelli",
+            "Pedido": "4600491392",
+            "Picking": "72011",
+            "TR": "72011",
+            "TotalLineas": 127,
+            "UnidadesPlanificadas": 1407
+          },
+          {
+            "Tienda": "San Juan",
+            "Pedido": "4600491398",
+            "Picking": "71975",
+            "TR": "71975",
+            "TotalLineas": 89,
+            "UnidadesPlanificadas": 928
+          },
+          {
+            "Tienda": "Rivadavia",
+            "Pedido": "4600491388",
+            "Picking": "72006",
+            "TR": "72006",
+            "TotalLineas": 168,
+            "UnidadesPlanificadas": 1665
+          },
+          {
+            "Tienda": "PERON",
+            "Pedido": "4600491397",
+            "Picking": "72009",
+            "TR": "72009",
+            "TotalLineas": 120,
+            "UnidadesPlanificadas": 1264
+          },
+          {
+            "Tienda": "Villa Lynch",
+            "Pedido": "4600491406",
+            "Picking": "71976",
+            "TR": "71976",
+            "TotalLineas": 103,
+            "UnidadesPlanificadas": 776
+          },
+          {
+            "Tienda": "BECCAR",
+            "Pedido": "4600491404",
+            "Picking": "71978",
+            "TR": "71978",
+            "TotalLineas": 109,
+            "UnidadesPlanificadas": 753
+          },
+          {
+            "Tienda": "Ramos",
+            "Pedido": "4600491395",
+            "Picking": "71971",
+            "TR": "71971",
+            "TotalLineas": 162,
+            "UnidadesPlanificadas": 1924
+          },
+          {
+            "Tienda": "MORON",
+            "Pedido": "4600491399",
+            "Picking": "72012",
+            "TR": "72012",
+            "TotalLineas": 86,
+            "UnidadesPlanificadas": 881
+          },
+          {
+            "Tienda": "LANUS",
+            "Pedido": "4600491405",
+            "Picking": "71980",
+            "TR": "71980",
+            "TotalLineas": 85,
+            "UnidadesPlanificadas": 676
+          },
+          {
+            "Tienda": "AVELLANEDA",
+            "Pedido": "4600491400",
+            "Picking": "72025",
+            "TR": "72025",
+            "TotalLineas": 50,
+            "UnidadesPlanificadas": 663
           }
         ]
       }
