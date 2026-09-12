@@ -6019,7 +6019,9 @@ function progressSectorAreaName(sector){
   if(u.includes('CONGEL'))return 'Congelados';
   if(u.includes('REFRIG')||u.includes('FRIO'))return 'Refrigerados';
   if(u.includes('CIGARR'))return 'Cigarrillos';
-  if(u.includes('MASCOT'))return 'Unitarios secos';
+  // No mezclar UNITARIO MASCOTAS con UNITARIO SECO:
+  // cada tarjeta inferior debe representar exactamente un sector de la PREPA.
+  if(u.includes('MASCOT'))return 'Unitarios mascotas';
   if(u.includes('SECO')||u.includes('UNITARIO'))return 'Unitarios secos';
   return sector;
 }
