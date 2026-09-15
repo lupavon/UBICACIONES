@@ -5830,6 +5830,7 @@ let ORDER_PROGRESS_ROWS=[],ORDER_PROGRESS_AREAS=[],ORDER_PROGRESS_TIMER=null,ORD
 let PROGRESS_SORT={key:'avance',dir:-1};
 const PROGRESS_PLAN_STORE_KEY='ubicaciones_progress_planning_v2';
 const PROGRESS_DAILY_PLAN_PARSER_VERSION=3;
+const TR_PERSISTENCE_FIX_VERSION='TR-PERSIST-v3';
 // Reemplazar por la URL real del Worker después de desplegar worker.js.
 const PROGRESS_GLOBAL_API='https://ubicaciones-api.pavonlucas-m.workers.dev';
 let PROGRESS_SHARED_LOADED=false,PROGRESS_SHARED_STORE=null;
@@ -5853,9 +5854,25 @@ function progressLoadStore(){
       const localDays=JSON.parse(JSON.stringify(x.days||{}));
       x.days=JSON.parse(JSON.stringify(PROGRESS_SHARED_STORE.days||{}));
       Object.entries(localDays).forEach(([d,ld])=>{
-        const lp=ld?.dailyPlanilla, rp=x.days?.[d]?.dailyPlanilla;
-        const lt=Date.parse(lp?.loadedAt||0)||0, rt=Date.parse(rp?.loadedAt||0)||0;
-        if(lp&&lt>rt){x.days[d]=x.days[d]||{};x.days[d].dailyPlanilla=lp;if(ld.unitarioPlanilla)x.days[d].unitarioPlanilla=ld.unitarioPlanilla;}
+        const rd=x.days?.[d]||{};
+        // Detalle TRs: conservar la copia local si es más nueva o si la base compartida
+        // volvió sin rows/detailRows. Esto evita que un refresh borre una importación válida.
+        const ltr=Date.parse(ld?.loadedAt||0)||0, rtr=Date.parse(rd?.loadedAt||0)||0;
+        const localHasTR=Array.isArray(ld?.rows)&&ld.rows.length>0;
+        const remoteHasTR=Array.isArray(rd?.rows)&&rd.rows.length>0;
+        const localHasDetail=Array.isArray(ld?.detailRows)&&ld.detailRows.length>0;
+        const remoteHasDetail=Array.isArray(rd?.detailRows)&&rd.detailRows.length>0;
+        if(localHasTR && (ltr>=rtr || !remoteHasTR || (localHasDetail&&!remoteHasDetail))){
+          x.days[d]={...rd,...ld};
+          // Si remoto sí trae una planilla diaria más nueva, conservarla.
+          const ldp=ld?.dailyPlanilla, rdp=rd?.dailyPlanilla;
+          const ldt=Date.parse(ldp?.loadedAt||0)||0, rdt=Date.parse(rdp?.loadedAt||0)||0;
+          if(rdp&&rdt>ldt){x.days[d].dailyPlanilla=rdp;if(rd.unitarioPlanilla)x.days[d].unitarioPlanilla=rd.unitarioPlanilla;}
+        }else{
+          const lp=ld?.dailyPlanilla, rp=rd?.dailyPlanilla;
+          const lt=Date.parse(lp?.loadedAt||0)||0, rt=Date.parse(rp?.loadedAt||0)||0;
+          if(lp&&lt>rt){x.days[d]=x.days[d]||{};x.days[d].dailyPlanilla=lp;if(ld.unitarioPlanilla)x.days[d].unitarioPlanilla=ld.unitarioPlanilla;}
+        }
       });
       x.cancellations=JSON.parse(JSON.stringify(PROGRESS_SHARED_STORE.cancellations||{}));
     }
