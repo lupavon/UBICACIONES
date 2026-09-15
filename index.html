@@ -5927,7 +5927,7 @@ function progressPlanZone(row){
   return sector||'SIN ZONA';
 }
 function progressProductKey(row){
-  return String(progressPlanValue(row,['Producto','PRODUCTO','product','Product','EAN','ean'])||'').trim().toUpperCase();
+  return String(progressPlanValue(row,['sync_Id','SYNC_ID','Sync_Id','syncId','SKU','sku','EAN','ean','Producto','PRODUCTO','product','Product'])||'').trim().toUpperCase();
 }
 function progressMergeCountMaps(rows,fieldName){
   const out={};rows.forEach(r=>Object.entries(r?.[fieldName]||{}).forEach(([k,v])=>{out[k]=(out[k]||0)+Number(v||0)}));return out;
