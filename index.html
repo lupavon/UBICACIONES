@@ -2328,6 +2328,7 @@ body.heatSplit .layoutHeatGrid{
         <th data-neg-sort="id">ID empleado <span class="sortMark">↕</span></th>
         <th data-neg-sort="caja">Caja <span class="sortMark">↕</span></th>
         <th data-neg-sort="zona">Zona <span class="sortMark">↕</span></th>
+        <th data-neg-sort="pendSku">Unid. pendientes SKU <span class="sortMark">↕</span></th>
       </tr></thead>
       <tbody id="negBody"></tbody>
     </table>
@@ -4971,14 +4972,70 @@ let NEG_ROWS=[];
 let NEG_LOADED=false;
 let NEG_SELECTED_DATE='';
 let NEG_SORT={key:'hora',dir:-1};
+let NEG_TR_PENDING_BY_SKU=new Map();
+let NEG_TR_PENDING_READY=false;
 function negVal(r,k){
   const m={hora:['Hora','hora','FechaHora','fechaHora'],pedido:['Pedido','pedido','NumPedido'],picking:['Picking','picking','NumPicking'],sku:['SKU','sku','EAN','ean','product'],referencia:['Referencia','referencia','Barcode','barcode'],desc:['Descripcion','descripcion'],cantidad:['CantidadNegada','cantidadNegada','Cant','cantidad'],motivo:['MotivoNegacion','motivoNegacion','cod_motivo_niega','CodMotivoNiega'],ubicacion:['Ubicacion','ubicacion','ubicacion_asig'],picker:['Picker','picker','Nombres','NombreEmpleado'],id:['IdEmpleado','idEmpleado','Empleado'],caja:['Caja','caja'],zona:['Zona','zona','ZonaPiso','zonapiso'],proceso:['Proceso','proceso','TipoProceso','tipoProceso']};
   for(const key of (m[k]||[])){ if(r&&r[key]!==undefined&&r[key]!==null&&String(r[key]).trim()!=='')return r[key]; }
   return '';
 }
+function negSkuKey(v){return String(v??'').trim().toUpperCase().replace(/^0+(?=\d)/,'')}
+function negPendingSkuUnits(r){
+  if(!NEG_TR_PENDING_READY)return null;
+  const sku=negSkuKey(negVal(r,'sku'));
+  return sku?(NEG_TR_PENDING_BY_SKU.get(sku)||0):0;
+}
 function negCmp(a,b,key){
   if(key==='cantidad')return (Number(negVal(a,key))||0)-(Number(negVal(b,key))||0);
+  if(key==='pendSku')return Number(negPendingSkuUnits(a)||0)-Number(negPendingSkuUnits(b)||0);
   return String(negVal(a,key)||'').localeCompare(String(negVal(b,key)||''),'es',{numeric:true,sensitivity:'base'});
+}
+function negLiveProductKey(r){
+  return negSkuKey(r?.Producto??r?.PRODUCTO??r?.product??r?.Product??r?.SKU??r?.sku??r?.EAN??r?.ean??'');
+}
+function negLivePickingKey(r){
+  return String(r?.Picking??r?.picking??r?.NumPicking??r?.NroTR??r?.TR??r?.tr??'').trim();
+}
+function negLivePedidoKey(r){return String(r?.Pedido??r?.pedido??r?.NumPedido??'').trim()}
+function negLiveProcessed(r){
+  if(typeof progressDailyIsProcessedState==='function')return progressDailyIsProcessedState(r?.Estado);
+  const x=String(r?.Estado??r?.estado??'').trim().toUpperCase();
+  return x.includes('CONFIRM')||x.includes('NEGAD')||x.includes('PROCES');
+}
+async function negBuildPendingSkuMap(date){
+  NEG_TR_PENDING_BY_SKU=new Map();NEG_TR_PENDING_READY=false;
+  try{
+    if(typeof progressRemoteLoad==='function')await progressRemoteLoad(false);
+    const store=typeof progressLoadStore==='function'?progressLoadStore():null;
+    const detail=Array.isArray(store?.days?.[date]?.detailRows)?store.days[date].detailRows:[];
+    if(!detail.length)return;
+    const url=(typeof progressHistoryUrl==='function'?progressHistoryUrl(date):(date===negTodayISO()?'./avance-pedidos.json':'./datos/avance/'+date.replaceAll('-','')+'.json'));
+    const res=await fetch(url+'?negsku='+Date.now(),{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json(),live=Array.isArray(payload?.rows)?payload.rows:[];
+    const groups=new Map();
+    detail.forEach(d=>{
+      const sku=negSkuKey(d.product),pedido=String(d.pedido||'').trim(),picking=String(d.picking||'').trim();
+      if(!sku||!pedido||!picking)return;
+      const k=pedido+'¦'+picking+'¦'+sku;
+      if(!groups.has(k))groups.set(k,{sku,qtys:[]});
+      groups.get(k).qtys.push(Math.max(0,Number(d.qty)||0));
+    });
+    const pendingCounts=new Map();
+    live.forEach(r=>{
+      if(negLiveProcessed(r))return;
+      const sku=negLiveProductKey(r),pedido=negLivePedidoKey(r),picking=negLivePickingKey(r);
+      if(!sku||!pedido||!picking)return;
+      const k=pedido+'¦'+picking+'¦'+sku;pendingCounts.set(k,(pendingCounts.get(k)||0)+1);
+    });
+    groups.forEach((g,k)=>{
+      const n=Math.min(g.qtys.length,pendingCounts.get(k)||0);
+      if(!n)return;
+      const qty=g.qtys.slice(0,n).reduce((a,v)=>a+v,0);
+      NEG_TR_PENDING_BY_SKU.set(g.sku,(NEG_TR_PENDING_BY_SKU.get(g.sku)||0)+qty);
+    });
+    NEG_TR_PENDING_READY=true;
+  }catch(e){console.warn('No se pudo calcular unidades pendientes por SKU desde TRs',e)}
 }
 function negProcess(r){
   const proceso=String(negVal(r,'proceso')||'').trim().toUpperCase();
@@ -5012,8 +5069,9 @@ function renderNegations(){
   if(empty)empty.style.display=rows.length?'none':'block';
   if(body)body.innerHTML=rows.map(r=>'<tr>'+[
     negVal(r,'hora')||'—',negVal(r,'pedido')||'—',negVal(r,'picking')||'—',negVal(r,'sku')||'—',negVal(r,'referencia')||'—',negVal(r,'desc')||'—',
-    negVal(r,'cantidad')||'0',negVal(r,'motivo')||'—',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'—'
-  ].map((v,i)=>'<td'+(i===9?' class="who"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
+    negVal(r,'cantidad')||'0',negVal(r,'motivo')||'—',negVal(r,'ubicacion')||'—',negVal(r,'picker')||'Sin identificar',negVal(r,'id')||'—',negVal(r,'caja')||'—',negVal(r,'zona')||'—',
+    NEG_TR_PENDING_READY?negFmt(negPendingSkuUnits(r)):'—'
+  ].map((v,i)=>'<td'+(i===9?' class="who"':'')+(i===13?' class="num"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('');
   document.querySelectorAll('[data-neg-sort]').forEach(th=>{const m=th.querySelector('.sortMark');if(m)m.textContent=th.dataset.negSort===NEG_SORT.key?(NEG_SORT.dir===1?'↑':'↓'):'↕';});
 
   const all=rows;
@@ -5058,10 +5116,11 @@ function exportNegationsXls(){
       'Picker': negVal(r,'picker')||'',
       'ID empleado': negVal(r,'id')||'',
       'Caja': negVal(r,'caja')||'',
-      'Zona': negVal(r,'zona')||''
+      'Zona': negVal(r,'zona')||'',
+      'Unid. pendientes SKU': NEG_TR_PENDING_READY?negPendingSkuUnits(r):''
     }));
     const ws=XLSX.utils.json_to_sheet(data);
-    ws['!cols']=[{wch:12},{wch:16},{wch:14},{wch:18},{wch:20},{wch:48},{wch:14},{wch:22},{wch:18},{wch:26},{wch:14},{wch:14},{wch:10}];
+    ws['!cols']=[{wch:12},{wch:16},{wch:14},{wch:18},{wch:20},{wch:48},{wch:14},{wch:22},{wch:18},{wch:26},{wch:14},{wch:14},{wch:10},{wch:20}];
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Negaciones');
     const zoneRaw=String($('negZoneFilter')?.value||'').trim();
@@ -5139,6 +5198,8 @@ async function buildNegationsPanel(force=false){
       else zoneSel.value=current;
     }
 
+    await negBuildPendingSkuMap(selected);
+
     if($('negUpdated'))$('negUpdated').textContent=payload?.fecha
       ?('Día '+payload.fecha)
       :('Día '+selected.split('-').reverse().join('/'));
@@ -5148,6 +5209,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
+        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas desde Detalle TRs':' · sin Detalle TRs para calcular unidades pendientes SKU')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
@@ -5940,6 +6002,7 @@ async function progressImportPlanFile(file,date){
     excludedRows:excludedDestination38,
     excludedDestination38,
     filterMode:'EXCLUIR DESTINO 38',
+    detailRows:validRows.map(x=>({pedido:x.pedido,picking:x.picking,product:x.product,qty:x.qty,zone:x.zone})),
     rows:Object.values(groups)
   };
   progressSaveStore(st);
