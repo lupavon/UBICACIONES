@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "updatedAt": "2026-09-15T10:21:01.655Z",
+  "updatedAt": "2026-09-15T10:26:35.037Z",
   "days": {
     "2026-09-11": {
       "dailyPlanilla": {
@@ -7170,7 +7170,7 @@
         ]
       },
       "fileName": "Detalle TRs 2.xlsx",
-      "loadedAt": "2026-09-15T10:21:00.999Z",
+      "loadedAt": "2026-09-15T10:26:34.285Z",
       "sourceRows": 12028,
       "excludedRows": 0,
       "excludedDestination38": 0,
