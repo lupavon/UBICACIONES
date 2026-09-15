@@ -5005,9 +5005,19 @@ function negLiveProcessed(r){
 async function negBuildPendingSkuMap(date){
   NEG_TR_PENDING_BY_SKU=new Map();NEG_TR_PENDING_READY=false;
   try{
-    if(typeof progressRemoteLoad==='function')await progressRemoteLoad(false);
-    const store=typeof progressLoadStore==='function'?progressLoadStore():null;
-    const detail=Array.isArray(store?.days?.[date]?.detailRows)?store.days[date].detailRows:[];
+    // Primero leer el Detalle TRs directamente del cache local. progressLoadStore() puede
+    // superponer la base compartida y, si el Worker todavía conserva una versión anterior
+    // del día, ocultar temporalmente detailRows recién cargado en este navegador.
+    let detail=[];
+    try{
+      const localRaw=JSON.parse(localStorage.getItem(PROGRESS_PLAN_STORE_KEY)||'{}');
+      if(Array.isArray(localRaw?.days?.[date]?.detailRows))detail=localRaw.days[date].detailRows;
+    }catch(e){}
+    if(!detail.length){
+      if(typeof progressRemoteLoad==='function')await progressRemoteLoad(true);
+      const store=typeof progressLoadStore==='function'?progressLoadStore():null;
+      detail=Array.isArray(store?.days?.[date]?.detailRows)?store.days[date].detailRows:[];
+    }
     if(!detail.length)return;
     const url=(typeof progressHistoryUrl==='function'?progressHistoryUrl(date):(date===negTodayISO()?'./avance-pedidos.json':'./datos/avance/'+date.replaceAll('-','')+'.json'));
     const res=await fetch(url+'?negsku='+Date.now(),{cache:'no-store'});
@@ -5209,7 +5219,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas desde Detalle TRs':' · sin Detalle TRs para calcular unidades pendientes SKU')+
+        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas desde Detalle TRs (v2)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
