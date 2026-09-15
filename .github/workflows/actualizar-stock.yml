@@ -56,7 +56,6 @@ jobs:
           GHOST_FILE = Path("cajas-fantasma-movimientos.json")
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
-          ORDER_PROGRESS_HISTORY_DIR = Path("datos/avance")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
@@ -997,6 +996,61 @@ jobs:
                   prod_rows = extract_rows(prod_response)
                   pick_rows = extract_rows(pick_response)
 
+                  # AVANCE DE PEDIDOS EN TIEMPO REAL
+                  # Fuente: reporte Líneas de Picking del día.
+                  # Se conserva una versión simplificada por línea para que el frontend
+                  # pueda agrupar por pedido, picking y familia operativa.
+                  def progress_sval(row, *names):
+                      v = field(row, *names)
+                      return str(v if v is not None else "").strip()
+
+                  progress_rows = []
+                  for ln_prog in pick_rows:
+                      progress_rows.append({
+                          "Pedido": progress_sval(ln_prog, "pedido", "Pedido", "NumPedido"),
+                          "Picking": progress_sval(ln_prog, "NumPicking", "Picking", "picking"),
+                          "Zona": progress_sval(ln_prog, "zonapiso", "ZonaPiso", "zona", "Zona").upper(),
+                          "Estado": progress_sval(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado"),
+                          "SKU": progress_sval(ln_prog, "ean", "EAN", "product", "Product"),
+                          "Descripcion": progress_sval(ln_prog, "descripcion", "Descripcion", "Descripción"),
+                          "Ubicacion": progress_sval(ln_prog, "ubicacion_asig", "Ubicacion_asig", "ubicacion", "Ubicacion"),
+                          "Cantidad": field(ln_prog, "Cant", "cant", "Cantidad", "cantidad", "unidad", "Unidad") or 0
+                      })
+
+                  # Métrica adicional para Negaciones: unidades YA PROCESADAS por SKU.
+                  # IMPORTANTE: no cambia progress_rows ni la lógica existente de Avance pedidos.
+                  # Solo suma Cant de líneas cuyo Estado contiene CONFIRM o NEGAD.
+                  processed_units_by_sku = {}
+                  processed_lines_by_sku = {}
+                  for ln_prog in pick_rows:
+                      estado_prog = progress_sval(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado").upper()
+                      if "CONFIRM" not in estado_prog and "NEGAD" not in estado_prog:
+                          continue
+                      sku_prog = progress_sval(ln_prog, "ean", "EAN", "product", "Product", "producto", "Producto").upper()
+                      if not sku_prog:
+                          continue
+                      qty_prog = field(ln_prog, "Cant", "cant", "Cantidad", "cantidad")
+                      try:
+                          qty_prog = float(qty_prog or 0)
+                      except Exception:
+                          qty_prog = 0.0
+                      processed_units_by_sku[sku_prog] = processed_units_by_sku.get(sku_prog, 0) + max(0, qty_prog)
+                      processed_lines_by_sku[sku_prog] = processed_lines_by_sku.get(sku_prog, 0) + 1
+
+                  progress_payload = {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico Líneas de Picking",
+                      "lineas_count": len(progress_rows),
+                      "processed_units_by_sku": processed_units_by_sku,
+                      "processed_lines_by_sku": processed_lines_by_sku,
+                      "processed_sku_source": "Líneas de Picking · Cant de Confirmadas + Negadas · global por SKU",
+                      "rows": progress_rows
+                  }
+                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
+                  print("avance-pedidos.json generado · líneas:", len(progress_rows))
+
                   def sval(row, *names):
                       v = field(row, *names)
                       return str(v if v is not None else "").strip()
@@ -1010,213 +1064,6 @@ jobs:
                       else:
                           vals = [sval(row,"ean","EAN"), sval(row,"product","Product","producto","Producto")]
                       return [nkey(x) for x in vals if nkey(x)]
-
-
-                  # AVANCE DE PEDIDOS EN TIEMPO REAL
-                  # Fuente: Líneas de Picking del día. Se agrupa por Pedido + área operativa.
-                  def progress_area(zone):
-                      z = nkey(zone).replace(" ", "")
-                      if z in ("AR","BR") or z.startswith("MFCA") or z.startswith("MFCB") or z.startswith("MFCC"):
-                          return "Unitarios secos"
-                      if z.startswith("MFCD") or z.startswith("MFCE") or z.startswith("MFCF") or z.startswith("MFCG"):
-                          return "Unitarios químicos"
-                      if z in ("AL","BL","CL","CR","DL","DR","EL","ER","FL","FR","GL","GR","HL","HR"):
-                          return "Masterbox"
-                      if z.startswith("REF") or z.startswith("RMFC"):
-                          return "Refrigerados"
-                      if z.startswith("CON") or z.startswith("CMFC") or z.startswith("CMC"):
-                          return "Congelados"
-                      if z.startswith("CIG") or z.startswith("CSG"):
-                          return "Cigarrillos"
-                      if z.startswith("CAR"):
-                          return "Carnes"
-                      if z in ("PM","PML","PMR") or z.startswith("PM"):
-                          return "PM"
-                      return "Otras"
-
-                  def progress_state(row):
-                      raw = nkey(sval(row,"EstadoDeLinea","estadoDeLinea","EstadoLinea","estadolinea","Estado","estado"))
-                      if "NEGAD" in raw:
-                          return "Negada"
-                      if "CONFIRM" in raw:
-                          return "Confirmada"
-                      return "Pendiente"
-
-                  # CONTADOR "SIN MOVIMIENTO"
-                  # Copérnico no expone de forma confiable la hora real de cada línea en
-                  # estos endpoints: algunos campos de fecha/hora corresponden al refresco
-                  # del reporte y hacían que todos los TR quedaran en 0 min.
-                  # Por eso medimos actividad por DELTA: si entre dos corridas aumenta la
-                  # cantidad procesada de Pedido + Picking + Área, consideramos que hubo
-                  # movimiento en esta corrida. Si no aumenta, conservamos la última hora
-                  # observada. Con el workflow cada minuto, el error máximo es ~1 minuto.
-                  ACTIVITY_TRACKING_MODE = "observed_processed_delta_v1"
-                  previous_progress_payload = load_json_file(ORDER_PROGRESS_FILE, {})
-                  previous_tracking_mode = previous_progress_payload.get("activity_tracking", "") if isinstance(previous_progress_payload, dict) else ""
-                  previous_progress_rows = extract_rows(previous_progress_payload)
-                  previous_progress_by_key = {}
-                  for prev_prog in previous_progress_rows:
-                      prev_key = (
-                          nkey(sval(prev_prog,"Pedido","pedido","NumPedido")),
-                          nkey(sval(prev_prog,"Picking","picking","NumPicking")),
-                          sval(prev_prog,"Area","area")
-                      )
-                      previous_progress_by_key[prev_key] = prev_prog
-
-                  # NEGACIONES: cantidades PROCESADAS globalmente por SKU.
-                  # El total pedido NO sale de Copérnico: se toma del Detalle TRs en el navegador.
-                  # Aquí sumamos Cant de líneas Confirmadas + Negadas; luego el index calcula:
-                  # Q_Ordered total TR por SKU - unidades procesadas por SKU.
-                  processed_units_by_sku = {}
-                  processed_lines_by_sku = {}
-                  for ln_processed in pick_rows:
-                      if progress_state(ln_processed) not in ("Confirmada", "Negada"):
-                          continue
-                      qty_processed = field(ln_processed,"Cant","cant","Cantidad","cantidad","Unidades","unidades")
-                      try:
-                          qty_processed = float(qty_processed or 0)
-                      except Exception:
-                          qty_processed = 0.0
-                      aliases = set(sku_keys(ln_processed,"pick"))
-                      for sku_processed in aliases:
-                          processed_units_by_sku[sku_processed] = processed_units_by_sku.get(sku_processed, 0.0) + max(0.0, qty_processed)
-                          processed_lines_by_sku[sku_processed] = processed_lines_by_sku.get(sku_processed, 0) + 1
-
-                  processed_units_by_sku = {
-                      k: (int(v) if float(v).is_integer() else round(v, 3))
-                      for k, v in processed_units_by_sku.items()
-                  }
-
-                  progress_groups = {}
-                  for ln_prog in pick_rows:
-                      pedido_prog = sval(ln_prog,"pedido","Pedido","NumPedido")
-                      if not pedido_prog:
-                          continue
-                      pk_prog = sval(ln_prog,"NumPicking","Picking","picking")
-                      zone_prog = sval(ln_prog,"zonapiso","ZonaPiso","zona","Zona")
-                      area_prog = progress_area(zone_prog)
-                      key_prog = (pedido_prog, pk_prog, area_prog)
-                      if key_prog not in progress_groups:
-                          progress_groups[key_prog] = {
-                              "Pedido": pedido_prog,
-                              "Picking": pk_prog,
-                              "Area": area_prog,
-                              "TotalLineas": 0,
-                              "Confirmadas": 0,
-                              "Negadas": 0,
-                              "Pendientes": 0,
-                              "Pickings": set(),
-                              "Zonas": set(),
-                              "ProductosProcesados": {},
-                              "PendientesPorZona": {},
-                              "UltimaLineaEpoch": 0
-                          }
-                      g = progress_groups[key_prog]
-                      g["TotalLineas"] += 1
-                      st_prog = progress_state(ln_prog)
-                      if st_prog == "Confirmada":
-                          g["Confirmadas"] += 1
-                      elif st_prog == "Negada":
-                          g["Negadas"] += 1
-                      else:
-                          g["Pendientes"] += 1
-                      if st_prog in ("Confirmada","Negada"):
-                          prod_prog = nkey(sval(ln_prog,"product","Product","producto","Producto","ean","EAN"))
-                          if prod_prog:
-                              g["ProductosProcesados"][prod_prog] = g["ProductosProcesados"].get(prod_prog,0) + 1
-                      if st_prog == "Pendiente":
-                          zone_pending = nkey(zone_prog) or "SIN ZONA"
-                          g["PendientesPorZona"][zone_pending] = g["PendientesPorZona"].get(zone_pending,0) + 1
-                      if pk_prog:
-                          g["Pickings"].add(pk_prog)
-                      if zone_prog:
-                          g["Zonas"].add(nkey(zone_prog))
-
-                  observed_now_ms = int(datetime.now(ar_tz).timestamp() * 1000)
-                  for g in progress_groups.values():
-                      curr_done = g["Confirmadas"] + g["Negadas"]
-                      lookup_key = (nkey(g.get("Pedido","")), nkey(g.get("Picking","")), g.get("Area",""))
-                      prev = previous_progress_by_key.get(lookup_key, {})
-                      prev_done = int(field(prev, "Procesadas", "procesadas") or 0) if prev else 0
-                      prev_epoch = int(field(prev, "UltimaLineaEpoch", "ultimaLineaEpoch") or 0) if prev else 0
-
-                      if curr_done <= 0:
-                          # Todavía no arrancó: no inventar hora.
-                          g["UltimaLineaEpoch"] = 0
-                      elif previous_tracking_mode != ACTIVITY_TRACKING_MODE:
-                          # Primera corrida con el nuevo método: arrancamos el reloj ahora.
-                          # Desde la siguiente corrida queda acumulando correctamente.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-                      elif curr_done > prev_done:
-                          # Se observó al menos una nueva línea procesada desde la corrida anterior.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-                      elif prev_epoch > 0:
-                          # No hubo nuevas líneas: conservar la última actividad observada.
-                          g["UltimaLineaEpoch"] = prev_epoch
-                      else:
-                          # Pedido ya iniciado pero sin baseline previo: iniciar contador ahora.
-                          g["UltimaLineaEpoch"] = observed_now_ms
-
-                  progress_rows = []
-                  for g in progress_groups.values():
-                      done = g["Confirmadas"] + g["Negadas"]
-                      total = g["TotalLineas"]
-                      progress_rows.append({
-                          "Pedido": g["Pedido"],
-                          "Picking": g.get("Picking", ""),
-                          "Area": g["Area"],
-                          "TotalLineas": total,
-                          "Procesadas": done,
-                          "Confirmadas": g["Confirmadas"],
-                          "Negadas": g["Negadas"],
-                          "Pendientes": g["Pendientes"],
-                          "Avance": round((done / total * 100.0) if total else 0, 1),
-                          "Pickings": sorted(g["Pickings"]),
-                          "Zonas": sorted(g["Zonas"]),
-                          "ProductosProcesados": g.get("ProductosProcesados", {}),
-                          "PendientesPorZona": g.get("PendientesPorZona", {}),
-                          "UltimaLineaEpoch": g.get("UltimaLineaEpoch", 0)
-                      })
-
-                  area_order = ["Masterbox","Refrigerados","Congelados","Carnes","Cigarrillos","Unitarios secos","Unitarios químicos","PM","Otras"]
-                  progress_rows.sort(key=lambda r: (area_order.index(r["Area"]) if r["Area"] in area_order else 99, -r["Pendientes"], r["Pedido"]))
-
-                  area_summary = []
-                  for area in area_order:
-                      rr = [x for x in progress_rows if x["Area"] == area]
-                      if not rr:
-                          continue
-                      total_l = sum(x["TotalLineas"] for x in rr)
-                      done_l = sum(x["Procesadas"] for x in rr)
-                      area_summary.append({
-                          "Area": area,
-                          "Pedidos": len(rr),
-                          "PedidosCompletos": sum(1 for x in rr if x["Pendientes"] == 0),
-                          "TotalLineas": total_l,
-                          "Procesadas": done_l,
-                          "Pendientes": sum(x["Pendientes"] for x in rr),
-                          "Avance": round((done_l / total_l * 100.0) if total_l else 0, 1)
-                      })
-
-                  progress_payload = {
-                      "updated_at": now_iso,
-                      "fecha": day_label,
-                      "fecha_query": day,
-                      "source": "Copernico Líneas de Picking · avance Pedido + área",
-                      "refresh_seconds": 60,
-                      "activity_tracking": ACTIVITY_TRACKING_MODE,
-                      "processed_units_by_sku": processed_units_by_sku,
-                      "processed_lines_by_sku": processed_lines_by_sku,
-                      "processed_sku_source": "Copernico Líneas de Picking · suma Cant de líneas Confirmadas + Negadas · global por SKU",
-                      "rows": progress_rows,
-                      "areas": area_summary
-                  }
-                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
-                  ORDER_PROGRESS_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-                  progress_history_file = ORDER_PROGRESS_HISTORY_DIR / f"{day}.json"
-                  save_json_file(progress_history_file, progress_payload)
-                  print("avance-pedidos.json generado · segmentos pedido/picking/área:", len(progress_rows))
-                  print("Histórico Avance guardado:", progress_history_file)
 
                   # PRODUCTIVIDAD es la fuente de verdad de las negaciones.
                   # Copérnico agrupa estas filas bajo "Negada"; toleramos distintos nombres
@@ -2469,7 +2316,7 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/avance datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
