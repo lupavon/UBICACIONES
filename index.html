@@ -5023,20 +5023,25 @@ async function negBuildPendingSkuMap(date){
     const res=await fetch(url+'?negsku='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json(),live=Array.isArray(payload?.rows)?payload.rows:[];
+    // IMPORTANTE: NRO TR del Detalle TRs no es el mismo identificador que Picking de Copérnico.
+    // El puente estable entre ambas fuentes es Pedido + SKU. Para cada Pedido/SKU contamos
+    // cuántas líneas de Copérnico siguen sin procesar y tomamos esa cantidad de líneas del TR,
+    // sumando Q_Ordered. El resultado final se acumula globalmente por SKU.
     const groups=new Map();
     detail.forEach(d=>{
-      const sku=negSkuKey(d.product),pedido=String(d.pedido||'').trim(),picking=String(d.picking||'').trim();
-      if(!sku||!pedido||!picking)return;
-      const k=pedido+'¦'+picking+'¦'+sku;
-      if(!groups.has(k))groups.set(k,{sku,qtys:[]});
+      const sku=negSkuKey(d.product),pedido=String(d.pedido||'').trim();
+      if(!sku||!pedido)return;
+      const k=pedido+'¦'+sku;
+      if(!groups.has(k))groups.set(k,{sku,pedido,qtys:[]});
       groups.get(k).qtys.push(Math.max(0,Number(d.qty)||0));
     });
     const pendingCounts=new Map();
     live.forEach(r=>{
       if(negLiveProcessed(r))return;
-      const sku=negLiveProductKey(r),pedido=negLivePedidoKey(r),picking=negLivePickingKey(r);
-      if(!sku||!pedido||!picking)return;
-      const k=pedido+'¦'+picking+'¦'+sku;pendingCounts.set(k,(pendingCounts.get(k)||0)+1);
+      const sku=negLiveProductKey(r),pedido=negLivePedidoKey(r);
+      if(!sku||!pedido)return;
+      const k=pedido+'¦'+sku;
+      pendingCounts.set(k,(pendingCounts.get(k)||0)+1);
     });
     groups.forEach((g,k)=>{
       const n=Math.min(g.qtys.length,pendingCounts.get(k)||0);
@@ -5219,7 +5224,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas desde Detalle TRs (v2)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
+        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas por Pedido + SKU desde Detalle TRs (v3)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
