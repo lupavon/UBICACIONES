@@ -5005,61 +5005,41 @@ function negLiveProcessed(r){
 async function negBuildPendingSkuMap(date){
   NEG_TR_PENDING_BY_SKU=new Map();NEG_TR_PENDING_READY=false;
   try{
-    let plan=null;
-    try{
-      const localRaw=JSON.parse(localStorage.getItem(PROGRESS_PLAN_STORE_KEY)||'{}');
-      const raw=localRaw?.days?.[date]?.pendingSkuPlan||null;
-      if(raw&&Object.keys(raw).length){
-        // v5: consolidar TR exclusivamente por SKU. El pedido deja de intervenir.
-        plan={};
-        Object.entries(raw).forEach(([k,vals])=>{
-          const sep=k.indexOf('¦');
-          const sku=negSkuKey(sep>=0?k.slice(sep+1):k);
-          if(!sku)return;
-          const arr=Array.isArray(vals)?vals:[vals];
-          (plan[sku]||(plan[sku]=[])).push(...arr.map(v=>Math.max(0,Number(v)||0)));
-        });
-      }
-      if(!plan){
-        const detail=localRaw?.days?.[date]?.detailRows;
-        if(Array.isArray(detail)&&detail.length){
-          plan={};detail.forEach(d=>{const sku=negSkuKey(d.product);if(!sku)return;(plan[sku]||(plan[sku]=[])).push(Math.max(0,Number(d.qty)||0));});
-        }
-      }
-    }catch(e){}
-    if(!plan||!Object.keys(plan).length){
-      if(typeof progressRemoteLoad==='function')await progressRemoteLoad(true);
-      const store=typeof progressLoadStore==='function'?progressLoadStore():null;
-      const raw=store?.days?.[date]?.pendingSkuPlan||null;
-      if(raw){
-        plan={};Object.entries(raw).forEach(([k,vals])=>{const sep=k.indexOf('¦'),sku=negSkuKey(sep>=0?k.slice(sep+1):k);if(!sku)return;const arr=Array.isArray(vals)?vals:[vals];(plan[sku]||(plan[sku]=[])).push(...arr.map(v=>Math.max(0,Number(v)||0)));});
-      }
+    // 1) TOTAL PEDIDO: Detalle TRs cargado. pendingSkuPlan contiene Pedido¦SKU -> [Q_Ordered...].
+    // Para Negaciones ignoramos Pedido y acumulamos todo globalmente por SKU.
+    if(typeof progressRemoteLoad==='function'){
+      try{await progressRemoteLoad(true)}catch(e){}
     }
-    if(!plan||!Object.keys(plan).length)return;
-    const url=(typeof progressHistoryUrl==='function'?progressHistoryUrl(date):(date===negTodayISO()?'./avance-pedidos.json':'./datos/avance/'+date.replaceAll('-','')+'.json'));
+    const store=typeof progressLoadStore==='function'?progressLoadStore():null;
+    const plan=store?.days?.[date]?.pendingSkuPlan||null;
+    if(!plan||typeof plan!=='object')throw new Error('Falta cargar Detalle TRs para obtener Q_Ordered por SKU');
+    const ordered=new Map();
+    Object.entries(plan).forEach(([key,vals])=>{
+      const sep=key.indexOf('¦');
+      const sku=negSkuKey(sep>=0?key.slice(sep+1):key);if(!sku)return;
+      const arr=Array.isArray(vals)?vals:[vals];
+      const qty=arr.reduce((a,v)=>a+Math.max(0,Number(v)||0),0);
+      ordered.set(sku,(ordered.get(sku)||0)+qty);
+    });
+    if(!ordered.size)throw new Error('Detalle TRs sin cantidades Q_Ordered por SKU');
+
+    // 2) PROCESADO: Copérnico Líneas de Picking, Confirmadas + Negadas, global por SKU.
+    const url=(typeof progressHistoryUrl==='function'
+      ?progressHistoryUrl(date)
+      :(date===negTodayISO()?'./avance-pedidos.json':'./datos/avance/'+date.replaceAll('-','')+'.json'));
     const res=await fetch(url+'?negsku='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json(),live=Array.isArray(payload?.rows)?payload.rows:[];
-    // Contar líneas todavía pendientes globalmente por SKU, sin Pedido ni Picking.
-    const pendingCounts=new Map();
-    live.forEach(r=>{
-      if(negLiveProcessed(r))return;
-      const sku=negLiveProductKey(r);if(!sku)return;
-      pendingCounts.set(sku,(pendingCounts.get(sku)||0)+1);
-    });
-    Object.entries(plan).forEach(([skuRaw,qtysRaw])=>{
-      const sku=negSkuKey(skuRaw);if(!sku)return;
-      const qtys=(Array.isArray(qtysRaw)?qtysRaw:[qtysRaw]).map(v=>Math.max(0,Number(v)||0));
-      const n=Math.min(qtys.length,pendingCounts.get(sku)||0);
-      if(!n){NEG_TR_PENDING_BY_SKU.set(sku,0);return;}
-      // Sin pedido, no sabemos qué ocurrencia exacta quedó pendiente si un SKU tiene
-      // cantidades distintas por línea. Para no inventar una asignación, usamos la
-      // cantidad media por línea del SKU multiplicada por sus líneas pendientes.
-      const total=qtys.reduce((a,v)=>a+v,0),avg=qtys.length?total/qtys.length:0;
-      NEG_TR_PENDING_BY_SKU.set(sku,Math.max(0,Math.round(avg*n*100)/100));
+    const payload=await res.json();
+    const processed=payload?.processed_units_by_sku;
+    if(!processed||typeof processed!=='object'||Array.isArray(processed))throw new Error('El workflow todavía no publicó processed_units_by_sku');
+
+    // 3) PENDIENTE = Q_Ordered TR - procesado. Nunca mostrar negativo.
+    ordered.forEach((orderedQty,sku)=>{
+      const done=Math.max(0,Number(processed[sku])||0);
+      NEG_TR_PENDING_BY_SKU.set(sku,Math.max(0,Math.round((orderedQty-done)*1000)/1000));
     });
     NEG_TR_PENDING_READY=true;
-  }catch(e){console.warn('No se pudo calcular unidades pendientes globales por SKU desde TRs',e)}
+  }catch(e){console.warn('No se pudo calcular TR pedida - procesadas por SKU',e)}
 }
 function negProcess(r){
   const proceso=String(negVal(r,'proceso')||'').trim().toUpperCase();
@@ -5233,7 +5213,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · unidades pendientes SKU globales calculadas solo por SKU desde Detalle TRs (v5)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
+        (NEG_TR_PENDING_READY?' · pendiente SKU = Q_Ordered TR − Confirmadas/Negadas de Líneas Picking':' · falta TR o procesadas por SKU para calcular pendiente')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
