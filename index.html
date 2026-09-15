@@ -5005,49 +5005,43 @@ function negLiveProcessed(r){
 async function negBuildPendingSkuMap(date){
   NEG_TR_PENDING_BY_SKU=new Map();NEG_TR_PENDING_READY=false;
   try{
-    // Primero leer el Detalle TRs directamente del cache local. progressLoadStore() puede
-    // superponer la base compartida y, si el Worker todavía conserva una versión anterior
-    // del día, ocultar temporalmente detailRows recién cargado en este navegador.
-    let detail=[];
+    let plan=null;
     try{
       const localRaw=JSON.parse(localStorage.getItem(PROGRESS_PLAN_STORE_KEY)||'{}');
-      if(Array.isArray(localRaw?.days?.[date]?.detailRows))detail=localRaw.days[date].detailRows;
+      plan=localRaw?.days?.[date]?.pendingSkuPlan||null;
+      // Compatibilidad con una carga anterior que sí haya podido guardar detailRows.
+      if(!plan){
+        const detail=localRaw?.days?.[date]?.detailRows;
+        if(Array.isArray(detail)&&detail.length){
+          plan={};detail.forEach(d=>{const sku=negSkuKey(d.product),pedido=String(d.pedido||'').trim();if(!sku||!pedido)return;const k=pedido+'¦'+sku;(plan[k]||(plan[k]=[])).push(Math.max(0,Number(d.qty)||0));});
+        }
+      }
     }catch(e){}
-    if(!detail.length){
+    if(!plan||!Object.keys(plan).length){
       if(typeof progressRemoteLoad==='function')await progressRemoteLoad(true);
       const store=typeof progressLoadStore==='function'?progressLoadStore():null;
-      detail=Array.isArray(store?.days?.[date]?.detailRows)?store.days[date].detailRows:[];
+      plan=store?.days?.[date]?.pendingSkuPlan||null;
     }
-    if(!detail.length)return;
+    if(!plan||!Object.keys(plan).length)return;
     const url=(typeof progressHistoryUrl==='function'?progressHistoryUrl(date):(date===negTodayISO()?'./avance-pedidos.json':'./datos/avance/'+date.replaceAll('-','')+'.json'));
     const res=await fetch(url+'?negsku='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const payload=await res.json(),live=Array.isArray(payload?.rows)?payload.rows:[];
-    // IMPORTANTE: NRO TR del Detalle TRs no es el mismo identificador que Picking de Copérnico.
-    // El puente estable entre ambas fuentes es Pedido + SKU. Para cada Pedido/SKU contamos
-    // cuántas líneas de Copérnico siguen sin procesar y tomamos esa cantidad de líneas del TR,
-    // sumando Q_Ordered. El resultado final se acumula globalmente por SKU.
-    const groups=new Map();
-    detail.forEach(d=>{
-      const sku=negSkuKey(d.product),pedido=String(d.pedido||'').trim();
-      if(!sku||!pedido)return;
-      const k=pedido+'¦'+sku;
-      if(!groups.has(k))groups.set(k,{sku,pedido,qtys:[]});
-      groups.get(k).qtys.push(Math.max(0,Number(d.qty)||0));
-    });
     const pendingCounts=new Map();
     live.forEach(r=>{
       if(negLiveProcessed(r))return;
       const sku=negLiveProductKey(r),pedido=negLivePedidoKey(r);
       if(!sku||!pedido)return;
-      const k=pedido+'¦'+sku;
-      pendingCounts.set(k,(pendingCounts.get(k)||0)+1);
+      const k=pedido+'¦'+sku;pendingCounts.set(k,(pendingCounts.get(k)||0)+1);
     });
-    groups.forEach((g,k)=>{
-      const n=Math.min(g.qtys.length,pendingCounts.get(k)||0);
+    Object.entries(plan).forEach(([k,qtysRaw])=>{
+      const sep=k.indexOf('¦');if(sep<0)return;
+      const sku=negSkuKey(k.slice(sep+1));
+      const qtys=Array.isArray(qtysRaw)?qtysRaw.map(v=>Math.max(0,Number(v)||0)):[Math.max(0,Number(qtysRaw)||0)];
+      const n=Math.min(qtys.length,pendingCounts.get(k)||0);
       if(!n)return;
-      const qty=g.qtys.slice(0,n).reduce((a,v)=>a+v,0);
-      NEG_TR_PENDING_BY_SKU.set(g.sku,(NEG_TR_PENDING_BY_SKU.get(g.sku)||0)+qty);
+      const qty=qtys.slice(0,n).reduce((a,v)=>a+v,0);
+      NEG_TR_PENDING_BY_SKU.set(sku,(NEG_TR_PENDING_BY_SKU.get(sku)||0)+qty);
     });
     NEG_TR_PENDING_READY=true;
   }catch(e){console.warn('No se pudo calcular unidades pendientes por SKU desde TRs',e)}
@@ -5224,7 +5218,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas por Pedido + SKU desde Detalle TRs (v3)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
+        (NEG_TR_PENDING_READY?' · unidades pendientes SKU calculadas por Pedido + SKU desde Detalle TRs (v4 compacto)':' · sin Detalle TRs para calcular unidades pendientes SKU')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
@@ -5835,7 +5829,7 @@ let ORDER_PROGRESS_ROWS=[],ORDER_PROGRESS_AREAS=[],ORDER_PROGRESS_TIMER=null,ORD
 let PROGRESS_SORT={key:'avance',dir:-1};
 const PROGRESS_PLAN_STORE_KEY='ubicaciones_progress_planning_v2';
 const PROGRESS_DAILY_PLAN_PARSER_VERSION=3;
-const TR_PERSISTENCE_FIX_VERSION='TR-PERSIST-v3';
+const TR_PERSISTENCE_FIX_VERSION='TR-PERSIST-v4-COMPACT';
 // Reemplazar por la URL real del Worker después de desplegar worker.js.
 const PROGRESS_GLOBAL_API='https://ubicaciones-api.pavonlucas-m.workers.dev';
 let PROGRESS_SHARED_LOADED=false,PROGRESS_SHARED_STORE=null;
@@ -6024,6 +6018,15 @@ async function progressImportPlanFile(file,date){
     const zone=x.zone||'SIN ZONA';g.PlanZones[zone]=(g.PlanZones[zone]||0)+1;
     if(x.product){g.ZoneProducts[zone]=g.ZoneProducts[zone]||{};g.ZoneProducts[zone][x.product]=(g.ZoneProducts[zone][x.product]||0)+1}
   });
+  // Índice compacto Pedido + SKU para Negaciones. Guardar las 12k filas completas en
+  // localStorage puede superar la cuota del navegador; este índice conserva solo las
+  // cantidades Q_Ordered necesarias para el cálculo pendiente por SKU.
+  const pendingSkuPlan={};
+  validRows.forEach(x=>{
+    if(!x.pedido||!x.product)return;
+    const k=x.pedido+'¦'+x.product;
+    (pendingSkuPlan[k]||(pendingSkuPlan[k]=[])).push(Math.max(0,Number(x.qty)||0));
+  });
   const st=progressLoadStore();
   const previousDay=(st.days&&st.days[date])?st.days[date]:{};
   st.days[date]={
@@ -6034,7 +6037,8 @@ async function progressImportPlanFile(file,date){
     excludedRows:excludedDestination38,
     excludedDestination38,
     filterMode:'EXCLUIR DESTINO 38',
-    detailRows:validRows.map(x=>({pedido:x.pedido,picking:x.picking,product:x.product,qty:x.qty,zone:x.zone})),
+    pendingSkuPlan,
+    // detailRows se omite intencionalmente: el índice compacto evita exceder la cuota de localStorage.
     rows:Object.values(groups)
   };
   progressSaveStore(st);
