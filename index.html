@@ -7188,9 +7188,9 @@ function pptFmtMonth(ym){
   return new Date(y,m-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
 }
 function pptAddHeader(slide,title,subtitle=''){
-  slide.addShape('rect',{x:0,y:0,w:13.333,h:0.18,fill:{color:'E3292F'},line:{color:'E3292F'}});
+  slide.addShape('rect',{x:0,y:0,w:13.333,h:0.18,fill:{color:'18365F'},line:{color:'18365F'}});
   slide.addImage({data:PRODUCTIVITY_PPT_LOGO,x:0.35,y:0.28,w:1.18,h:0.55});
-  slide.addText(title,{x:1.72,y:0.28,w:10.9,h:0.38,fontFace:'Arial',fontSize:22,bold:true,color:'27313A',margin:0});
+  slide.addText(title,{x:1.72,y:0.28,w:10.9,h:0.38,fontFace:'Arial',fontSize:22,bold:true,color:'18365F',margin:0});
   if(subtitle)slide.addText(subtitle,{x:1.73,y:0.72,w:10.7,h:0.25,fontFace:'Arial',fontSize:9,color:'6D7780',margin:0});
   slide.addShape('line',{x:0.35,y:1.08,w:12.55,h:0,line:{color:'D7DCE1',width:1}});
 }
@@ -7201,7 +7201,7 @@ function pptAddFooter(slide){
 function pptAddKpi(slide,x,y,w,label,value,detail=''){
   slide.addShape('roundRect',{x,y,w,h:1.05,rectRadius:0.05,fill:{color:'F4F6F8'},line:{color:'D9DEE3',width:1},radius:0.06});
   slide.addText(label,{x:x+0.16,y:y+0.13,w:w-0.32,h:0.18,fontFace:'Arial',fontSize:7.5,bold:true,color:'6F7881',margin:0});
-  slide.addText(String(value),{x:x+0.16,y:y+0.35,w:w-0.32,h:0.36,fontFace:'Arial',fontSize:20,bold:true,color:'252D35',margin:0});
+  slide.addText(String(value),{x:x+0.16,y:y+0.35,w:w-0.32,h:0.36,fontFace:'Arial',fontSize:20,bold:true,color:'18365F',margin:0});
   if(detail)slide.addText(detail,{x:x+0.16,y:y+0.76,w:w-0.32,h:0.16,fontFace:'Arial',fontSize:6.5,color:'7D858D',margin:0});
 }
 async function generateProductivityPpt(){
@@ -7237,22 +7237,22 @@ async function generateProductivityPpt(){
     const total=$('productivityTotalLines')?.textContent||'0', pc=$('productivityPickerCount')?.textContent||'0', ga=$('productivityGeneralAvg')?.textContent||'0.0';
     pptAddKpi(s,0.55,1.35,3.7,'LÍNEAS DEL DÍA',total,'Confirmadas + Negadas'); pptAddKpi(s,4.82,1.35,3.7,'PICKERS',pc,'Con actividad'); pptAddKpi(s,9.08,1.35,3.7,'PROMEDIO GENERAL',ga,'Líneas/h por picker');
     const daily=[...document.querySelectorAll('#productivityDailyBody tr')].map(tr=>[...tr.children].map(td=>td.innerText.trim()));
-    s.addText('Promedio diario por picker',{x:0.55,y:2.72,w:5,h:0.3,fontSize:15,bold:true,color:'2B333B',margin:0});
-    if(daily.length) s.addTable([['Picker','Líneas del día','Promedio líneas/h','Zona'],...daily.slice(0,18)],{x:0.55,y:3.08,w:12.2,h:3.75,border:{type:'solid',color:'D7DCE1',pt:0.7},fontFace:'Arial',fontSize:8,color:'303840',fill:'FFFFFF',margin:0.05,rowH:0.22,bold:false,autoFit:false,fillHeader:'E9EDF1',colorHeader:'242B31'});
+    s.addText('Promedio diario por picker',{x:0.55,y:2.72,w:5,h:0.3,fontSize:15,bold:true,color:'18365F',margin:0});
+    if(daily.length) s.addTable([['Picker','Líneas del día','Promedio líneas/h','Zona'],...daily.slice(0,18)],{x:0.55,y:3.08,w:12.2,h:3.75,border:{type:'solid',color:'D7DCE1',pt:0.7},fontFace:'Arial',fontSize:8,color:'303840',fill:'FFFFFF',margin:0.05,rowH:0.22,bold:false,autoFit:false,fillHeader:'E7EDF5',colorHeader:'18365F'});
     pptAddFooter(s);
 
     // 3 · Evolución mensual del picker
     s=pptx.addSlide(); pptAddHeader(s,'EVOLUCIÓN MENSUAL · '+picker.toUpperCase(),pptFmtMonth(month)+' · promedio diario de líneas/h');
     const avgs=points.map(p=>p.avg), avg=avgs.reduce((a,b)=>a+b,0)/avgs.length, best=points.slice().sort((a,b)=>b.avg-a.avg)[0], worst=points.slice().sort((a,b)=>a.avg-b.avg)[0];
     pptAddKpi(s,0.55,1.32,3.7,'PROMEDIO MENSUAL',avg.toFixed(1),points.length+' días con actividad'); pptAddKpi(s,4.82,1.32,3.7,'MEJOR DÍA',best.avg.toFixed(1),pptFmtDate(best.day)+' · '+best.zone); pptAddKpi(s,9.08,1.32,3.7,'MENOR DÍA',worst.avg.toFixed(1),pptFmtDate(worst.day)+' · '+worst.zone);
-    s.addChart(pptx.ChartType.line,[{name:'Líneas/h',labels:points.map(p=>String(Number(p.day.slice(8,10)))),values:points.map(p=>Number(p.avg.toFixed(1)))}],{x:0.7,y:2.72,w:11.95,h:3.7,showLegend:false,showTitle:false,catAxisLabelFontFace:'Arial',catAxisLabelFontSize:8,valAxisLabelFontSize:8,showValue:true,showCatName:false,showSerName:false,dataLabelPosition:'t',chartColors:['E3292F'],showValue:true,valGridLine:{color:'DDE2E6',width:1},showCatName:false,lineSize:3,showMarker:true,markerSize:5});
+    s.addChart(pptx.ChartType.line,[{name:'Líneas/h',labels:points.map(p=>String(Number(p.day.slice(8,10)))),values:points.map(p=>Number(p.avg.toFixed(1)))}],{x:0.7,y:2.72,w:11.95,h:3.7,showLegend:false,showTitle:false,catAxisLabelFontFace:'Arial',catAxisLabelFontSize:8,valAxisLabelFontSize:8,showValue:true,showCatName:false,showSerName:false,dataLabelPosition:'t',chartColors:['18365F'],showValue:true,valGridLine:{color:'DDE2E6',width:1},showCatName:false,lineSize:3,showMarker:true,markerSize:5});
     s.addText('Día del mes',{x:5.75,y:6.48,w:1.8,h:0.2,fontSize:7,color:'7D858D',align:'center',margin:0}); pptAddFooter(s);
 
     // 4 · Líneas por hora
     s=pptx.addSlide(); pptAddHeader(s,'LÍNEAS PREPARADAS POR HORA · '+picker.toUpperCase(),pptFmtMonth(month)+' · turno 06:00 a 14:00');
     const hrRows=points.map(p=>{const h=Array(8).fill(0);p.rows.forEach(r=>{const hh=Number(r.Hora);if(hh>=6&&hh<14)h[hh-6]++;});return [p.day.slice(8,10),...h,p.count,p.avg.toFixed(1),p.zone];});
     const hdr=['Día','06–07','07–08','08–09','09–10','10–11','11–12','12–13','13–14','Total','Prom.','Zona'];
-    s.addTable([hdr,...hrRows],{x:0.35,y:1.35,w:12.65,h:5.55,border:{type:'solid',color:'D7DCE1',pt:0.55},fontFace:'Arial',fontSize:7,color:'303840',margin:0.035,rowH:0.19,autoFit:false,fillHeader:'E9EDF1',colorHeader:'242B31'}); pptAddFooter(s);
+    s.addTable([hdr,...hrRows],{x:0.35,y:1.35,w:12.65,h:5.55,border:{type:'solid',color:'D7DCE1',pt:0.55},fontFace:'Arial',fontSize:7,color:'303840',margin:0.035,rowH:0.19,autoFit:false,fillHeader:'E7EDF5',colorHeader:'18365F'}); pptAddFooter(s);
 
     const fname='Productividad_'+month+'_'+picker.replace(/[^a-z0-9_-]+/gi,'_')+'.pptx';
     await pptx.writeFile({fileName:fname});
