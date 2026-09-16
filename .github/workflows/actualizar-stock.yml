@@ -63,6 +63,8 @@ jobs:
           PRODUCTIVITY_HISTORY_DIR = Path("datos/productividad")
           PICKING_HISTORY_DIR = Path("datos/lineas-picking")
           PRODUCTIVITY_SUMMARY_DIR = Path("datos/productividad-resumen")
+          for _d in (NEGATIONS_HISTORY_DIR, TIMES_HISTORY_DIR, PRODUCTIVITY_HISTORY_DIR, PICKING_HISTORY_DIR, PRODUCTIVITY_SUMMARY_DIR):
+              _d.mkdir(parents=True, exist_ok=True)
 
           # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
           GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
@@ -79,32 +81,6 @@ jobs:
               "Referer": "https://copernicowms.com/",
               "User-Agent": "Mozilla/5.0"
           }
-
-          def norm_key(v):
-              return str(v or "").strip().lower().replace(" ", "").replace("_", "").replace("-", "")
-
-          def field(row, *names):
-              if not isinstance(row, dict):
-                  return ""
-              idx = {norm_key(k): v for k, v in row.items()}
-              for name in names:
-                  k = norm_key(name)
-                  if k in idx and idx[k] is not None:
-                      return idx[k]
-              return ""
-
-          def sval(row, *names):
-              return str(field(row, *names) or "").strip()
-
-          def nkey(v):
-              return str(v or "").strip().upper()
-
-          def save_json(path, payload):
-              path.write_text(
-                  json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
-                  encoding="utf-8",
-              )
-
 
           class ApiError(RuntimeError):
               def __init__(self, code, detail, url):
@@ -134,6 +110,78 @@ jobs:
                   ),
                   encoding="utf-8"
               )
+
+          # Productividad: helpers independientes para persistir raw + resumen diario.
+          def ps_sval(row, *names):
+              v = field(row, *names)
+              return str(v if v is not None else "").strip()
+
+          def ps_nkey(v):
+              return str(v if v is not None else "").strip().upper()
+
+          def ps_prod_hour(row):
+              raw = field(row, "hora", "Hora")
+              try:
+                  return int(float(raw))
+              except Exception:
+                  pass
+              hr = ps_sval(row, "horaregistro", "HoraRegistro", "horaRegistro")
+              try:
+                  return int(hr[0:2])
+              except Exception:
+                  return -1
+
+          def ps_prod_process(row):
+              return ps_sval(row, "Proceso", "proceso", "TipoProceso", "tipoProceso")
+
+          def ps_sku_values(row, source):
+              if source == "prod":
+                  vals = [ps_sval(row,"ean","EAN"), ps_sval(row,"ref","Ref","Referencia"), ps_sval(row,"barcode","Barcode")]
+              else:
+                  vals = [ps_sval(row,"ean","EAN"), ps_sval(row,"product","Product","producto","Producto")]
+              return [ps_nkey(x) for x in vals if ps_nkey(x)]
+
+          def build_summary(prod_rows, pick_rows, day_key, day_label, updated_at):
+              by_exact = defaultdict(list); by_pick_sku = defaultdict(list)
+              for ln in pick_rows:
+                  picking=ps_nkey(ps_sval(ln,"NumPicking","Picking","picking")); pedido=ps_nkey(ps_sval(ln,"pedido","Pedido","NumPedido"))
+                  if not picking: continue
+                  for sku in ps_sku_values(ln,"pick"):
+                      by_pick_sku[(picking,sku)].append(ln)
+                      if pedido: by_exact[(picking,pedido,sku)].append(ln)
+              def choose_line(pr):
+                  picking=ps_nkey(ps_sval(pr,"Picking","picking","NumPicking")); pedido=ps_nkey(ps_sval(pr,"NumPedido","Pedido","pedido")); skus=ps_sku_values(pr,"prod")
+                  for sku in skus:
+                      rows=by_exact.get((picking,pedido,sku),[])
+                      if len(rows)==1: return rows[0],"Picking+Pedido+SKU"
+                      if len(rows)>1:
+                          zones={ps_nkey(ps_sval(x,"zonapiso","ZonaPiso","zona","Zona")) for x in rows}; zones.discard("")
+                          if len(zones)==1: return rows[0],"Picking+Pedido+SKU (misma zona)"
+                  for sku in skus:
+                      rows=by_pick_sku.get((picking,sku),[]); zones={ps_nkey(ps_sval(x,"zonapiso","ZonaPiso","zona","Zona")) for x in rows}; zones.discard("")
+                      if rows and (len(rows)==1 or len(zones)==1): return rows[0],"Picking+SKU"
+                  return None,"Sin cruce seguro"
+              detail=[]; grouped={}
+              for pr in prod_rows:
+                  proc=ps_nkey(ps_prod_process(pr))
+                  if proc and "PICK" not in proc: continue
+                  hh=ps_prod_hour(pr)
+                  if hh<6 or hh>=14: continue
+                  picker=ps_sval(pr,"Nombres","nombres","NombreEmpleado","nombreEmpleado"); emp=ps_sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado")
+                  if not picker: picker=emp or "Sin nombre"
+                  ln,match=choose_line(pr); zone=ps_nkey(ps_sval(ln,"zonapiso","ZonaPiso","zona","Zona")) if ln else ""
+                  detail.append({"Fecha":day_label,"Picker":picker,"IdEmpleado":emp,"Picking":ps_sval(pr,"Picking","picking","NumPicking"),"Pedido":ps_sval(pr,"NumPedido","Pedido","pedido"),"SKU":ps_sval(pr,"ean","EAN","ref","Ref","barcode","Barcode"),"FechaRegistro":ps_sval(pr,"fecharegistro","FechaRegistro","fechaRegistro"),"Hora":hh,"ZonaLineaPicking":zone,"CruceZona":match})
+                  key=(emp,picker)
+                  if key not in grouped: grouped[key]={"Fecha":day_label,"FechaQuery":day_key,"IdEmpleado":emp,"Picker":picker,"Lineas":0,"Zonas":Counter(),"SinCruceZona":0}
+                  g=grouped[key]; g["Lineas"]+=1
+                  if zone: g["Zonas"][zone]+=1
+                  else: g["SinCruceZona"]+=1
+              pickers=[]
+              for g in grouped.values():
+                  zonas=dict(g["Zonas"].most_common()); principal=next(iter(zonas),"")
+                  pickers.append({"Fecha":g["Fecha"],"FechaQuery":g["FechaQuery"],"IdEmpleado":g["IdEmpleado"],"Picker":g["Picker"],"Lineas":g["Lineas"],"PromedioLineasHora":round(g["Lineas"]/6.5,2),"ZonaPrincipal":principal,"Zonas":zonas,"SinCruceZona":g["SinCruceZona"]})
+              pickers.sort(key=lambda x:(-x["Lineas"],x["Picker"].upper()))
+              return {"updated_at":updated_at,"fecha":day_label,"fecha_query":day_key,"source":"Cruce ProductividadPIK + Líneas de Picking; zona exclusivamente desde Líneas de Picking","referencia_minutos":390,"productividad_raw_count":len(prod_rows),"lineas_picking_raw_count":len(pick_rows),"lineas_productividad_06_14":len(detail),"pickers_count":len(pickers),"pickers":pickers,"rows":detail}
 
           def request_json(url, method="GET", data=None, jwt=None, timeout=120):
               headers = dict(BASE_HEADERS)
@@ -1026,26 +1074,14 @@ jobs:
                   prod_rows = extract_rows(prod_response)
                   pick_rows = extract_rows(pick_response)
 
-                  # PRODUCTIVIDAD: guardar SIEMPRE el día actual junto con la consulta operativa.
-                  # Esto evita que Productividad quede congelada mientras tiempos.json sigue avanzando.
-                  PRODUCTIVITY_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-                  PICKING_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-                  PRODUCTIVITY_SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
-                  prod_payload_hist = {
-                      "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
-                      "source": "Copernico ProductividadPIK RAW", "http": prod_http,
-                      "row_count": len(prod_rows), "rows": prod_rows
-                  }
-                  pick_payload_hist = {
-                      "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
-                      "source": "Copernico Líneas de Picking RAW", "http": pick_http,
-                      "row_count": len(pick_rows), "rows": pick_rows
-                  }
-                  summary_payload_hist = build_summary(prod_rows, pick_rows, day, day_label, now_iso)
-                  save_json(PRODUCTIVITY_HISTORY_DIR / f"{day}.json", prod_payload_hist)
-                  save_json(PICKING_HISTORY_DIR / f"{day}.json", pick_payload_hist)
-                  save_json(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload_hist)
-                  print("productividad-resumen actualizado · líneas 06-14:", summary_payload_hist["lineas_productividad_06_14"], "· pickers:", summary_payload_hist["pickers_count"])
+                  # Persistir las tres bases que consume Productividad.
+                  prod_payload = {"updated_at": now_iso, "fecha": day_label, "fecha_query": day, "source": "Copernico ProductividadPIK", "row_count": len(prod_rows), "rows": prod_rows}
+                  pick_payload = {"updated_at": now_iso, "fecha": day_label, "fecha_query": day, "source": "Copernico Líneas de Picking", "row_count": len(pick_rows), "rows": pick_rows}
+                  summary_payload = build_summary(prod_rows, pick_rows, day, day_label, now_iso)
+                  save_json_file(PRODUCTIVITY_HISTORY_DIR / f"{day}.json", prod_payload)
+                  save_json_file(PICKING_HISTORY_DIR / f"{day}.json", pick_payload)
+                  save_json_file(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload)
+                  print("Productividad persistida:", day, "· raw:", len(prod_rows), "· picking:", len(pick_rows), "· resumen 06-14:", summary_payload["lineas_productividad_06_14"], "· pickers:", summary_payload["pickers_count"])
 
                   # AVANCE DE PEDIDOS EN TIEMPO REAL
                   # Fuente: reporte Líneas de Picking del día.
@@ -1188,6 +1224,7 @@ jobs:
                           "SKU": sku,
                           "EAN": (sval(ln,"ean","EAN") if ln else "") or sval(pr,"ean","EAN"),
                           "Producto": (sval(ln,"product","Product") if ln else "") or sval(pr,"ref","Ref","Referencia"),
+                          "Referencia": sval(pr,"ref","Ref","Referencia") or (sval(ln,"product","Product","producto","Producto") if ln else ""),
                           "Descripcion": sval(pr,"Descripcion","descripcion","Descripción") or (sval(ln,"descripcion","Descripcion","Descripción") if ln else ""),
                           "CantidadNegada": qty,
                           "Unidad": (sval(ln,"unidad","Unidad") if ln else "") or "UN",
@@ -1281,6 +1318,7 @@ jobs:
                               "SKU": sku2,
                               "EAN": (sval(ln2,"ean","EAN") if ln2 else "") or sval(pr2,"ean","EAN"),
                               "Producto": (sval(ln2,"product","Product") if ln2 else "") or sval(pr2,"ref","Ref","Referencia"),
+                              "Referencia": sval(pr2,"ref","Ref","Referencia") or (sval(ln2,"product","Product","producto","Producto") if ln2 else ""),
                               "Descripcion": sval(pr2,"Descripcion","descripcion","Descripción") or (sval(ln2,"descripcion","Descripcion","Descripción") if ln2 else ""),
                               "CantidadNegada": qty2,
                               "Unidad": (sval(ln2,"unidad","Unidad") if ln2 else "") or "UN",
@@ -2351,9 +2389,7 @@ jobs:
             cp -a datos/negaciones/. /tmp/ubicaciones-sync/datos/negaciones/
           fi
           for d in productividad lineas-picking productividad-resumen; do
-            if [ -d "datos/$d" ]; then
-              cp -a "datos/$d/." "/tmp/ubicaciones-sync/datos/$d/"
-            fi
+            if [ -d "datos/$d" ]; then cp -a "datos/$d/." "/tmp/ubicaciones-sync/datos/$d/"; fi
           done
 
           git fetch origin main
@@ -2375,10 +2411,7 @@ jobs:
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
           for d in productividad lineas-picking productividad-resumen; do
-            if [ -d "/tmp/ubicaciones-sync/datos/$d" ]; then
-              mkdir -p "datos/$d"
-              cp -a "/tmp/ubicaciones-sync/datos/$d/." "datos/$d/"
-            fi
+            if [ -d "/tmp/ubicaciones-sync/datos/$d" ]; then mkdir -p "datos/$d"; cp -a "/tmp/ubicaciones-sync/datos/$d/." "datos/$d/"; fi
           done
 
           git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
