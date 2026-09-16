@@ -37,6 +37,7 @@ jobs:
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
+          from collections import defaultdict, Counter
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
@@ -59,6 +60,9 @@ jobs:
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
+          PRODUCTIVITY_HISTORY_DIR = Path("datos/productividad")
+          PICKING_HISTORY_DIR = Path("datos/lineas-picking")
+          PRODUCTIVITY_SUMMARY_DIR = Path("datos/productividad-resumen")
 
           # 119 cajas únicas relevadas como etiquetas viejas/fantasma (columna ETIQUETA).
           GHOST_BOXES = ["362145", "392720", "351304", "320622", "330092", "501197", "331314", "351866", "331553", "312595", "481440", "502542", "502468", "481135", "1160720", "481291", "373159", "371880", "361840", "500702", "372193", "372037", "410928", "960443", "301085", "420679", "330910", "851469", "470260", "590174", "590257", "502914", "502997", "600031", "600114", "362574", "362657", "352732", "352815", "620815", "630111", "390591", "410365", "312348", "312363", "81547", "341461", "341453", "380840", "380923", "302273", "302356", "500934", "500850", "301820", "470443", "470229", "420794", "420117", "480715", "480525", "502559", "502476", "501791", "501874", "502690", "451153", "320606", "330126", "421324", "330936", "301713", "301630", "70011", "312264", "312280", "490276", "400135", "471441", "171017", "312892", "91538", "351536", "351478", "381913", "381830", "310433", "310359", "331009", "342030", "341958", "350959", "350876", "502286", "502369", "322735", "322818", "312736", "312819", "360313", "360230", "300939", "300855", "450197", "450205", "300301", "300228", "480780", "480772", "300335", "500173", "500256", "321281", "321208", "331454", "331538", "502617", "501486", "501569"]
@@ -75,6 +79,32 @@ jobs:
               "Referer": "https://copernicowms.com/",
               "User-Agent": "Mozilla/5.0"
           }
+
+          def norm_key(v):
+              return str(v or "").strip().lower().replace(" ", "").replace("_", "").replace("-", "")
+
+          def field(row, *names):
+              if not isinstance(row, dict):
+                  return ""
+              idx = {norm_key(k): v for k, v in row.items()}
+              for name in names:
+                  k = norm_key(name)
+                  if k in idx and idx[k] is not None:
+                      return idx[k]
+              return ""
+
+          def sval(row, *names):
+              return str(field(row, *names) or "").strip()
+
+          def nkey(v):
+              return str(v or "").strip().upper()
+
+          def save_json(path, payload):
+              path.write_text(
+                  json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                  encoding="utf-8",
+              )
+
 
           class ApiError(RuntimeError):
               def __init__(self, code, detail, url):
@@ -996,6 +1026,27 @@ jobs:
                   prod_rows = extract_rows(prod_response)
                   pick_rows = extract_rows(pick_response)
 
+                  # PRODUCTIVIDAD: guardar SIEMPRE el día actual junto con la consulta operativa.
+                  # Esto evita que Productividad quede congelada mientras tiempos.json sigue avanzando.
+                  PRODUCTIVITY_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+                  PICKING_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+                  PRODUCTIVITY_SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
+                  prod_payload_hist = {
+                      "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
+                      "source": "Copernico ProductividadPIK RAW", "http": prod_http,
+                      "row_count": len(prod_rows), "rows": prod_rows
+                  }
+                  pick_payload_hist = {
+                      "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
+                      "source": "Copernico Líneas de Picking RAW", "http": pick_http,
+                      "row_count": len(pick_rows), "rows": pick_rows
+                  }
+                  summary_payload_hist = build_summary(prod_rows, pick_rows, day, day_label, now_iso)
+                  save_json(PRODUCTIVITY_HISTORY_DIR / f"{day}.json", prod_payload_hist)
+                  save_json(PICKING_HISTORY_DIR / f"{day}.json", pick_payload_hist)
+                  save_json(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload_hist)
+                  print("productividad-resumen actualizado · líneas 06-14:", summary_payload_hist["lineas_productividad_06_14"], "· pickers:", summary_payload_hist["pickers_count"])
+
                   # AVANCE DE PEDIDOS EN TIEMPO REAL
                   # Fuente: reporte Líneas de Picking del día.
                   # Se conserva una versión simplificada por línea para que el frontend
@@ -1136,7 +1187,6 @@ jobs:
                           "Picking": sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else ""),
                           "SKU": sku,
                           "EAN": (sval(ln,"ean","EAN") if ln else "") or sval(pr,"ean","EAN"),
-                          "Referencia": (sval(ln,"referencia","Referencia","ref","Ref","barcode","Barcode") if ln else "") or sval(pr,"referencia","Referencia","ref","Ref","barcode","Barcode"),
                           "Producto": (sval(ln,"product","Product") if ln else "") or sval(pr,"ref","Ref","Referencia"),
                           "Descripcion": sval(pr,"Descripcion","descripcion","Descripción") or (sval(ln,"descripcion","Descripcion","Descripción") if ln else ""),
                           "CantidadNegada": qty,
@@ -1230,7 +1280,6 @@ jobs:
                               "Picking": sval(pr2,"Picking","picking","NumPicking") or (sval(ln2,"NumPicking","Picking","picking") if ln2 else ""),
                               "SKU": sku2,
                               "EAN": (sval(ln2,"ean","EAN") if ln2 else "") or sval(pr2,"ean","EAN"),
-                              "Referencia": (sval(ln2,"referencia","Referencia","ref","Ref","barcode","Barcode") if ln2 else "") or sval(pr2,"referencia","Referencia","ref","Ref","barcode","Barcode"),
                               "Producto": (sval(ln2,"product","Product") if ln2 else "") or sval(pr2,"ref","Ref","Referencia"),
                               "Descripcion": sval(pr2,"Descripcion","descripcion","Descripción") or (sval(ln2,"descripcion","Descripcion","Descripción") if ln2 else ""),
                               "CantidadNegada": qty2,
@@ -2284,6 +2333,9 @@ jobs:
           mkdir -p /tmp/ubicaciones-sync
           mkdir -p /tmp/ubicaciones-sync/datos/tiempos
           mkdir -p /tmp/ubicaciones-sync/datos/negaciones
+          mkdir -p /tmp/ubicaciones-sync/datos/productividad
+          mkdir -p /tmp/ubicaciones-sync/datos/lineas-picking
+          mkdir -p /tmp/ubicaciones-sync/datos/productividad-resumen
 
           for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
             if [ -f "$f" ]; then
@@ -2298,6 +2350,11 @@ jobs:
           if [ -d "datos/negaciones" ]; then
             cp -a datos/negaciones/. /tmp/ubicaciones-sync/datos/negaciones/
           fi
+          for d in productividad lineas-picking productividad-resumen; do
+            if [ -d "datos/$d" ]; then
+              cp -a "datos/$d/." "/tmp/ubicaciones-sync/datos/$d/"
+            fi
+          done
 
           git fetch origin main
           git reset --hard origin/main
@@ -2317,8 +2374,14 @@ jobs:
             mkdir -p datos/negaciones
             cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
           fi
+          for d in productividad lineas-picking productividad-resumen; do
+            if [ -d "/tmp/ubicaciones-sync/datos/$d" ]; then
+              mkdir -p "datos/$d"
+              cp -a "/tmp/ubicaciones-sync/datos/$d/." "datos/$d/"
+            fi
+          done
 
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No hay cambios para publicar."
