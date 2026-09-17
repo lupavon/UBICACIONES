@@ -6289,13 +6289,50 @@ function progressAggregateLive(rows){
     UltimaLineaEpoch:Math.max(0,...rows.map(r=>Number(r.UltimaLineaEpoch||0)))
   };
 }
+function progressMatchId(v){
+  let s=String(v??'').trim();
+  if(/^\d+\.0+$/.test(s))s=s.replace(/\.0+$/,'');
+  return s.replace(/\s+/g,'');
+}
+function progressRawLiveAggregate(rows,plan){
+  if(!rows.length)return null;
+  const denied=rows.filter(r=>progressDailyIsDeniedState(r?.Estado)).length;
+  const processed=rows.filter(r=>progressDailyIsProcessedState(r?.Estado)).length;
+  const pendingByZone={};
+  rows.filter(r=>!progressDailyIsProcessedState(r?.Estado)).forEach(r=>{
+    const z=progressExactZone(r?.Zona||r?.ZonaPiso||r?.zonapiso||'');
+    if(z)pendingByZone[z]=(pendingByZone[z]||0)+1;
+  });
+  const pickings=[...new Set(rows.map(progressLivePicking).filter(Boolean))];
+  return {
+    Pedido:String(plan?.Pedido||rows[0]?.Pedido||''),
+    Picking:pickings.join(' / '),Pickings:pickings,Area:String(plan?.Area||''),
+    TotalLineas:rows.length,Procesadas:processed,Confirmadas:Math.max(0,processed-denied),Negadas:denied,
+    Pendientes:Math.max(0,rows.length-processed),
+    Zonas:[...new Set(rows.map(r=>progressExactZone(r?.Zona||r?.ZonaPiso||r?.zonapiso||'')).filter(Boolean))],
+    PendientesPorZona:pendingByZone,ProductosProcesados:{},UltimaLineaEpoch:0,_rawLineMode:true
+  };
+}
 function progressFindLiveRow(plan){
-  const pedido=String(plan.Pedido),picking=String(plan.Picking),area=String(plan.Area);
-  const exact=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&progressLivePicking(r)===picking&&String(r.Area||'').trim()===area);
+  const pedido=progressMatchId(plan?.Pedido),picking=progressMatchId(plan?.Picking||plan?.TR),area=String(plan?.Area||'').trim();
+  const raw=Array.isArray(ORDER_PROGRESS_LIVE_ROWS)?ORDER_PROGRESS_LIVE_ROWS:[];
+  const isRaw=raw.some(r=>r&&r.Estado!==undefined&&r.TotalLineas===undefined&&r.Procesadas===undefined);
+  if(isRaw){
+    let matches=[];
+    // 1) La clave más segura: Pedido + Picking.
+    if(pedido&&picking)matches=raw.filter(r=>progressMatchId(r?.Pedido)===pedido&&progressMatchId(progressLivePicking(r))===picking);
+    // 2) Si el Detalle TR guardó otro identificador en Picking/TR, usar Pedido.
+    if(!matches.length&&pedido)matches=raw.filter(r=>progressMatchId(r?.Pedido)===pedido);
+    // 3) Último fallback: Picking.
+    if(!matches.length&&picking)matches=raw.filter(r=>progressMatchId(progressLivePicking(r))===picking);
+    if(matches.length)return progressRawLiveAggregate(matches,plan);
+    return null;
+  }
+  const exact=raw.filter(r=>progressMatchId(r?.Pedido)===pedido&&progressMatchId(progressLivePicking(r))===picking&&String(r.Area||'').trim()===area);
   if(exact.length)return progressAggregateLive(exact);
-  const pp=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&progressLivePicking(r)===picking);if(pp.length)return progressAggregateLive(pp);
-  const pa=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido&&String(r.Area||'').trim()===area);if(pa.length)return progressAggregateLive(pa);
-  const po=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r.Pedido||'').trim()===pedido);if(po.length)return progressAggregateLive(po);
+  const pp=raw.filter(r=>progressMatchId(r?.Pedido)===pedido&&progressMatchId(progressLivePicking(r))===picking);if(pp.length)return progressAggregateLive(pp);
+  const pa=raw.filter(r=>progressMatchId(r?.Pedido)===pedido&&String(r.Area||'').trim()===area);if(pa.length)return progressAggregateLive(pa);
+  const po=raw.filter(r=>progressMatchId(r?.Pedido)===pedido);if(po.length)return progressAggregateLive(po);
   return null;
 }
 function progressBuildPlannedRows(date){
