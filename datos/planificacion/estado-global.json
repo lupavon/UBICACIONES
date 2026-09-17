@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "updatedAt": "2026-09-17T10:16:11.386Z",
+  "updatedAt": "2026-09-17T10:35:41.414Z",
   "days": {
     "2026-09-11": {
       "dailyPlanilla": {
@@ -207069,7 +207069,7 @@
       "dailyPlanilla": {
         "fileName": "Planilla Preparacion Septiembre (1) (10).xlsx",
         "sheetName": "17-09",
-        "loadedAt": "2026-09-17T10:16:09.903Z",
+        "loadedAt": "2026-09-17T10:35:38.145Z",
         "parserVersion": 3,
         "sectors": [
           {
@@ -208635,7 +208635,7 @@
       "unitarioPlanilla": {
         "fileName": "Planilla Preparacion Septiembre (1) (10).xlsx",
         "sheetName": "17-09",
-        "loadedAt": "2026-09-17T10:16:09.903Z",
+        "loadedAt": "2026-09-17T10:35:38.145Z",
         "parserVersion": 3,
         "rows": [
           {
