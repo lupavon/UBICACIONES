@@ -2365,61 +2365,55 @@ jobs:
 
       - name: Publicar estado y datos válidos
         run: |
+          set -e
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
 
-          mkdir -p /tmp/ubicaciones-sync
-          mkdir -p /tmp/ubicaciones-sync/datos/tiempos
-          mkdir -p /tmp/ubicaciones-sync/datos/negaciones
-          mkdir -p /tmp/ubicaciones-sync/datos/productividad
-          mkdir -p /tmp/ubicaciones-sync/datos/lineas-picking
-          mkdir -p /tmp/ubicaciones-sync/datos/productividad-resumen
+          SNAP=/tmp/ubicaciones-sync
+          rm -rf "$SNAP"
+          mkdir -p "$SNAP/datos/tiempos" "$SNAP/datos/negaciones" "$SNAP/datos/productividad" "$SNAP/datos/lineas-picking" "$SNAP/datos/productividad-resumen"
 
           for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
-            if [ -f "$f" ]; then
-              cp "$f" "/tmp/ubicaciones-sync/$f"
+            [ ! -f "$f" ] || cp "$f" "$SNAP/$f"
+          done
+          for d in tiempos negaciones productividad lineas-picking productividad-resumen; do
+            [ ! -d "datos/$d" ] || cp -a "datos/$d/." "$SNAP/datos/$d/"
+          done
+
+          publicar_snapshot() {
+            git fetch origin main
+            git reset --hard origin/main
+
+            for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
+              [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"
+            done
+            for d in tiempos negaciones productividad lineas-picking productividad-resumen; do
+              if [ -d "$SNAP/datos/$d" ]; then
+                mkdir -p "datos/$d"
+                cp -a "$SNAP/datos/$d/." "datos/$d/"
+              fi
+            done
+
+            git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
+            if git diff --cached --quiet; then
+              echo "No hay cambios para publicar."
+              return 0
             fi
-          done
+            git commit -m "AutoSync Copérnico · datos y estado"
+            git push origin HEAD:main
+          }
 
-          if [ -d "datos/tiempos" ]; then
-            cp -a datos/tiempos/. /tmp/ubicaciones-sync/datos/tiempos/
-          fi
-
-          if [ -d "datos/negaciones" ]; then
-            cp -a datos/negaciones/. /tmp/ubicaciones-sync/datos/negaciones/
-          fi
-          for d in productividad lineas-picking productividad-resumen; do
-            if [ -d "datos/$d" ]; then cp -a "datos/$d/." "/tmp/ubicaciones-sync/datos/$d/"; fi
-          done
-
-          git fetch origin main
-          git reset --hard origin/main
-
-          for f in stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json; do
-            if [ -f "/tmp/ubicaciones-sync/$f" ]; then
-              cp "/tmp/ubicaciones-sync/$f" "$f"
+          # Si main cambia entre fetch y push (otro workflow o commit manual),
+          # reconstruimos el commit sobre el main más nuevo y reintentamos.
+          for intento in 1 2 3 4 5; do
+            echo "Publicación intento $intento/5"
+            if publicar_snapshot; then
+              echo "Publicación OK"
+              exit 0
             fi
+            echo "main cambió durante la publicación; reintentando..."
+            sleep $((intento * 2))
           done
 
-          if [ -d "/tmp/ubicaciones-sync/datos/tiempos" ]; then
-            mkdir -p datos/tiempos
-            cp -a /tmp/ubicaciones-sync/datos/tiempos/. datos/tiempos/
-          fi
-
-          if [ -d "/tmp/ubicaciones-sync/datos/negaciones" ]; then
-            mkdir -p datos/negaciones
-            cp -a /tmp/ubicaciones-sync/datos/negaciones/. datos/negaciones/
-          fi
-          for d in productividad lineas-picking productividad-resumen; do
-            if [ -d "/tmp/ubicaciones-sync/datos/$d" ]; then mkdir -p "datos/$d"; cp -a "/tmp/ubicaciones-sync/datos/$d/." "datos/$d/"; fi
-          done
-
-          git add stock.json pallets-proceso.json en-recibo.json negaciones.json avance-pedidos.json tiempos.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen trazabilidad-cajas.json cajas-fantasma-movimientos.json sync-status.json 2>/dev/null || true
-
-          if git diff --cached --quiet; then
-            echo "No hay cambios para publicar."
-            exit 0
-          fi
-
-          git commit -m "AutoSync Copérnico · datos y estado"
-          git push origin HEAD:main
+          echo "ERROR: no se pudo publicar tras 5 intentos"
+          exit 1
