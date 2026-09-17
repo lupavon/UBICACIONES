@@ -5934,7 +5934,24 @@ async function progressHydrateSnapshotsFromHistory(st,date){
     try{
       const r=await fetch('./datos/avance/'+progressCompactDate(d)+'.json?v='+Date.now(),{cache:'no-store'});if(!r.ok)continue;
       const p=await r.json(),rows=Array.isArray(p.rows)?p.rows:[],snap={};
-      rows.forEach(x=>{const pk=progressLivePicking(x),k=progressKey(x.Pedido,pk,x.Area);snap[k]={Procesadas:Number(x.Procesadas||0),Negadas:Number(x.Negadas||0),UltimaLineaEpoch:Number(x.UltimaLineaEpoch||0),updatedAt:p.updated_at||''}});
+      const planRows=Array.isArray(st.days?.[d]?.rows)?st.days[d].rows:[];
+      // El histórico actual de avance-pedidos guarda una fila cruda por línea de Picking
+      // (Pedido/Picking/Estado/Zona), no los campos agregados Procesadas/Negadas/Area.
+      // Reconstruimos el snapshot contra cada segmento planificado para que el arrastre
+      // del día siguiente conserve lo realmente procesado.
+      if(rows.length && planRows.length && !rows.some(x=>Object.prototype.hasOwnProperty.call(x,'Procesadas'))){
+        planRows.forEach(pr=>{
+          const pedido=String(pr?.Pedido||'').trim(), picking=String(pr?.Picking||pr?.TR||'').trim();
+          let m=rows.filter(x=>pedido&&String(x?.Pedido||'').trim()===pedido);
+          if(!m.length&&picking)m=rows.filter(x=>progressLivePicking(x)===picking);
+          const processed=m.filter(x=>progressDailyIsProcessedState(x?.Estado)).length;
+          const denied=m.filter(x=>progressDailyIsDeniedState(x?.Estado)).length;
+          const k=pr.Key||progressKey(pr.Pedido,pr.Picking||pr.TR,pr.Area);
+          snap[k]={Procesadas:Math.min(Number(pr.TotalLineas||0),processed),Negadas:Math.min(processed,denied),UltimaLineaEpoch:0,updatedAt:p.updated_at||''};
+        });
+      }else{
+        rows.forEach(x=>{const pk=progressLivePicking(x),k=progressKey(x.Pedido,pk,x.Area);snap[k]={Procesadas:Number(x.Procesadas||0),Negadas:Number(x.Negadas||0),UltimaLineaEpoch:Number(x.UltimaLineaEpoch||0),updatedAt:p.updated_at||''}});
+      }
       st.snapshots[d]=snap;
     }catch(e){console.warn('No se pudo hidratar histórico',d,e)}
   }
