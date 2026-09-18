@@ -5013,8 +5013,18 @@ async function negBuildPendingSkuMap(date){
       try{await progressRemoteLoad(true)}catch(e){}
     }
     const store=typeof progressLoadStore==='function'?progressLoadStore():null;
-    const plan=store?.days?.[date]?.pendingSkuPlan||null;
-    if(!plan||typeof plan!=='object')throw new Error('Falta cargar Detalle TRs para obtener Q_Ordered por SKU');
+    // Pendiente SKU es GLOBAL: usar el Detalle TRs más reciente cargado, no limitarlo
+    // a la fecha seleccionada en Negaciones. El Detalle puede corresponder al día de
+    // preparación siguiente y contiene el universo vigente de TR/SKU a descontar.
+    const planDays=Object.entries(store?.days||{})
+      .filter(([,d])=>d?.pendingSkuPlan&&typeof d.pendingSkuPlan==='object')
+      .sort((a,b)=>{
+        const ta=Date.parse(a[1]?.loadedAt||'')||0, tb=Date.parse(b[1]?.loadedAt||'')||0;
+        if(tb!==ta)return tb-ta;
+        return String(b[0]).localeCompare(String(a[0]));
+      });
+    const plan=planDays[0]?.[1]?.pendingSkuPlan||null;
+    if(!plan||typeof plan!=='object')throw new Error('Falta cargar Detalle TRs para obtener Q_Ordered global por SKU');
     const ordered=new Map();
     Object.entries(plan).forEach(([key,vals])=>{
       const sep=key.indexOf('¦');
@@ -5035,7 +5045,7 @@ async function negBuildPendingSkuMap(date){
     const processed=payload?.processed_units_by_sku;
     if(!processed||typeof processed!=='object'||Array.isArray(processed))throw new Error('El workflow todavía no publicó processed_units_by_sku');
 
-    // 3) PENDIENTE = Q_Ordered TR - procesado. Nunca mostrar negativo.
+    // 3) PENDIENTE GLOBAL SKU = Q_Ordered del Detalle TRs vigente - procesado global. Nunca negativo.
     ordered.forEach((orderedQty,sku)=>{
       const done=Math.max(0,Number(processed[sku])||0);
       NEG_TR_PENDING_BY_SKU.set(sku,Math.max(0,Math.round((orderedQty-done)*1000)/1000));
@@ -5238,7 +5248,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · pendiente SKU = Q_Ordered TR − Confirmadas/Negadas de Líneas Picking':' · falta TR o procesadas por SKU para calcular pendiente')+
+        (NEG_TR_PENDING_READY?' · pendiente SKU GLOBAL = Q_Ordered TR vigente − Confirmadas/Negadas de Líneas Picking':' · falta TR o procesadas por SKU para calcular pendiente')+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
