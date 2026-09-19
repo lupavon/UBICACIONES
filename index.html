@@ -3304,6 +3304,7 @@ function setDisplayMode(mode){
 
   if(mode==='dashboard') buildOperationalDashboard();
   if(mode==='progress') buildOrderProgressPanel();
+  if(mode==='rack') rebuild();
   if(mode==='heat') buildHeatmap();
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
@@ -3313,7 +3314,6 @@ function setDisplayMode(mode){
   if(mode==='negations') buildNegationsPanel();
   if(mode==='productivity') buildTimesPanel(false, $('productivityDateFilter')?.value||'');
   if(mode==='times') buildTimesPanel(false, $('timeDateFilter')?.value||'');
-  if(mode==='times') buildTimesPanel();
 }
 
 
@@ -7007,7 +7007,9 @@ function applyStockPayload(payload,{fromCache=false}={}){
     });
   }
 
-  rebuild();
+  // Renderear solamente la vista visible. Antes se reconstruían todos los racks
+  // en cada actualización de stock, incluso estando en Avance/Productividad.
+  if(displayMode==='rack')rebuild();
   if(displayMode==='heat')buildHeatmap();
   if(displayMode==='occupancy')buildOccupancyMap();
   if(displayMode==='kpi')buildKpiPanel();
@@ -7041,14 +7043,27 @@ function refreshVisibleStockStatus(){
   }
 }
 
+let stockCacheSaveHandle=null;
 function saveStockCache(payload){
-  try{
-    localStorage.setItem(STOCK_CACHE_KEY,JSON.stringify(payload));
-    const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
-    localStorage.setItem(STOCK_CACHE_META_KEY,updatedAt||String(Date.now()));
-  }catch(err){
-    console.warn('No pude guardar cache de stock',err);
+  // localStorage + JSON.stringify de miles de filas es síncrono y puede trabar el scroll.
+  // Lo diferimos hasta que el navegador esté libre.
+  const doSave=()=>{
+    stockCacheSaveHandle=null;
+    try{
+      localStorage.setItem(STOCK_CACHE_KEY,JSON.stringify(payload));
+      const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+      localStorage.setItem(STOCK_CACHE_META_KEY,updatedAt||String(Date.now()));
+    }catch(err){
+      console.warn('No pude guardar cache de stock',err);
+    }
+  };
+  if(stockCacheSaveHandle){
+    if('cancelIdleCallback' in window) cancelIdleCallback(stockCacheSaveHandle);
+    else clearTimeout(stockCacheSaveHandle);
   }
+  stockCacheSaveHandle=('requestIdleCallback' in window)
+    ? requestIdleCallback(doSave,{timeout:2000})
+    : setTimeout(doSave,250);
 }
 
 async function loadPublishedStock({silent=false}={}){
@@ -7148,7 +7163,7 @@ rebuild();
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ loadPublishedStock({silent:true}); },8000);
+  autoRefreshTimer=setInterval(()=>{ if(!document.hidden) loadPublishedStock({silent:true}); },8000);
 }
 
 const refreshBtn=document.getElementById('refreshStockBtn');
@@ -7176,6 +7191,10 @@ loadPublishedStock({silent:true});
 startAutoStockRefresh();
 
 
+
+
+// Mantener el texto "hace X min" actualizado sin reconstruir vistas.
+setInterval(()=>{if(!document.hidden)refreshVisibleStockStatus()},15000);
 
 let LAST_SYNC_STATUS=null;
 
@@ -7235,7 +7254,7 @@ async function loadSyncHealth(){
 }
 
 loadSyncHealth();
-setInterval(loadSyncHealth,8000);
+setInterval(()=>{if(!document.hidden)loadSyncHealth()},15000);
 
 // === UBICACIONES AUTH ===
 const AUTH_API = 'https://ubicaciones-auth.pavonlucas-m.workers.dev';
