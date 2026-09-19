@@ -995,22 +995,98 @@ jobs:
                   raise SystemExit(0)
 
               # A partir de acá, si algo secundario falla, stock igual queda válido.
-              print("=== 2B. NEGACIONES DEL DÍA ===")
-              try:
-                  ar_tz = timezone(timedelta(hours=-3))
-                  day = datetime.now(ar_tz).strftime("%Y%m%d")
-                  day_label = datetime.now(ar_tz).strftime("%d/%m/%Y")
+              #
+              # IMPORTANTE: Avance de pedidos se actualiza primero y de forma
+              # independiente usando únicamente Líneas de Picking. De esta manera,
+              # un 401/fallo posterior de Productividad/Negaciones no congela
+              # avance-pedidos.json.
+              ar_tz = timezone(timedelta(hours=-3))
+              day = datetime.now(ar_tz).strftime("%Y%m%d")
+              day_label = datetime.now(ar_tz).strftime("%d/%m/%Y")
+              pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({"fecha": day})
 
+              pick_rows = []
+              pick_http = None
+
+              print("=== 2B. AVANCE DE PEDIDOS ===")
+              try:
+                  pick_response, pick_http, _ = request_json(
+                      pick_url, jwt=jwt, timeout=180
+                  )
+                  pick_rows = extract_rows(pick_response)
+
+                  def progress_sval_ind(row, *names):
+                      v = field(row, *names)
+                      return str(v if v is not None else "").strip()
+
+                  progress_rows_ind = []
+                  for ln_prog in pick_rows:
+                      progress_rows_ind.append({
+                          "Pedido": progress_sval_ind(ln_prog, "pedido", "Pedido", "NumPedido"),
+                          "Picking": progress_sval_ind(ln_prog, "NumPicking", "Picking", "picking"),
+                          "Zona": progress_sval_ind(ln_prog, "zonapiso", "ZonaPiso", "zona", "Zona").upper(),
+                          "Estado": progress_sval_ind(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado"),
+                          "SKU": progress_sval_ind(ln_prog, "ean", "EAN", "product", "Product"),
+                          "Descripcion": progress_sval_ind(ln_prog, "descripcion", "Descripcion", "Descripción"),
+                          "Ubicacion": progress_sval_ind(ln_prog, "ubicacion_asig", "Ubicacion_asig", "ubicacion", "Ubicacion"),
+                          "Cantidad": field(ln_prog, "Cant", "cant", "Cantidad", "cantidad", "unidad", "Unidad") or 0
+                      })
+
+                  processed_units_ind = {}
+                  processed_lines_ind = {}
+                  for ln_prog in pick_rows:
+                      estado_prog = progress_sval_ind(
+                          ln_prog, "EstadoDeLinea", "estadoDeLinea",
+                          "EstadoLinea", "estadolinea", "Estado"
+                      ).upper()
+                      if "CONFIRM" not in estado_prog and "NEGAD" not in estado_prog:
+                          continue
+                      sku_prog = progress_sval_ind(
+                          ln_prog, "ean", "EAN", "product", "Product",
+                          "producto", "Producto"
+                      ).upper()
+                      if not sku_prog:
+                          continue
+                      qty_prog = field(ln_prog, "Cant", "cant", "Cantidad", "cantidad")
+                      try:
+                          qty_prog = float(qty_prog or 0)
+                      except Exception:
+                          qty_prog = 0.0
+                      processed_units_ind[sku_prog] = processed_units_ind.get(sku_prog, 0) + max(0, qty_prog)
+                      processed_lines_ind[sku_prog] = processed_lines_ind.get(sku_prog, 0) + 1
+
+                  save_json_file(ORDER_PROGRESS_FILE, {
+                      "updated_at": now_iso,
+                      "fecha": day_label,
+                      "fecha_query": day,
+                      "source": "Copernico Líneas de Picking",
+                      "lineas_count": len(progress_rows_ind),
+                      "processed_units_by_sku": processed_units_ind,
+                      "processed_lines_by_sku": processed_lines_ind,
+                      "processed_sku_source": "Líneas de Picking · Cant de Confirmadas + Negadas · global por SKU",
+                      "rows": progress_rows_ind
+                  })
+                  print("avance-pedidos.json generado independientemente · líneas:", len(progress_rows_ind))
+              except Exception as e:
+                  print("AVISO: Avance pedidos no pudo actualizarse; se conserva el último válido:", str(e))
+
+              print("=== 2C. PRODUCTIVIDAD / NEGACIONES / TIEMPOS ===")
+              try:
                   prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
                       "fecha": day,
                       "tipo_productividad": "ProductividadPIK"
                   })
-                  pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({"fecha": day})
 
                   prod_response, prod_http, _ = request_json(prod_url, jwt=jwt, timeout=180)
-                  pick_response, pick_http, _ = request_json(pick_url, jwt=jwt, timeout=180)
                   prod_rows = extract_rows(prod_response)
-                  pick_rows = extract_rows(pick_response)
+
+                  # Reutilizar Líneas de Picking si Avance ya las obtuvo. Si Avance
+                  # falló, se intenta consultarlas nuevamente para este bloque.
+                  if not pick_rows:
+                      pick_response, pick_http, _ = request_json(
+                          pick_url, jwt=jwt, timeout=180
+                      )
+                      pick_rows = extract_rows(pick_response)
 
                   # Persistir las tres bases que consume Productividad.
                   prod_payload = {"updated_at": now_iso, "fecha": day_label, "fecha_query": day, "source": "Copernico ProductividadPIK", "row_count": len(prod_rows), "rows": prod_rows}
@@ -1021,60 +1097,8 @@ jobs:
                   save_json_file(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload)
                   print("Productividad persistida:", day, "· raw:", len(prod_rows), "· picking:", len(pick_rows), "· resumen 06-14:", summary_payload["lineas_productividad_06_14"], "· pickers:", summary_payload["pickers_count"])
 
-                  # AVANCE DE PEDIDOS EN TIEMPO REAL
-                  # Fuente: reporte Líneas de Picking del día.
-                  # Se conserva una versión simplificada por línea para que el frontend
-                  # pueda agrupar por pedido, picking y familia operativa.
-                  def progress_sval(row, *names):
-                      v = field(row, *names)
-                      return str(v if v is not None else "").strip()
-
-                  progress_rows = []
-                  for ln_prog in pick_rows:
-                      progress_rows.append({
-                          "Pedido": progress_sval(ln_prog, "pedido", "Pedido", "NumPedido"),
-                          "Picking": progress_sval(ln_prog, "NumPicking", "Picking", "picking"),
-                          "Zona": progress_sval(ln_prog, "zonapiso", "ZonaPiso", "zona", "Zona").upper(),
-                          "Estado": progress_sval(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado"),
-                          "SKU": progress_sval(ln_prog, "ean", "EAN", "product", "Product"),
-                          "Descripcion": progress_sval(ln_prog, "descripcion", "Descripcion", "Descripción"),
-                          "Ubicacion": progress_sval(ln_prog, "ubicacion_asig", "Ubicacion_asig", "ubicacion", "Ubicacion"),
-                          "Cantidad": field(ln_prog, "Cant", "cant", "Cantidad", "cantidad", "unidad", "Unidad") or 0
-                      })
-
-                  # Métrica adicional para Negaciones: unidades YA PROCESADAS por SKU.
-                  # IMPORTANTE: no cambia progress_rows ni la lógica existente de Avance pedidos.
-                  # Solo suma Cant de líneas cuyo Estado contiene CONFIRM o NEGAD.
-                  processed_units_by_sku = {}
-                  processed_lines_by_sku = {}
-                  for ln_prog in pick_rows:
-                      estado_prog = progress_sval(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado").upper()
-                      if "CONFIRM" not in estado_prog and "NEGAD" not in estado_prog:
-                          continue
-                      sku_prog = progress_sval(ln_prog, "ean", "EAN", "product", "Product", "producto", "Producto").upper()
-                      if not sku_prog:
-                          continue
-                      qty_prog = field(ln_prog, "Cant", "cant", "Cantidad", "cantidad")
-                      try:
-                          qty_prog = float(qty_prog or 0)
-                      except Exception:
-                          qty_prog = 0.0
-                      processed_units_by_sku[sku_prog] = processed_units_by_sku.get(sku_prog, 0) + max(0, qty_prog)
-                      processed_lines_by_sku[sku_prog] = processed_lines_by_sku.get(sku_prog, 0) + 1
-
-                  progress_payload = {
-                      "updated_at": now_iso,
-                      "fecha": day_label,
-                      "fecha_query": day,
-                      "source": "Copernico Líneas de Picking",
-                      "lineas_count": len(progress_rows),
-                      "processed_units_by_sku": processed_units_by_sku,
-                      "processed_lines_by_sku": processed_lines_by_sku,
-                      "processed_sku_source": "Líneas de Picking · Cant de Confirmadas + Negadas · global por SKU",
-                      "rows": progress_rows
-                  }
-                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
-                  print("avance-pedidos.json generado · líneas:", len(progress_rows))
+                  # Avance de pedidos ya fue generado arriba, de forma independiente.
+                  # A partir de aquí continúan Negaciones y Tiempos.
 
                   def sval(row, *names):
                       v = field(row, *names)
