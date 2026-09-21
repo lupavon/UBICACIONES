@@ -6455,7 +6455,7 @@ function progressFilteredRows(){
   const rows=ORDER_PROGRESS_ROWS.filter(r=>{
     const matchesArea=(area==='__ALL__'||r.Area===area);
     const matchesSearch=(!q||String(r.Pedido||'').toLowerCase().includes(q)||String(r.Picking||'').toLowerCase().includes(q)||String((r.Pickings||[]).join(' ')).toLowerCase().includes(q)||String(r.TR||'').toLowerCase().includes(q));
-    const isOpen=Number(r.Pendientes||0)>0&&Number(r.Procesadas||0)>0&&r.Estado!=='No preparar';
+    const isOpen=Number(r.Pendientes||0)>0&&r.Estado!=='No preparar';
     const isClosed=Number(r.Pendientes||0)===0||r.Estado==='No preparar';
     const matchesState=(state==='__ALL__'||(state==='OPEN'&&isOpen)||(state==='CLOSED'&&isClosed));
     return matchesArea&&matchesSearch&&matchesState;
