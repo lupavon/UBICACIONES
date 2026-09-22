@@ -2249,7 +2249,7 @@ body.heatSplit .layoutHeatGrid{
       <div class="progressUnitarioHead"><div><b id="progressSectorTitle">SECTOR</b><small>Avance por pedido medido en líneas · calles que todavía tienen líneas pendientes</small></div><div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label style="font-size:8px;color:#8d98a5;font-weight:800">Sector<br><select id="progressSectorFilter" style="margin-top:3px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:6px;padding:6px 8px;min-width:180px"><option value="">Sin planilla</option></select></label><small id="progressUnitarioMeta">—</small></div></div>
       <div class="progressUnitarioTableWrap">
         <table class="progressUnitarioTable">
-          <thead><tr><th style="width:42px">#</th><th>TIENDA</th><th>Pedido ERP</th><th>Picking</th><th class="num">Líneas</th><th>Avance</th><th>Calles pendientes</th></tr></thead>
+          <thead><tr><th style="width:42px">#</th><th>TIENDA</th><th>Pedido ERP</th><th>Picking</th><th class="num">Líneas</th><th>Avance</th><th>Líneas pendientes por calle</th></tr></thead>
           <tbody id="progressUnitarioBody"></tbody>
           <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="progressUnitarioLines">0</td><td id="progressUnitarioAdvance">—</td><td>—</td></tr></tfoot>
         </table>
@@ -6599,28 +6599,58 @@ function progressDailyLiveForPlanRow(row){
   if(!matches.length&&pedido)matches=ORDER_PROGRESS_LIVE_ROWS.filter(r=>String(r?.Pedido||'').trim()===pedido);
   return matches.length?progressAggregateLive(matches):null;
 }
+function progressPhysicalStreetForSku(sku){
+  const key=String(sku||'').trim();
+  if(!key||!Array.isArray(DATA)||!DATA.length)return '';
+  const candidates=DATA.filter(r=>{
+    const ean=String(r?.EAN??r?.ean??'').trim();
+    const ref=String(r?.referencia??r?.Referencia??'').trim();
+    const type=String(r?.TipoUbicacion??r?.tipoubicacion??'').trim().toUpperCase();
+    return (ean===key||ref===key)&&type==='PICKING';
+  }).map(r=>({
+    zone:progressExactZone(r?.zonapiso||r?.ZonaPiso||r?.Zona||''),
+    saldo:Number(String(r?.Saldo??0).replace(',','.'))||0
+  })).filter(x=>x.zone&&x.zone!=='SIN ZONA');
+  if(!candidates.length)return '';
+  const by={};candidates.forEach(x=>by[x.zone]=(by[x.zone]||0)+Math.max(0,x.saldo));
+  return Object.entries(by).sort((a,b)=>b[1]-a[1]||xcmp(a[0],b[0]))[0][0];
+}
+function progressPendingPhysicalStreets(row,live){
+  const details=progressDailyDetailRows(row);
+  const planned={};
+  details.forEach(d=>Object.values(d?.ZoneProducts||{}).forEach(products=>Object.entries(products||{}).forEach(([sku,n])=>{
+    planned[String(sku).trim()]=(planned[String(sku).trim()]||0)+Number(n||0);
+  })));
+  if(!Object.keys(planned).length)return [];
+  const info=progressDailyRawMatches(row),processed={};
+  (info.matches||[]).filter(r=>progressDailyIsProcessedState(r?.Estado)).forEach(r=>{
+    const sku=String(r?.SKU??r?.EAN??r?.ean??'').trim();if(sku)processed[sku]=(processed[sku]||0)+1;
+  });
+  const out={};let unresolved=0;
+  Object.entries(planned).forEach(([sku,n])=>{
+    const left=Math.max(0,Number(n||0)-Number(processed[sku]||0));if(!left)return;
+    const street=progressPhysicalStreetForSku(sku);
+    if(street)out[street]=(out[street]||0)+left;else unresolved+=left;
+  });
+  const rows=Object.entries(out).map(([zone,pending])=>({zone,pending,physical:true})).sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+  if(unresolved)rows.push({zone:'Sin calle',pending:unresolved,physical:true});
+  return rows;
+}
 function progressDailyOrderView(row){
   const live=progressDailyLiveForPlanRow(row),total=Math.max(0,Number(row?.TotalLineas||0));
   const processed=Math.min(total,Math.max(0,Number(live?.Procesadas||0)));
   const pending=Math.max(0,total-processed),pct=total?processed/total*100:0;
 
-  let map=live?.PendientesPorZona||{};
-  let streets=Object.entries(map)
-    .map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0)}))
-    .filter(x=>x.zone&&x.pending>0)
-    .sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
+  // Mostrar la calle física de picking (zonapiso de stock), no el grupo/código de planificación.
+  // Se reconstruyen los SKU pendientes del pedido y cada SKU se lleva a su calle de Picking actual.
+  let streets=progressPendingPhysicalStreets(row,live);
 
   // Si todavía no hubo coincidencia con el reporte de Líneas de Picking,
   // Detalle TRs se usa solamente como puente Pedido ERP -> TR/códigos.
   // No inventamos avance; pero sí podemos mostrar las calles planificadas
   // como referencia cuando el pedido está 0%.
-  if(!streets.length&&pending>0&&processed===0){
-    const bridge=progressDailyDetailBridge(row);
-    streets=Object.entries(bridge.planZones||{})
-      .map(([zone,n])=>({zone:progressExactZone(zone),pending:Number(n||0),planned:true}))
-      .filter(x=>x.zone&&x.pending>0)
-      .sort((a,b)=>b.pending-a.pending||xcmp(a.zone,b.zone));
-  }
+  // No volver a mostrar códigos/grupos (FMFCUP, FMFCCU, etc.) como si fueran calles.
+  // Si no puede resolverse una ubicación física, la UI muestra "Sin detalle de calle pendiente".
 
   return {live,total,processed,pending,pct,streets};
 }
@@ -6638,7 +6668,7 @@ function progressRenderUnitarioPanel(){
     const advance='<div class="progressDailyAdvance"><b>'+Number(v.pct||0).toFixed(1)+'%</b><div class="progressBar"><i style="width:'+progressPct(v.pct)+'%"></i></div><small>'+progressFmt(v.processed)+' de '+progressFmt(v.total)+' líneas</small></div>';
     let streets='';
     if(v.pending===0)streets='<span class="progressDailyStreet done">✓ Completo</span>';
-    else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet" title="'+(z.planned?'Calle/código planificado según Detalle TRs':'Líneas pendientes informadas por Copérnico')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
+    else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet" title="'+(z.physical?'Calle física de picking según stock / SKU pendiente':(z.planned?'Calle/código planificado según Detalle TRs':'Líneas pendientes informadas por Copérnico'))+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
     else streets='<span class="progressDailyNoDetail">Sin detalle de calle pendiente</span>';
     return '<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(v.total)+'</td><td>'+advance+'</td><td>'+streets+'</td></tr>';
   }).join(''):'<tr><td colspan="7" class="muted">Sin pedidos para el sector seleccionado en la fecha elegida.</td></tr>';
