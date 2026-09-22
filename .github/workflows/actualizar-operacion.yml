@@ -58,13 +58,14 @@ jobs:
           TRACE_FILE = Path("trazabilidad-cajas.json")
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
+          ORDER_PROGRESS_HISTORY_DIR = Path("datos/avance")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
           PRODUCTIVITY_HISTORY_DIR = Path("datos/productividad")
           PICKING_HISTORY_DIR = Path("datos/lineas-picking")
           PRODUCTIVITY_SUMMARY_DIR = Path("datos/productividad-resumen")
-          for _d in (NEGATIONS_HISTORY_DIR, TIMES_HISTORY_DIR, PRODUCTIVITY_HISTORY_DIR, PICKING_HISTORY_DIR, PRODUCTIVITY_SUMMARY_DIR):
+          for _d in (ORDER_PROGRESS_HISTORY_DIR, NEGATIONS_HISTORY_DIR, TIMES_HISTORY_DIR, PRODUCTIVITY_HISTORY_DIR, PICKING_HISTORY_DIR, PRODUCTIVITY_SUMMARY_DIR):
               _d.mkdir(parents=True, exist_ok=True)
 
           DEFAULT_TECH_USER_ID = 11257
@@ -1055,7 +1056,7 @@ jobs:
                       processed_units_ind[sku_prog] = processed_units_ind.get(sku_prog, 0) + max(0, qty_prog)
                       processed_lines_ind[sku_prog] = processed_lines_ind.get(sku_prog, 0) + 1
 
-                  save_json_file(ORDER_PROGRESS_FILE, {
+                  progress_payload = {
                       "updated_at": now_iso,
                       "fecha": day_label,
                       "fecha_query": day,
@@ -1065,8 +1066,10 @@ jobs:
                       "processed_lines_by_sku": processed_lines_ind,
                       "processed_sku_source": "Líneas de Picking · Cant de Confirmadas + Negadas · global por SKU",
                       "rows": progress_rows_ind
-                  })
-                  print("avance-pedidos.json generado independientemente · líneas:", len(progress_rows_ind))
+                  }
+                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
+                  save_json_file(ORDER_PROGRESS_HISTORY_DIR / f"{day}.json", progress_payload)
+                  print("avance-pedidos.json + histórico diario generados · líneas:", len(progress_rows_ind))
               except Exception as e:
                   print("AVISO: Avance pedidos no pudo actualizarse; se conserva el último válido:", str(e))
 
@@ -2198,13 +2201,13 @@ jobs:
           rm -rf "$SNAP"; mkdir -p "$SNAP"
           for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
           mkdir -p "$SNAP/datos"
-          for d in tiempos negaciones productividad lineas-picking productividad-resumen; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
+          for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
           for intento in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
-            for d in tiempos negaciones productividad lineas-picking productividad-resumen; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
-            git add negaciones.json avance-pedidos.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen 2>/dev/null || true
+            for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
+            git add negaciones.json avance-pedidos.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
             if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
             git commit -m "AutoSync Copernico · operational"
             if git push origin HEAD:main; then exit 0; fi
