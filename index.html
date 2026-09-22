@@ -1813,6 +1813,50 @@ body.light-mode td{color:#17202a!important;border-color:#e1e6ec!important}
 body.light-mode small,body.light-mode .muted{color:#667085!important}
 </style>
 
+
+<style id="taste-pass-v1">
+/* ===== TASTE PASS v1 · UI operativa clara, compacta y consistente ===== */
+:root{--t-bg:#f5f7fa;--t-surface:#fff;--t-surface2:#f8fafc;--t-border:#d8e0e8;--t-border2:#e7ecf1;--t-text:#17212b;--t-muted:#667586;--t-blue:#1769aa;--t-blue-soft:#eaf4fc;--t-green:#16835f;--t-amber:#a56a00;--t-red:#c43d4b;--t-shadow:0 1px 2px rgba(16,24,40,.04),0 4px 14px rgba(16,24,40,.035)}
+body.light-mode{background:var(--t-bg)!important;color:var(--t-text)!important;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;font-size:13px}
+body.light-mode .top{background:rgba(255,255,255,.96)!important;border-bottom:1px solid var(--t-border)!important;box-shadow:0 1px 6px rgba(16,24,40,.05)!important;padding:10px 16px!important;backdrop-filter:blur(8px)}
+body.light-mode .brand h1{font-size:18px!important;letter-spacing:-.25px;color:#14202b!important} body.light-mode .brand small{color:#687789!important}
+body.light-mode .main{background:var(--t-bg)!important;padding:14px 16px 24px!important}
+body.light-mode .modebar{gap:6px!important;margin-bottom:14px!important;position:sticky;top:61px;z-index:15;background:var(--t-bg);padding:7px 0}
+body.light-mode .btn,body.light-mode .filelabel,body.light-mode .zonebtn{background:#fff!important;color:#344252!important;border:1px solid #cfd8e3!important;border-radius:7px!important;box-shadow:0 1px 1px rgba(16,24,40,.02)!important;font-weight:650!important;transition:.12s ease!important}
+body.light-mode .btn:hover,body.light-mode .filelabel:hover,body.light-mode .zonebtn:hover{border-color:#9db2c7!important;background:#f8fbfd!important;color:#17212b!important;transform:none!important}
+body.light-mode .btn.active,body.light-mode .zonebtn.active{background:#172b3d!important;border-color:#172b3d!important;color:#fff!important;box-shadow:none!important}
+body.light-mode #themeToggleBtn{background:#fff!important;color:#344252!important}
+body.light-mode input,body.light-mode select,body.light-mode textarea,body.light-mode .search{background:#fff!important;color:#17212b!important;border:1px solid #cbd5e1!important;border-radius:7px!important;box-shadow:inset 0 1px 2px rgba(16,24,40,.025)!important;color-scheme:light!important}
+body.light-mode input:focus,body.light-mode select:focus,body.light-mode textarea:focus,body.light-mode .search:focus{outline:2px solid #b9d9f2!important;outline-offset:1px!important;border-color:#5795c5!important}
+body.light-mode .opsHero{margin:2px 0 12px!important;align-items:center!important} body.light-mode .opsHero h2{color:#15212c!important;font-size:19px!important;letter-spacing:-.2px} body.light-mode .opsHero p,body.light-mode .opsDashStatus{color:var(--t-muted)!important}
+body.light-mode .opsDashGrid{gap:9px!important}
+body.light-mode .opsCard{background:var(--t-surface)!important;border:1px solid var(--t-border)!important;border-radius:9px!important;min-height:94px!important;padding:12px 13px!important;box-shadow:var(--t-shadow)!important;transform:none!important}
+body.light-mode .opsCard:hover{border-color:#b5c3d2!important;box-shadow:0 3px 12px rgba(16,24,40,.07)!important}
+body.light-mode .opsCard small{color:#718096!important;font-size:8px!important;letter-spacing:.55px!important} body.light-mode .opsCard b{color:#14202b!important;font-size:25px!important;margin-top:6px!important} body.light-mode .opsCard span{color:#6c7a89!important} body.light-mode .opsCard .opsMini{color:#314354!important;font-weight:600!important}
+body.light-mode .opsCard.good{box-shadow:inset 3px 0 0 var(--t-green),var(--t-shadow)!important}.light-mode .opsCard.warn{box-shadow:inset 3px 0 0 #d49a20,var(--t-shadow)!important}.light-mode .opsCard.bad{box-shadow:inset 3px 0 0 var(--t-red),var(--t-shadow)!important}.light-mode .opsCard.info{box-shadow:inset 3px 0 0 #2d83c5,var(--t-shadow)!important}
+body.light-mode .opsSectionGrid{gap:9px!important;margin-top:9px!important} body.light-mode .opsPanel{background:#fff!important;border:1px solid var(--t-border)!important;border-radius:9px!important;padding:12px!important;box-shadow:var(--t-shadow)!important} body.light-mode .opsPanelHead b{color:#243241!important} body.light-mode .opsPanelHead small{color:#758496!important}
+body.light-mode table{color:#263442!important} body.light-mode th{background:#f2f5f8!important;color:#526273!important;border-color:#dbe3eb!important;font-weight:750!important} body.light-mode td{color:#263442!important;border-color:#e4e9ef!important} body.light-mode tr:hover td{background:#f7fafc!important}
+body.light-mode .opsTable th{background:transparent!important;color:#6a798a!important} body.light-mode .opsTable td{border-color:#e7ecf1!important} body.light-mode .opsAlert{border-color:#e7ecf1!important} body.light-mode .opsAlert strong{color:#273747!important} body.light-mode .opsAlert span{color:#718096!important}
+body.light-mode .opsBadge.bad{color:#a92e3b!important;border-color:#e6aab1!important;background:#fff5f6!important}.light-mode .opsBadge.warn{color:#8c5a00!important;border-color:#e4c27a!important;background:#fff9e9!important}.light-mode .opsBadge.good{color:#116a4c!important;border-color:#9bd2be!important;background:#f0fbf6!important}
+/* superficies operativas */
+body.light-mode .progressPlanPanel,body.light-mode .progressAreaCard,body.light-mode .progressUnitarioPanel,body.light-mode .progressMicroPanel,body.light-mode .progressMicroCard,body.light-mode .progressPlanKpi,body.light-mode .progressDailyDrop,body.light-mode .processKpi,body.light-mode .processTableWrap,body.light-mode .receiptTableWrap,body.light-mode .receiptQuickCard,body.light-mode .sanControls,body.light-mode .opsSection,body.light-mode .opsZoneCard,body.light-mode .detailCard,body.light-mode .moveCard,body.light-mode .mixTraceBox{background:#fff!important;color:var(--t-text)!important;border-color:var(--t-border)!important;box-shadow:none!important}
+body.light-mode .progressUnitarioHead,body.light-mode .progressMicroHead,body.light-mode .progressZoneFilterBar,body.light-mode .opsSectionHead{background:#f7f9fb!important;border-color:#dce4ec!important} body.light-mode .progressUnitarioHead b,body.light-mode .progressMicroHead b,body.light-mode .receiptQuickTitle,body.light-mode .opsSectionHead b{color:#243241!important}
+body.light-mode .progressTableWrap,body.light-mode .progressUnitarioTableWrap{background:#fff!important;border-color:var(--t-border)!important} body.light-mode .progressBar{background:#e4eaf0!important} body.light-mode .progressBar>i{background:linear-gradient(90deg,#3288c9,#36a57d)!important}
+body.light-mode .progressDailyStreet,body.light-mode .progressPendingZones .zoneChip{background:#f7f9fb!important;color:#344252!important;border-color:#ccd7e2!important}.light-mode .progressDailyStreet.done{background:#eef9f4!important;color:#167052!important;border-color:#acd6c5!important}
+body.light-mode .progressDailyDropText small,body.light-mode .progressDailyDropMeta,body.light-mode .progressMeta,body.light-mode .progressOrigin,body.light-mode .progressDailyNoDetail{color:#6c7a89!important}
+/* detalle y racks: conservar semántica de colores, aclarar contenedores */
+body.light-mode .detailSection{background:#fff!important;border-color:var(--t-border)!important} body.light-mode .detailSection h2,body.light-mode .detailSection .loc{color:#17212b!important} body.light-mode .gbox,body.light-mode .groupBox,body.light-mode .itemGrid>div{background:#f5f7fa!important;color:#263442!important;border-color:#dce3ea!important}
+body.light-mode .rack{background:#eef2f5!important;border-color:#9da8b3!important}.light-mode .slot{background:#f8fafc!important;border-color:#cbd5df!important;color:#263442!important}.light-mode .modlabel,.light-mode .viewtitle{color:#263442!important}.light-mode .rail{background:#9da8b3!important}.light-mode .pnum{color:#657586!important}
+body.light-mode .layoutHeatTitle{color:#17212b!important}.light-mode .layoutHeatSubtitle,.light-mode .layoutHeatHint,.light-mode .layoutHeatLegend{color:#667586!important}.light-mode .layoutHeatViewport{background:#fff!important;border-color:#d4dde6!important;box-shadow:var(--t-shadow)!important}.light-mode .layoutHeatGrid{background:#fff!important}.light-mode .layoutHeatStat{background:#fff!important;border-color:#d7e0e9!important;color:#263442!important}.light-mode .layoutHeatStat small{color:#718096!important}.light-mode .layoutHeatCell.zero,.light-mode .occCell.o0{background:#e8edf2!important;color:#526273!important}
+/* auth */
+body.light-mode #authGate{background:#eef2f6!important}.light-mode .loginCard,.light-mode .modalCard{background:#fff!important;color:#17212b!important;border-color:#d5dee7!important;box-shadow:0 18px 50px rgba(16,24,40,.14)!important}.light-mode .loginCard p,.light-mode .authField span,.light-mode .authNotice{color:#667586!important}
+/* texto secundario global */
+body.light-mode .muted,body.light-mode small{color:#687789!important}
+/* scrollbars discretos */
+body.light-mode *{scrollbar-color:#bcc7d2 #eef2f5} body.light-mode *::-webkit-scrollbar{width:10px;height:10px} body.light-mode *::-webkit-scrollbar-track{background:#eef2f5} body.light-mode *::-webkit-scrollbar-thumb{background:#bcc7d2;border-radius:10px;border:2px solid #eef2f5}
+@media(max-width:900px){body.light-mode .modebar{top:0;position:relative}body.light-mode .main{padding:10px!important}.light-mode .opsDashGrid{gap:8px!important}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -7523,7 +7567,7 @@ if($('productivityGeneratePptBtn'))$('productivityGeneratePptBtn').onclick=gener
      chip.insertBefore(b,document.getElementById('logoutBtn')||null);
      b.onclick=function(){const t=document.body.classList.contains('light-mode')?'dark':'light';try{localStorage.setItem(KEY,t)}catch(e){} apply(t)};
    }
-   let t='dark';try{const s=localStorage.getItem(KEY);if(s==='light'||s==='dark')t=s}catch(e){}
+   let t='light';try{const s=localStorage.getItem(KEY);if(s==='light'||s==='dark')t=s}catch(e){}
    apply(t);
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
