@@ -6615,6 +6615,16 @@ function progressPhysicalStreetForSku(sku){
   const by={};candidates.forEach(x=>by[x.zone]=(by[x.zone]||0)+Math.max(0,x.saldo));
   return Object.entries(by).sort((a,b)=>b[1]-a[1]||xcmp(a[0],b[0]))[0][0];
 }
+function progressDailyDetailRows(row){
+  const date=progressSelectedDate();
+  const pedido=String(row?.Pedido||'').trim();
+  const picking=String(row?.Picking||row?.TR||'').trim();
+  const day=progressLoadStore().days?.[date]||{};
+  const rows=Array.isArray(day.rows)?day.rows:[];
+  let details=rows.filter(r=>pedido&&String(r?.Pedido||'').trim()===pedido&&(!picking||String(r?.Picking||r?.TR||'').trim()===picking));
+  if(!details.length&&pedido)details=rows.filter(r=>String(r?.Pedido||'').trim()===pedido);
+  return details;
+}
 function progressPendingPhysicalStreets(row,live){
   const details=progressDailyDetailRows(row);
   const planned={};
