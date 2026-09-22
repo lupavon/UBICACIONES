@@ -6177,15 +6177,17 @@ function progressSectorAreaName(sector){
   if(u.includes('SECO')||u.includes('UNITARIO'))return 'Unitarios secos';
   return sector;
 }
-function progressCurrentPlanSheetName(){
-  // La Planilla de Preparación usa pestañas DD-MM (ej. 11-09).
-  // Siempre se toma únicamente la pestaña correspondiente al día calendario actual.
+function progressCurrentPlanSheetName(date=progressSelectedDate()){
+  // La Planilla de Preparación usa pestañas DD-MM. La referencia es la fecha seleccionada,
+  // no el reloj del navegador, para no invalidar una planificación ya cargada.
+  const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m)return `${m[3]}-${m[2]}`;
   const now=new Date();
   return `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}`;
 }
 async function progressImportDailyPlanFile(file,date){
   const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false});
-  const wantedSheet=progressCurrentPlanSheetName();
+  const wantedSheet=progressCurrentPlanSheetName(date);
   const realSheet=wb.SheetNames.find(sn=>String(sn).trim()===wantedSheet);
   if(!realSheet){
     throw new Error(`No encontré la pestaña ${wantedSheet}, que corresponde al día de hoy. Pestañas disponibles: ${wb.SheetNames.join(' · ')}`);
@@ -6223,15 +6225,15 @@ async function progressImportDailyPlanFile(file,date){
 }
 function progressDailyPlan(date){
   const st=progressLoadStore(),p=st.days?.[date]?.dailyPlanilla||null;
-  if(!p)return null;
-  // Invalida automáticamente imports generados por parsers viejos que mezclaban pestañas.
-  const expected=progressCurrentPlanSheetName();
-  if(Number(p.parserVersion||0)!==PROGRESS_DAILY_PLAN_PARSER_VERSION)return null;
-  if(String(p.sheetName||'').trim()!==expected)return null;
-  if(!Array.isArray(p.sectors)||!p.sectors.length)return null;
+  if(!p||!Array.isArray(p.sectors)||!p.sectors.length)return null;
+  // Compatibilidad: no ocultar una planilla válida solo porque fue guardada por una versión
+  // anterior del parser. La fecha elegida manda; si hay sheetName DD-MM, debe coincidir con ella.
+  const expected=progressCurrentPlanSheetName(date);
+  const sheet=String(p.sheetName||'').trim();
+  if(sheet&&/^\d{2}-\d{2}$/.test(sheet)&&sheet!==expected)return null;
   return p;
 }
-function progressDailyUnitario(date){const st=progressLoadStore(),p=st.days?.[date]?.unitarioPlanilla||null;return Number(p?.parserVersion||0)===PROGRESS_DAILY_PLAN_PARSER_VERSION?p:null}
+function progressDailyUnitario(date){const st=progressLoadStore(),p=st.days?.[date]?.unitarioPlanilla||null;return p&&Array.isArray(p.rows)?p:null}
 function progressSelectedDailySector(date){
   const daily=progressDailyPlan(date),sel=$('progressSectorFilter');
   if(!daily?.sectors?.length)return null;
@@ -6602,19 +6604,27 @@ function progressDailyLiveForPlanRow(row){
 function progressPhysicalStreetForSku(sku){
   const key=String(sku||'').trim();
   if(!key||!Array.isArray(DATA)||!DATA.length)return '';
-  const candidates=DATA.filter(r=>{
+  const candidates=DATA.map(r=>{
     const ean=String(r?.EAN??r?.ean??'').trim();
     const ref=String(r?.referencia??r?.Referencia??'').trim();
-    const type=String(r?.TipoUbicacion??r?.tipoubicacion??'').trim().toUpperCase();
-    return (ean===key||ref===key)&&type==='PICKING';
-  }).map(r=>({
-    zone:progressExactZone(r?.zonapiso||r?.ZonaPiso||r?.Zona||''),
-    saldo:Number(String(r?.Saldo??0).replace(',','.'))||0
-  })).filter(x=>x.zone&&x.zone!=='SIN ZONA');
+    if(ean!==key&&ref!==key)return null;
+    const x=normalizeRow(r);if(!x)return null;
+    // Solo ubicaciones físicas que existen en las vistas de picking del depósito.
+    if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return null;
+    }else if(x.prefix==='A'||x.prefix==='B'){
+      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos)||!validABModule(x.prefix,x.modulo))return null;
+    }else return null;
+    let street=moduleZone(moduleKeyFromRow(x));
+    // Operativamente MFCC se informa como una sola calle; MFC A/B conservan L/R.
+    if(/^MFCC[LR]$/.test(street))street='MFCC';
+    return {street,saldo:Math.max(0,Number(x.saldo||0))};
+  }).filter(Boolean).filter(x=>x.street&&x.street!=='OTROS');
   if(!candidates.length)return '';
-  const by={};candidates.forEach(x=>by[x.zone]=(by[x.zone]||0)+Math.max(0,x.saldo));
+  const by={};candidates.forEach(x=>by[x.street]=(by[x.street]||0)+x.saldo);
   return Object.entries(by).sort((a,b)=>b[1]-a[1]||xcmp(a[0],b[0]))[0][0];
 }
+
 function progressDailyDetailRows(row){
   const date=progressSelectedDate();
   const pedido=String(row?.Pedido||'').trim();
