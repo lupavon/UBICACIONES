@@ -1797,66 +1797,20 @@ body.heatSplit .layoutHeatGrid{
 </style>
 
 
-<style id="themeToggleStyles">
-/* Modo claro/oscuro: solo presentación, sin tocar lógica operativa */
-#themeToggleBtn{min-width:44px;padding:8px 10px;font-size:16px;line-height:1}
-
-body.light-mode{
-  background:#f4f6f8!important;
-  color:#17202a!important;
-  color-scheme:light;
-}
-body.light-mode .top,
-body.light-mode .side,
-body.light-mode .detailSection,
-body.light-mode .card,
-body.light-mode .panel,
-body.light-mode .box,
-body.light-mode .kpi,
-body.light-mode .tableWrap,
-body.light-mode .progressUnitarioTableWrap{
-  background:#fff!important;
-  border-color:#d7dde5!important;
-}
+<style id="themeV3Styles">
+#themeToggleBtn{min-width:42px;padding:7px 9px;font-size:15px}
+body.light-mode{background:#f4f6f8!important;color:#17202a!important;color-scheme:light}
+body.light-mode .top{background:#fff!important;border-color:#d7dde5!important}
 body.light-mode .main{background:#f4f6f8!important}
-body.light-mode .btn,
-body.light-mode .filelabel,
-body.light-mode .zonebtn{
-  background:#fff!important;
-  color:#1f2937!important;
-  border-color:#c9d1dc!important;
-}
-body.light-mode .btn:hover,
-body.light-mode .filelabel:hover,
-body.light-mode .zonebtn:hover{background:#eef2f6!important}
-body.light-mode .btn.active,
-body.light-mode .zonebtn.active{
-  background:#1f2937!important;
-  color:#fff!important;
-  border-color:#1f2937!important;
-}
-body.light-mode input,
-body.light-mode select,
-body.light-mode textarea,
-body.light-mode .search{
-  background:#fff!important;
-  color:#17202a!important;
-  border-color:#c9d1dc!important;
-}
-body.light-mode table,
-body.light-mode thead,
-body.light-mode tbody,
-body.light-mode tr,
-body.light-mode td,
-body.light-mode th{
-  color:#17202a;
-  border-color:#dfe4ea!important;
-}
-body.light-mode th{background:#eef2f6!important}
-body.light-mode tr:nth-child(even) td{background:rgba(15,23,42,.018)}
-body.light-mode small,
-body.light-mode .muted{color:#667085!important}
-body.light-mode .userChip{color:#17202a!important}
+body.light-mode .card,body.light-mode .panel,body.light-mode .box,
+body.light-mode .detailSection,body.light-mode .tableWrap,
+body.light-mode .progressUnitarioTableWrap{background:#fff!important;border-color:#d7dde5!important;color:#17202a!important}
+body.light-mode .btn,body.light-mode .filelabel,body.light-mode .zonebtn,
+body.light-mode input,body.light-mode select,body.light-mode textarea{
+ background:#fff!important;color:#17202a!important;border-color:#c9d1dc!important}
+body.light-mode th{background:#eef2f6!important;color:#344054!important}
+body.light-mode td{color:#17202a!important;border-color:#e1e6ec!important}
+body.light-mode small,body.light-mode .muted{color:#667085!important}
 </style>
 
 </head>
@@ -6613,15 +6567,90 @@ function progressDailyDetailBridge(row){
   }));
   return {pickings,planZones};
 }
+
+// ===== Índices rápidos para Avance pedidos =====
+let PROGRESS_FAST_IDX={date:null,liveRef:null,dataRef:null,dataLen:-1,dayRowsRef:null,
+  livePedido:new Map(),livePicking:new Map(),detailPedido:new Map(),detailPedidoPicking:new Map(),skuStreet:new Map()};
+
+function progressFastPush(map,key,row){
+  key=String(key||'').trim(); if(!key)return;
+  let a=map.get(key); if(!a){a=[];map.set(key,a)} a.push(row);
+}
+function progressEnsureFastIndexes(){
+  const date=progressSelectedDate();
+  const live=Array.isArray(ORDER_PROGRESS_LIVE_ROWS)?ORDER_PROGRESS_LIVE_ROWS:[];
+  const data=Array.isArray(DATA)?DATA:[];
+  const dayRows=progressLoadStore().days?.[date]?.rows||[];
+
+  if(PROGRESS_FAST_IDX.liveRef!==live){
+    const byPedido=new Map(),byPicking=new Map();
+    for(const r of live){
+      progressFastPush(byPedido,String(r?.Pedido||'').trim(),r);
+      progressFastPush(byPicking,progressLivePicking(r),r);
+    }
+    PROGRESS_FAST_IDX.livePedido=byPedido;
+    PROGRESS_FAST_IDX.livePicking=byPicking;
+    PROGRESS_FAST_IDX.liveRef=live;
+  }
+
+  if(PROGRESS_FAST_IDX.date!==date || PROGRESS_FAST_IDX.dayRowsRef!==dayRows){
+    const byPedido=new Map(),byPP=new Map();
+    for(const r of dayRows){
+      const p=String(r?.Pedido||'').trim(), pk=String(r?.Picking||r?.TR||'').trim();
+      progressFastPush(byPedido,p,r);
+      if(p&&pk)progressFastPush(byPP,p+'|'+pk,r);
+    }
+    PROGRESS_FAST_IDX.detailPedido=byPedido;
+    PROGRESS_FAST_IDX.detailPedidoPicking=byPP;
+    PROGRESS_FAST_IDX.dayRowsRef=dayRows;
+    PROGRESS_FAST_IDX.date=date;
+  }
+
+  if(PROGRESS_FAST_IDX.dataRef!==data || PROGRESS_FAST_IDX.dataLen!==data.length){
+    const sums=new Map();
+    for(const r of data){
+      const x=normalizeRow(r); if(!x)continue;
+      if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
+        if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))continue;
+      }else if(x.prefix==='A'||x.prefix==='B'){
+        if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos)||!validABModule(x.prefix,x.modulo))continue;
+      }else continue;
+      let street=moduleZone(moduleKeyFromRow(x));
+      if(/^MFCC[LR]$/.test(street))street='MFCC';
+      if(!street||street==='OTROS')continue;
+      const saldo=Math.max(0,Number(x.saldo||0));
+      const keys=[String(r?.EAN??r?.ean??'').trim(),String(r?.referencia??r?.Referencia??'').trim()].filter(Boolean);
+      for(const key of new Set(keys)){
+        let m=sums.get(key); if(!m){m=new Map();sums.set(key,m)}
+        m.set(street,(m.get(street)||0)+saldo);
+      }
+    }
+    const skuStreet=new Map();
+    for(const [sku,m] of sums){
+      const best=[...m.entries()].sort((a,b)=>b[1]-a[1]||xcmp(a[0],b[0]))[0];
+      if(best)skuStreet.set(sku,best[0]);
+    }
+    PROGRESS_FAST_IDX.skuStreet=skuStreet;
+    PROGRESS_FAST_IDX.dataRef=data;
+    PROGRESS_FAST_IDX.dataLen=data.length;
+  }
+}
+
 function progressDailyRawMatches(row){
+  progressEnsureFastIndexes();
   const pedido=String(row?.Pedido||'').trim();
   const planPicking=String(row?.Picking||row?.TR||'').trim();
   const bridge=progressDailyDetailBridge(row);
-  const bridgePickings=new Set(bridge.pickings.map(String));
-  const raw=Array.isArray(ORDER_PROGRESS_LIVE_ROWS)?ORDER_PROGRESS_LIVE_ROWS:[];
-  let matches=raw.filter(r=>pedido&&String(r?.Pedido||'').trim()===pedido);
-  if(!matches.length&&planPicking)matches=raw.filter(r=>progressLivePicking(r)===planPicking);
-  if(!matches.length&&bridgePickings.size)matches=raw.filter(r=>bridgePickings.has(progressLivePicking(r)));
+  const bridgePickings=[...new Set(bridge.pickings.map(String))];
+  let matches=pedido?(PROGRESS_FAST_IDX.livePedido.get(pedido)||[]):[];
+  if(!matches.length&&planPicking)matches=PROGRESS_FAST_IDX.livePicking.get(planPicking)||[];
+  if(!matches.length&&bridgePickings.length){
+    const seen=new Set(),all=[];
+    for(const pk of bridgePickings)for(const r of (PROGRESS_FAST_IDX.livePicking.get(pk)||[])){
+      if(!seen.has(r)){seen.add(r);all.push(r)}
+    }
+    matches=all;
+  }
   return {matches,bridge};
 }
 function progressDailyLiveForPlanRow(row){
@@ -6665,38 +6694,20 @@ function progressDailyLiveForPlanRow(row){
   return matches.length?progressAggregateLive(matches):null;
 }
 function progressPhysicalStreetForSku(sku){
-  const key=String(sku||'').trim();
-  if(!key||!Array.isArray(DATA)||!DATA.length)return '';
-  const candidates=DATA.map(r=>{
-    const ean=String(r?.EAN??r?.ean??'').trim();
-    const ref=String(r?.referencia??r?.Referencia??'').trim();
-    if(ean!==key&&ref!==key)return null;
-    const x=normalizeRow(r);if(!x)return null;
-    // Solo ubicaciones físicas que existen en las vistas de picking del depósito.
-    if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
-      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return null;
-    }else if(x.prefix==='A'||x.prefix==='B'){
-      if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos)||!validABModule(x.prefix,x.modulo))return null;
-    }else return null;
-    let street=moduleZone(moduleKeyFromRow(x));
-    // Operativamente MFCC se informa como una sola calle; MFC A/B conservan L/R.
-    if(/^MFCC[LR]$/.test(street))street='MFCC';
-    return {street,saldo:Math.max(0,Number(x.saldo||0))};
-  }).filter(Boolean).filter(x=>x.street&&x.street!=='OTROS');
-  if(!candidates.length)return '';
-  const by={};candidates.forEach(x=>by[x.street]=(by[x.street]||0)+x.saldo);
-  return Object.entries(by).sort((a,b)=>b[1]-a[1]||xcmp(a[0],b[0]))[0][0];
+  progressEnsureFastIndexes();
+  return PROGRESS_FAST_IDX.skuStreet.get(String(sku||'').trim())||'';
 }
 
 function progressDailyDetailRows(row){
-  const date=progressSelectedDate();
+  progressEnsureFastIndexes();
   const pedido=String(row?.Pedido||'').trim();
   const picking=String(row?.Picking||row?.TR||'').trim();
-  const day=progressLoadStore().days?.[date]||{};
-  const rows=Array.isArray(day.rows)?day.rows:[];
-  let details=rows.filter(r=>pedido&&String(r?.Pedido||'').trim()===pedido&&(!picking||String(r?.Picking||r?.TR||'').trim()===picking));
-  if(!details.length&&pedido)details=rows.filter(r=>String(r?.Pedido||'').trim()===pedido);
-  return details;
+  if(!pedido)return [];
+  if(picking){
+    const exact=PROGRESS_FAST_IDX.detailPedidoPicking.get(pedido+'|'+picking)||[];
+    if(exact.length)return exact;
+  }
+  return PROGRESS_FAST_IDX.detailPedido.get(pedido)||[];
 }
 function progressPendingPhysicalStreets(row,live){
   const details=progressDailyDetailRows(row);
@@ -7496,56 +7507,26 @@ if($('productivityGeneratePptBtn'))$('productivityGeneratePptBtn').onclick=gener
 
 </script>
 
-<script id="themeToggleScript">
+<script id="themeV3Script">
 (function(){
-  const KEY = "ubicaciones-theme";
-
-  function applyTheme(theme){
-    const light = theme === "light";
-    document.body.classList.toggle("light-mode", light);
-
-    const btn = document.getElementById("themeToggleBtn");
-    if (btn){
-      btn.textContent = light ? "🌙" : "☀️";
-      btn.title = light ? "Cambiar a modo oscuro" : "Cambiar a modo claro";
-      btn.setAttribute("aria-label", btn.title);
-    }
-
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", light ? "#ffffff" : "#0b0f14");
-  }
-
-  function initThemeToggle(){
-    let saved = "dark";
-    try {
-      const stored = localStorage.getItem(KEY);
-      if (stored === "light" || stored === "dark") saved = stored;
-    } catch(e){}
-
-    const chip = document.getElementById("userChip");
-    if (chip && !document.getElementById("themeToggleBtn")){
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.id = "themeToggleBtn";
-      btn.className = "btn";
-      const logout = document.getElementById("logoutBtn");
-      chip.insertBefore(btn, logout || null);
-
-      btn.addEventListener("click", function(){
-        const next = document.body.classList.contains("light-mode") ? "dark" : "light";
-        try { localStorage.setItem(KEY, next); } catch(e){}
-        applyTheme(next);
-      });
-    }
-
-    applyTheme(saved);
-  }
-
-  if (document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", initThemeToggle, {once:true});
-  } else {
-    initThemeToggle();
-  }
+ const KEY='ubicaciones-theme';
+ function apply(t){
+   const light=t==='light';
+   document.body.classList.toggle('light-mode',light);
+   const b=document.getElementById('themeToggleBtn');
+   if(b){b.textContent=light?'🌙':'☀️';b.title=light?'Modo oscuro':'Modo claro'}
+ }
+ function init(){
+   const chip=document.getElementById('userChip');
+   if(chip&&!document.getElementById('themeToggleBtn')){
+     const b=document.createElement('button'); b.type='button'; b.id='themeToggleBtn'; b.className='btn';
+     chip.insertBefore(b,document.getElementById('logoutBtn')||null);
+     b.onclick=function(){const t=document.body.classList.contains('light-mode')?'dark':'light';try{localStorage.setItem(KEY,t)}catch(e){} apply(t)};
+   }
+   let t='dark';try{const s=localStorage.getItem(KEY);if(s==='light'||s==='dark')t=s}catch(e){}
+   apply(t);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 </script>
 
