@@ -1,6 +1,6 @@
 {
   "version": 4,
-  "updatedAt": "2026-09-22T10:24:23.795Z",
+  "updatedAt": "2026-09-22T10:29:22.420Z",
   "days": {
     "2026-09-22": {
       "fileName": "Detalle TRs (60).xlsx",
@@ -40382,7 +40382,7 @@
       "dailyPlanilla": {
         "fileName": "Planilla Preparacion Septiembre (1) (12).xlsx",
         "sheetName": "22-09",
-        "loadedAt": "2026-09-22T10:24:10.050Z",
+        "loadedAt": "2026-09-22T10:29:21.390Z",
         "parserVersion": 3,
         "sectors": [
           {
@@ -41938,7 +41938,7 @@
       "unitarioPlanilla": {
         "fileName": "Planilla Preparacion Septiembre (1) (12).xlsx",
         "sheetName": "22-09",
-        "loadedAt": "2026-09-22T10:24:10.050Z",
+        "loadedAt": "2026-09-22T10:29:21.391Z",
         "parserVersion": 3,
         "rows": [
           {
