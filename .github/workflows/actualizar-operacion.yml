@@ -1380,22 +1380,30 @@ jobs:
                           "rows": neg_rows2
                       }
 
-                  # Primera ejecución: reconstruye automáticamente los últimos 7 días
-                  # si todavía no existe el archivo histórico. Luego cada día queda persistido.
-                  for neg_back_days in range(1, 8):
-                      prev_dt_neg = datetime.now(ar_tz) - timedelta(days=neg_back_days)
-                      prev_day_neg = prev_dt_neg.strftime("%Y%m%d")
-                      prev_label_neg = prev_dt_neg.strftime("%d/%m/%Y")
-                      prev_file_neg = NEGATIONS_HISTORY_DIR / f"{prev_day_neg}.json"
+                  # SINCRONIZACIÓN DINÁMICA DE NEGACIONES HISTÓRICAS.
+                  # Revisa TODOS los históricos existentes y solo consulta fechas
+                  # que todavía tengan alguna negación sin MotivoNegacion.
+                  pending_history = []
+                  for prev_file_neg in sorted(NEGATIONS_HISTORY_DIR.glob("*.json")):
+                      prev_day_neg = prev_file_neg.stem
+                      if prev_day_neg == day or len(prev_day_neg) != 8 or not prev_day_neg.isdigit():
+                          continue
+                      try:
+                          existing_neg = json.loads(prev_file_neg.read_text(encoding="utf-8"))
+                          existing_rows = existing_neg.get("rows") or []
+                          if not existing_rows:
+                              continue
+                          if not any(not str(r.get("MotivoNegacion") or "").strip()
+                                     for r in existing_rows if isinstance(r, dict)):
+                              continue
+                          prev_dt_neg = datetime.strptime(prev_day_neg, "%Y%m%d")
+                          prev_label_neg = prev_dt_neg.strftime("%d/%m/%Y")
+                          pending_history.append((prev_day_neg, prev_label_neg, prev_file_neg))
+                      except Exception as scan_err:
+                          print("AVISO: no pude revisar histórico", prev_file_neg, ":", str(scan_err))
 
-                      if prev_file_neg.exists():
-                          try:
-                              existing_neg = json.loads(prev_file_neg.read_text(encoding="utf-8"))
-                              if existing_neg.get("motivos_count") is not None:
-                                  continue
-                          except Exception:
-                              pass
-
+                  print("Históricos pendientes de motivo:", len(pending_history))
+                  for prev_day_neg, prev_label_neg, prev_file_neg in pending_history:
                       try:
                           prev_prod_url_neg = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
                               "fecha": prev_day_neg,
@@ -1427,7 +1435,7 @@ jobs:
                               prev_reason_http_neg
                           )
                           save_json_file(prev_file_neg, prev_payload_neg)
-                          print("Backfill Negaciones:", prev_file_neg, "· negaciones:", len(prev_payload_neg["rows"]))
+                          print("Sync Negaciones histórico:", prev_file_neg, "· negaciones:", len(prev_payload_neg["rows"]), "· motivos:", prev_payload_neg.get("motivos_matched_count", 0))
                       except Exception as e:
                           print("AVISO: no se pudo completar histórico de Negaciones", prev_day_neg, ":", str(e))
 
