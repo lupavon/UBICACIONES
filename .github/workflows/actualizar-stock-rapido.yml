@@ -2,14 +2,15 @@ name: Actualizar stock rapido Copernico
 
 on:
   schedule:
-    - cron: "* * * * *"
+    - cron: "1-59/3 * * * *"
+    - cron: "2-59/3 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: copernico-fast
+  group: copernico-session
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +45,7 @@ jobs:
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
           PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
           PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/pasillos/lineas/picking"
-          NEGATION_REASONS_URL = "https://services.copernicowms.com/backendweb25/kpi/dashboard/lineas-negadas"
+          NEGATION_REASONS_URL = "https://services.copernicowms.com/backweb25/kpi/dashboard/lineas-negadas"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
