@@ -1930,6 +1930,96 @@ body.light-mode .opsSection,body.light-mode .progressPlanPanel,body.light-mode .
 @media(max-width:800px){.top{padding-left:100px!important}.top:before{left:20px}.top:after{left:57px}.main{padding:0 14px 24px!important}.modebar{margin-left:-14px!important;margin-right:-14px!important;padding:0 14px!important;position:static!important}.opsDashGrid{grid-template-columns:1fr!important}.opsSectionGrid{grid-template-columns:1fr!important}.opsCard{padding-left:70px!important}}
 </style>
 
+
+<style id="personalTasteV4">
+/* ===== Personal Taste v4 · identidad propia + tema consistente ===== */
+:root{
+  --p-accent:#1769aa;--p-accent2:#2385cf;--p-danger:#d54b58;--p-success:#16835f;--p-warn:#b7790a;
+  --p-bg:#f4f7fa;--p-surface:#ffffff;--p-surface2:#f8fafc;--p-text:#17212b;--p-muted:#667789;
+  --p-border:#dbe3eb;--p-border2:#e9eef3;--p-shadow:0 8px 26px rgba(16,38,61,.06);
+}
+body:not(.light-mode){
+  --p-bg:#0b1118;--p-surface:#111923;--p-surface2:#151f2b;--p-text:#edf3f8;--p-muted:#92a1b1;
+  --p-border:#293644;--p-border2:#202c38;--p-shadow:0 10px 30px rgba(0,0,0,.20);
+}
+html{background:var(--p-bg)!important}
+body,body.light-mode{background:var(--p-bg)!important;color:var(--p-text)!important}
+body:before{display:none!important;content:none!important}
+.top,body.light-mode .top{
+  top:0!important;min-height:72px!important;padding:12px 26px!important;background:color-mix(in srgb,var(--p-surface) 96%,transparent)!important;
+  color:var(--p-text)!important;border-bottom:1px solid var(--p-border)!important;box-shadow:0 1px 8px rgba(10,35,58,.04)!important
+}
+.top:before,.top:after{display:none!important;content:none!important}
+.brand h1,.brand h1:before,.brand h1:after{content:none!important}
+.brand h1{font-size:20px!important;color:var(--p-text)!important;line-height:1.08!important;letter-spacing:-.35px!important}
+.brand small,.userChip small{color:var(--p-muted)!important}
+.userChip{color:var(--p-text)!important}
+.userChip:before{background:color-mix(in srgb,var(--p-accent) 12%,var(--p-surface))!important;color:var(--p-accent)!important}
+.main{background:var(--p-bg)!important;padding:0 26px 34px!important}
+.modebar,body.light-mode .modebar{
+  top:72px!important;background:color-mix(in srgb,var(--p-surface) 97%,transparent)!important;border-bottom:1px solid var(--p-border)!important;
+  box-shadow:0 4px 14px rgba(22,57,91,.025)!important
+}
+.modebar .btn,body.light-mode .modebar .btn{color:var(--p-muted)!important;background:transparent!important}
+.modebar .btn:hover{color:var(--p-accent)!important;background:var(--p-surface2)!important}
+.modebar .btn.active{color:var(--p-accent)!important;background:color-mix(in srgb,var(--p-accent) 7%,var(--p-surface))!important}
+.modebar .btn.active:after{background:var(--p-accent)!important}
+.btn,.filelabel,body.light-mode .btn,body.light-mode .filelabel,.zonebtn{
+  background:var(--p-surface)!important;color:var(--p-text)!important;border-color:var(--p-border)!important
+}
+.btn:hover,.filelabel:hover{background:var(--p-surface2)!important;border-color:color-mix(in srgb,var(--p-accent) 45%,var(--p-border))!important}
+.btn.active,.zonebtn.active{background:var(--p-accent)!important;color:#fff!important;border-color:var(--p-accent)!important}
+input,select,textarea,.search,body.light-mode input,body.light-mode select,body.light-mode textarea,body.light-mode .search{
+  background:var(--p-surface)!important;color:var(--p-text)!important;border-color:var(--p-border)!important;color-scheme:light
+}
+body:not(.light-mode) input,body:not(.light-mode) select,body:not(.light-mode) textarea,body:not(.light-mode) .search{color-scheme:dark}
+.zonebar,.detailSection,.detailCard,.processKpi,.processTableWrap,.receiptTableWrap,.receiptSupplierCard,.opsSection,.opsKpiCard,.opsZoneCard,
+.sanControls,.sanKpi,.sanStage,.sanCard,.usersTable,.modalCard,.loginCard,.progressPanel,.progressCard,.timeCard,.productivityMonthLayout,
+body.light-mode .zonebar,body.light-mode .detailSection,body.light-mode .detailCard,body.light-mode .processKpi,body.light-mode .processTableWrap,
+body.light-mode .receiptTableWrap,body.light-mode .receiptSupplierCard,body.light-mode .opsSection,body.light-mode .opsKpiCard,body.light-mode .opsZoneCard{
+  background:var(--p-surface)!important;color:var(--p-text)!important;border-color:var(--p-border)!important
+}
+.opsSectionHead,.receiptSupplierHead,.processTable th,.receiptTable th,.usersTable th,.groupRow td,
+body.light-mode .opsSectionHead,body.light-mode .receiptSupplierHead,body.light-mode .processTable th,body.light-mode .receiptTable th{
+  background:var(--p-surface2)!important;color:var(--p-text)!important;border-color:var(--p-border)!important
+}
+.processTable td,.receiptTable td,.usersTable td,.opsGroupTable td,.opsGroupTable th,.receiptSupplierTable td,.receiptSupplierTable th{
+  color:var(--p-text)!important;border-color:var(--p-border2)!important
+}
+.processTable tr:hover td,.receiptTable tr:hover td,.opsGroupTable tbody tr:hover{background:var(--p-surface2)!important}
+.layoutHeatTitle,.viewtitle,.opsHero h2,.sanTitle,.receiptSupplierHead b{color:var(--p-text)!important}
+.layoutHeatSubtitle,.authNotice,.processStatus,.receiptSupplierHead small,.sanSubtitle,.opsHero p,.opsKpiCard small,.opsKpiCard span{color:var(--p-muted)!important}
+.opsCard,body.light-mode .opsCard{background:var(--p-surface)!important;color:var(--p-text)!important;border-color:var(--p-border)!important;box-shadow:var(--p-shadow)!important}
+.opsCard b,.opsCard small,.opsCard span{color:inherit}
+#authGate{background:var(--p-bg)!important}
+.loginCard{box-shadow:var(--p-shadow)!important}
+
+/* Saneamiento: elimina el bloque oscuro fijo en modo claro y respeta el tema global. */
+.sanControls,.sanKpi,.sanStage,.sanCard,.sanMoveCard,.sanMixedCard,.sanPositionCard{
+  background:var(--p-surface)!important;color:var(--p-text)!important;border-color:var(--p-border)!important
+}
+body:not(.light-mode) .sanControls,body:not(.light-mode) .sanKpi,body:not(.light-mode) .sanStage,body:not(.light-mode) .sanCard,
+body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(.light-mode) .sanPositionCard{background:var(--p-surface)!important}
+.sanControls label,.sanMeta,.sanHint,.sanKpi small{color:var(--p-muted)!important}
+
+/* Negaciones · gráfico por motivo */
+.negReasonCard{overflow:hidden}
+.negReasonChart{display:grid;gap:8px;padding:14px 16px 17px}
+.negReasonRow{display:grid;grid-template-columns:26px minmax(0,1fr) 64px;gap:10px;align-items:center;min-height:38px}
+.negReasonRank{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--p-surface2);border:1px solid var(--p-border);color:var(--p-muted);font-size:10px;font-weight:850}
+.negReasonInfo{min-width:0}
+.negReasonLabel{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;font-size:11px}
+.negReasonLabel b{color:var(--p-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.negReasonLabel span{color:var(--p-muted);font-size:10px;white-space:nowrap}
+.negReasonTrack{height:8px;background:color-mix(in srgb,var(--p-border) 70%,transparent);border-radius:999px;overflow:hidden}
+.negReasonTrack i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--p-accent),var(--p-accent2));min-width:2px}
+.negReasonPct{text-align:right;font-size:17px;font-weight:900;color:var(--p-accent);font-variant-numeric:tabular-nums}
+@media(max-width:800px){
+  .top{padding:11px 14px!important}.main{padding:0 14px 24px!important}.modebar{top:70px!important}
+  .negReasonRow{grid-template-columns:24px minmax(0,1fr) 52px}.negReasonPct{font-size:14px}
+}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2424,6 +2514,14 @@ body.light-mode .opsSection,body.light-mode .progressPlanPanel,body.light-mode .
     <div class="processKpi"><small>UNIDADES</small><b id="negUnits">0</b><span>cantidad negada</span></div>
     <div class="processKpi"><small>PEDIDOS</small><b id="negOrders">0</b><span>pedidos afectados</span></div>
     <div class="processKpi"><small>SKU</small><b id="negSkus">0</b><span>SKU afectados</span></div>
+  </div>
+  <div class="receiptSupplierCard negReasonCard" style="margin-top:14px">
+    <div class="receiptSupplierHead">
+      <div><b>% de unidades negadas por motivo</b><small>Participación sobre las unidades negadas del día y filtros seleccionados</small></div>
+      <small id="negReasonTotal">0 unidades</small>
+    </div>
+    <div id="negReasonChart" class="negReasonChart"></div>
+    <div id="negReasonEmpty" class="receiptSupplierEmpty" style="display:none">No hay motivos informados para el filtro seleccionado.</div>
   </div>
   <div class="receiptSupplierCard" style="margin-top:14px">
     <div class="receiptSupplierHead"><div><b>Resumen por picker</b><small>Negaciones, unidades y SKU distintos del día</small></div><small id="negUpdated"></small></div>
@@ -5252,6 +5350,34 @@ function renderNegations(){
   $('negUnits').textContent=negFmt(all.reduce((s,r)=>s+(Number(negVal(r,'cantidad'))||0),0));
   $('negOrders').textContent=negFmt(new Set(all.map(r=>String(negVal(r,'pedido')||'')).filter(Boolean)).size);
   $('negSkus').textContent=negFmt(new Set(all.map(r=>String(negVal(r,'sku')||'')).filter(Boolean)).size);
+
+  // Distribución de UNIDADES negadas por motivo (no cantidad de registros).
+  const reasonMap=new Map();
+  let reasonTotal=0;
+  for(const r of all){
+    const units=Math.max(0,Number(negVal(r,'cantidad'))||0);
+    const raw=String(negVal(r,'motivo')||'').trim();
+    const reason=raw||'Sin motivo informado';
+    reasonMap.set(reason,(reasonMap.get(reason)||0)+units);
+    reasonTotal+=units;
+  }
+  const reasonRows=[...reasonMap.entries()].sort((a,b)=>b[1]-a[1]);
+  const reasonChart=$('negReasonChart'),reasonEmpty=$('negReasonEmpty'),reasonTotalEl=$('negReasonTotal');
+  if(reasonTotalEl)reasonTotalEl.textContent=negFmt(reasonTotal)+' unidades';
+  if(reasonEmpty)reasonEmpty.style.display=reasonRows.length&&reasonTotal>0?'none':'block';
+  if(reasonChart){
+    reasonChart.style.display=reasonRows.length&&reasonTotal>0?'grid':'none';
+    reasonChart.innerHTML=reasonRows.map(([reason,units],idx)=>{
+      const pct=reasonTotal?units*100/reasonTotal:0;
+      const pctText=pct.toLocaleString('es-AR',{minimumFractionDigits:pct<10?1:0,maximumFractionDigits:1})+'%';
+      return '<div class="negReasonRow" title="'+esc(reason)+' · '+negFmt(units)+' unidades · '+pctText+'">'+
+        '<div class="negReasonRank">'+(idx+1)+'</div>'+
+        '<div class="negReasonInfo"><div class="negReasonLabel"><b>'+esc(reason)+'</b><span>'+negFmt(units)+' un.</span></div>'+
+        '<div class="negReasonTrack"><i style="width:'+Math.max(0,Math.min(100,pct)).toFixed(2)+'%"></i></div></div>'+
+        '<div class="negReasonPct">'+pctText+'</div></div>';
+    }).join('');
+  }
+
   const by=new Map();
   for(const r of all){const p=String(negVal(r,'picker')||'Sin identificar').trim()||'Sin identificar';if(!by.has(p))by.set(p,{n:0,u:0,s:new Set()});const g=by.get(p);g.n++;g.u+=Number(negVal(r,'cantidad'))||0;const sku=String(negVal(r,'sku')||'');if(sku)g.s.add(sku);}
   const arr=[...by.entries()].sort((a,b)=>b[1].n-a[1].n||b[1].u-a[1].u);
