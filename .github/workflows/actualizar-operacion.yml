@@ -44,6 +44,7 @@ jobs:
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
           PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
           PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/pasillos/lineas/picking"
+          NEGATION_REASONS_URL = "https://services.copernicowms.com/backendweb25/kpi/dashboard/lineas-negadas"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
 
@@ -1110,6 +1111,38 @@ jobs:
                   def nkey(v):
                       return str(v if v is not None else "").strip().upper()
 
+                  def build_negation_reason_index(reason_rows):
+                      """Índice del reporte Dashboard > Líneas Negadas de Copérnico.
+                      Prioriza Picking+Pedido+SKU y conserva fallbacks controlados.
+                      """
+                      exact, pick_sku, order_sku = {}, {}, {}
+                      for rr in reason_rows or []:
+                          pk = nkey(sval(rr,"picking","Picking","NumPicking"))
+                          order = nkey(sval(rr,"Pedido","pedido","NumPedido"))
+                          sku = nkey(sval(rr,"productoean","ProductoEAN","ean","EAN","producto","Producto"))
+                          reason = sval(rr,"cod_motivo_niega","CodMotivoNiega","motivo","Motivo")
+                          if not reason: continue
+                          if pk and order and sku: exact.setdefault((pk,order,sku), reason)
+                          if pk and sku: pick_sku.setdefault((pk,sku), reason)
+                          if order and sku: order_sku.setdefault((order,sku), reason)
+                      return exact, pick_sku, order_sku
+
+                  def reason_for_negation(row, reason_index):
+                      exact, pick_sku, order_sku = reason_index
+                      pk=nkey(sval(row,"Picking","picking","NumPicking"))
+                      order=nkey(sval(row,"Pedido","pedido","NumPedido"))
+                      skus=[]
+                      for name in ("SKU","EAN","Producto","Referencia","ean","ref"):
+                          v=nkey(sval(row,name))
+                          if v and v not in skus: skus.append(v)
+                      for sku in skus:
+                          if (pk,order,sku) in exact: return exact[(pk,order,sku)], "Picking+Pedido+SKU"
+                      for sku in skus:
+                          if (pk,sku) in pick_sku: return pick_sku[(pk,sku)], "Picking+SKU"
+                      for sku in skus:
+                          if (order,sku) in order_sku: return order_sku[(order,sku)], "Pedido+SKU"
+                      return "", "Sin motivo"
+
                   def sku_keys(row, source):
                       if source == "prod":
                           vals = [sval(row,"ean","EAN"), sval(row,"ref","Ref","Referencia"), sval(row,"barcode","Barcode")]
@@ -1173,6 +1206,21 @@ jobs:
                       if len(vals) == 1: return vals[0], "Picking"
                       return None, "Sin cruce"
 
+                  # Motivos oficiales: Dashboard > Líneas Negadas. Misma fecha que el index.
+                  reason_rows = []
+                  reason_http = None
+                  try:
+                      reason_url = NEGATION_REASONS_URL + "?" + urllib.parse.urlencode({
+                          "fechainicial": day, "fechafinal": day, "topRanking": 10,
+                          "tipo": 0, "opcion": "RS8"
+                      })
+                      reason_response, reason_http, _ = request_json(reason_url, jwt=jwt, timeout=180)
+                      reason_rows = extract_rows(reason_response)
+                      print("Motivos Líneas Negadas:", len(reason_rows), "· HTTP:", reason_http)
+                  except Exception as reason_err:
+                      print("AVISO: no se pudieron traer motivos de negación:", str(reason_err))
+                  reason_index = build_negation_reason_index(reason_rows)
+
                   neg_prod_rows = [pr for pr in prod_rows if productivity_is_negated(pr)]
                   neg_rows = []
                   for pr in neg_prod_rows:
@@ -1201,7 +1249,13 @@ jobs:
                           "IdEmpleado": sval(pr,"Empleado","empleado","IdEmpleado","idEmpleado"),
                           "Caja": sval(pr,"Caja","caja"),
                           "FechaRegistro": sval(pr,"fecharegistro","FechaRegistro"),
-                          "Cruce": match_type
+                          "Cruce": match_type,
+                          "MotivoNegacion": reason_for_negation({
+                              "Picking": sval(pr,"Picking","picking","NumPicking") or (sval(ln,"NumPicking","Picking","picking") if ln else ""),
+                              "Pedido": (sval(ln,"pedido","Pedido","NumPedido") if ln else "") or sval(pr,"NumPedido","pedido","Pedido"),
+                              "SKU": sku, "EAN": (sval(ln,"ean","EAN") if ln else "") or sval(pr,"ean","EAN"),
+                              "Referencia": sval(pr,"ref","Ref","Referencia")
+                          }, reason_index)[0]
                       }
                       neg_rows.append(row)
 
@@ -1217,6 +1271,9 @@ jobs:
                       "lineas_picking_count": len(pick_rows),
                       "negaciones_count": len(neg_rows),
                       "matched_count": matched,
+                      "motivos_http": reason_http,
+                      "motivos_count": len(reason_rows),
+                      "motivos_matched_count": sum(1 for r in neg_rows if r.get("MotivoNegacion")),
                       "rows": neg_rows
                   }
                   save_json_file(NEGATIONS_FILE, neg_payload)
@@ -1231,7 +1288,7 @@ jobs:
                   save_json_file(neg_history_file, neg_payload)
                   print("Histórico Negaciones guardado:", neg_history_file)
 
-                  def make_neg_payload_for_day(source_prod, source_pick, query_day, label_day, updated_at, prod_status=200, pick_status=200):
+                  def make_neg_payload_for_day(source_prod, source_pick, query_day, label_day, updated_at, prod_status=200, pick_status=200, source_reasons=None, reasons_status=None):
                       # Índices propios del día histórico.
                       by_exact = {}
                       by_pick_sku = {}
@@ -1267,6 +1324,7 @@ jobs:
                           if len(vals2) == 1: return vals2[0], "Picking"
                           return None, "Sin cruce"
 
+                      reason_index2 = build_negation_reason_index(source_reasons or [])
                       neg_prod2 = [pr2 for pr2 in source_prod if productivity_is_negated(pr2)]
                       neg_rows2 = []
                       for pr2 in neg_prod2:
@@ -1295,7 +1353,13 @@ jobs:
                               "IdEmpleado": sval(pr2,"Empleado","empleado","IdEmpleado","idEmpleado"),
                               "Caja": sval(pr2,"Caja","caja"),
                               "FechaRegistro": sval(pr2,"fecharegistro","FechaRegistro"),
-                              "Cruce": match2
+                              "Cruce": match2,
+                              "MotivoNegacion": reason_for_negation({
+                                  "Picking": sval(pr2,"Picking","picking","NumPicking") or (sval(ln2,"NumPicking","Picking","picking") if ln2 else ""),
+                                  "Pedido": (sval(ln2,"pedido","Pedido","NumPedido") if ln2 else "") or sval(pr2,"NumPedido","pedido","Pedido"),
+                                  "SKU": sku2, "EAN": (sval(ln2,"ean","EAN") if ln2 else "") or sval(pr2,"ean","EAN"),
+                                  "Referencia": sval(pr2,"ref","Ref","Referencia")
+                              }, reason_index2)[0]
                           })
 
                       matched2 = sum(1 for rr in neg_rows2 if rr.get("Cruce") != "Sin cruce")
@@ -1310,6 +1374,9 @@ jobs:
                           "lineas_picking_count": len(source_pick),
                           "negaciones_count": len(neg_rows2),
                           "matched_count": matched2,
+                          "motivos_http": reasons_status,
+                          "motivos_count": len(source_reasons or []),
+                          "motivos_matched_count": sum(1 for rr in neg_rows2 if rr.get("MotivoNegacion")),
                           "rows": neg_rows2
                       }
 
@@ -1322,7 +1389,12 @@ jobs:
                       prev_file_neg = NEGATIONS_HISTORY_DIR / f"{prev_day_neg}.json"
 
                       if prev_file_neg.exists():
-                          continue
+                          try:
+                              existing_neg = json.loads(prev_file_neg.read_text(encoding="utf-8"))
+                              if existing_neg.get("motivos_count") is not None:
+                                  continue
+                          except Exception:
+                              pass
 
                       try:
                           prev_prod_url_neg = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
@@ -1336,6 +1408,12 @@ jobs:
                           prev_pick_resp_neg, prev_pick_http_neg, _ = request_json(prev_pick_url_neg, jwt=jwt, timeout=180)
                           prev_prod_rows_neg = extract_rows(prev_prod_resp_neg)
                           prev_pick_rows_neg = extract_rows(prev_pick_resp_neg)
+                          prev_reason_url_neg = NEGATION_REASONS_URL + "?" + urllib.parse.urlencode({
+                              "fechainicial": prev_day_neg, "fechafinal": prev_day_neg,
+                              "topRanking": 10, "tipo": 0, "opcion": "RS8"
+                          })
+                          prev_reason_resp_neg, prev_reason_http_neg, _ = request_json(prev_reason_url_neg, jwt=jwt, timeout=180)
+                          prev_reason_rows_neg = extract_rows(prev_reason_resp_neg)
 
                           prev_payload_neg = make_neg_payload_for_day(
                               prev_prod_rows_neg,
@@ -1344,7 +1422,9 @@ jobs:
                               prev_label_neg,
                               now_iso,
                               prev_prod_http_neg,
-                              prev_pick_http_neg
+                              prev_pick_http_neg,
+                              prev_reason_rows_neg,
+                              prev_reason_http_neg
                           )
                           save_json_file(prev_file_neg, prev_payload_neg)
                           print("Backfill Negaciones:", prev_file_neg, "· negaciones:", len(prev_payload_neg["rows"]))
