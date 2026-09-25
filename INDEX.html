@@ -2043,6 +2043,24 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 @media(max-width:900px){.traceKpis{grid-template-columns:repeat(2,1fr)}.traceEvent{grid-template-columns:62px 80px minmax(130px,1fr)}.traceEvent .traceOrder,.traceEvent .traceState{display:none}.traceStreetGrid{grid-template-columns:repeat(2,1fr)}.traceTools input,.traceTools select{min-width:0;width:100%}}
 </style>
 
+
+<style>
+/* ===== vTRAZA3 · Trazabilidad operativa / resumen visual ===== */
+.tracePanel{background:#0b1118}
+.traceKpis{grid-template-columns:repeat(5,minmax(120px,1fr))}
+.traceKpi.traceAlert{border-color:#63343b;background:#201318}.traceKpi.traceAlert b{color:#ff9da7}
+.traceKpi.traceGood{border-color:#28513d;background:#102019}.traceKpi.traceGood b{color:#7ee2a8}
+.traceStory{display:flex;flex-direction:column;gap:10px;padding:4px 0 2px}
+.traceStage{display:grid;grid-template-columns:92px 84px minmax(180px,1fr) auto;gap:12px;align-items:center;border:1px solid #26313d;background:#101821;border-radius:10px;padding:11px 12px}
+.traceStage:hover{background:#131d27}.traceStageTime{font-weight:900;font-variant-numeric:tabular-nums;color:#e8eef6}.traceStageZone{font-weight:950;color:#67d5ff}.traceStageMain b{display:block;font-size:12px}.traceStageMain small{display:block;margin-top:3px;color:#8996a4}.traceStageCount{font-size:11px;font-weight:900;color:#c6d1dd;white-space:nowrap}
+.traceCause{border:1px solid #684048;background:#26161a;border-radius:11px;padding:12px 14px;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center}.traceCauseIcon{font-size:22px}.traceCause b{color:#ffadb5}.traceCause small{display:block;color:#c5a4a8;margin-top:4px}.traceCauseMeta{text-align:right;font-size:10px;color:#ffbdc3;font-weight:900}
+.traceRepick{border:1px solid #6b5727;background:#251f11;border-radius:11px;padding:12px 14px;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center}.traceRepick b{color:#ffd783}.traceRepick small{display:block;color:#c8b98d;margin-top:4px}.traceRepickMeta{text-align:right;font-size:10px;color:#ffe3a4;font-weight:900}
+.traceFlowArrow{text-align:center;color:#718090;font-size:18px;line-height:14px}
+.traceSectionTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:15px 0 8px}.traceSectionTitle b{font-size:12px}.traceSectionTitle span{font-size:9px;color:#83909e}
+.traceRawToggle{margin-top:12px;border:1px solid #28333e;border-radius:9px;overflow:hidden}.traceRawToggle summary{cursor:pointer;padding:10px 12px;background:#101821;font-size:10px;font-weight:900;color:#9ca9b7}.traceRawToggle .traceTimelineRaw{max-height:430px;overflow:auto}
+.traceNotice{padding:14px;border:1px dashed #536171;border-radius:10px;background:#10161d;color:#aeb9c5;font-size:11px;line-height:1.5}.traceNotice b{color:#e5edf5}
+@media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2512,7 +2530,7 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 
   <div class="tracePanel" id="tracePanel">
     <div class="traceHead">
-      <div><b>🎬 Trazabilidad Picking · película real</b><small>Reconstruye las confirmaciones de Productividad en orden cronológico para detectar cortes, cambios de picker y tiempos sin actividad.</small></div>
+      <div><b>🎬 Trazabilidad Picking · película real</b><small>Resume el recorrido real y destaca vueltas al pedido, negaciones de ubicación y repicks sin obligarte a leer cada confirmación.</small></div>
       <div class="traceTools">
         <label>Modo<select id="traceMode"><option value="pedido">Por pedido</option><option value="picker">Por picker</option></select></label>
         <label>Buscar<input id="traceQuery" placeholder="Pedido ERP / picker…"></label>
@@ -2523,8 +2541,8 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
       <div class="traceKpi"><small>Confirmaciones</small><b id="traceKpiEvents">0</b><span>líneas procesadas</span></div>
       <div class="traceKpi"><small>Inicio</small><b id="traceKpiStart">—</b><span>primera confirmación</span></div>
       <div class="traceKpi"><small>Última</small><b id="traceKpiEnd">—</b><span>última confirmación</span></div>
-      <div class="traceKpi"><small>Mayor corte</small><b id="traceKpiGap">—</b><span>sin actividad</span></div>
-      <div class="traceKpi"><small>Pickers / pedidos</small><b id="traceKpiActors">—</b><span id="traceKpiActorsLabel">que tocaron el pedido</span></div>
+      <div class="traceKpi"><small>Vueltas detectadas</small><b id="traceKpiGap">—</b><span>retornos al pedido</span></div>
+      <div class="traceKpi"><small>Saltos por negación</small><b id="traceKpiActors">—</b><span id="traceKpiActorsLabel">explicados por reporte</span></div>
     </div>
     <div class="traceBody">
       <div class="traceStatus" id="traceStatus">Elegí un pedido de la tabla o escribilo arriba.</div>
@@ -2584,8 +2602,6 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
     <input id="negSearch" placeholder="Buscar pedido, picking, SKU/EAN, descripción, ubicación, picker o caja..."/>
     <select id="negProcessFilter" class="select" title="Proceso">
       <option value="PICKING" selected>Picking</option>
-      <option value="ADUANA">Aduana</option>
-      <option value="__ALL__">Todos</option>
     </select>
     <select id="negZoneFilter" class="select"><option value="__ALL__">Todas las zonas</option></select>
     <button class="btn" id="negExportBtn">⬇ Exportar XLS</button>
@@ -5372,7 +5388,7 @@ function renderNegations(){
   const zoneRaw=String($('negZoneFilter')?.value||'__ALL__').trim();
   const zone=zoneRaw.toUpperCase();
   let rows=Array.isArray(NEG_ROWS)?NEG_ROWS.slice():[];
-  const process=String($('negProcessFilter')?.value||'PICKING').trim().toUpperCase();
+  const process='PICKING'; if($('negProcessFilter'))$('negProcessFilter').value='PICKING';
   // Default: solo negaciones cuyo Proceso de la línea es Picking.
   // No se usa el perfil del empleado para clasificar.
   if(process && process!=='__ALL__')rows=rows.filter(r=>{
@@ -7120,7 +7136,13 @@ async function traceLoadRows(force=false){
   const urls=[productivityRawFileForDate(date),productivitySummaryFileForDate(date)];let rows=[],err='';
   for(const u of urls){try{const res=await fetch(u+'?trace='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[]);if(rows.length)break}catch(e){err=String(e.message||e)}}
   if(!rows.length)throw new Error('Productividad sin datos '+err);
-  TRACE_ROWS=rows.filter(r=>!(typeof timeIsExcluded==='function'&&timeIsExcluded(r))).map(r=>({...r,_traceDate:traceDateObj(r,date)})).filter(r=>r._traceDate&&!isNaN(r._traceDate));
+  // Trazabilidad operativa: SOLO PICKING. Se excluye cualquier registro identificado como Aduana.
+  // La clasificación usa el Proceso real de la fila; no el perfil del empleado.
+  TRACE_ROWS=rows.filter(r=>{
+    if(typeof timeIsExcluded==='function'&&timeIsExcluded(r))return false;
+    const p=traceNorm(traceField(r,['Proceso','proceso','TipoProceso','tipoProceso'])).toUpperCase();
+    return !p.includes('ADUANA');
+  }).map(r=>({...r,_traceDate:traceDateObj(r,date)})).filter(r=>r._traceDate&&!isNaN(r._traceDate));
   TRACE_ROWS.sort((a,b)=>a._traceDate-b._traceDate);TRACE_DATE=date;return TRACE_ROWS;
 }
 async function traceLoadNegatedLines(force=false){
@@ -7128,6 +7150,14 @@ async function traceLoadNegatedLines(force=false){
   const compact=progressCompactDate(date);let rows=[];
   try{const res=await fetch('./datos/lineas-negadas/'+compact+'.json?trace='+Date.now(),{cache:'no-store'});if(res.ok){const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[])}}
   catch(e){}
+  // El cruce causal también usa exclusivamente líneas negadas de Picking.
+  rows=rows.filter(r=>{
+    const p=traceNorm(traceField(r,['Proceso','proceso','TipoProceso','tipoProceso'])).toUpperCase();
+    if(p.includes('ADUANA'))return false;
+    if(p.includes('PICK'))return true;
+    // Compatibilidad con históricos antiguos sin campo Proceso: se conservan hasta que el workflow los regenere.
+    return !p;
+  });
   TRACE_NEG_ROWS=rows;TRACE_NEG_DATE=date;return rows;
 }
 function traceRelevantRows(rows,mode,q){
@@ -7152,17 +7182,35 @@ function traceFindRepick(events,n,negEvent){
   return events.find(e=>progressMatchId(tracePedido(e))===progressMatchId(n.pedido)&&progressMatchId(traceSku(e))===progressMatchId(n.sku)&&(!t||e._traceDate>t)&&traceState(e).includes('CONFIRM'))||null;
 }
 function traceSegments(rows,mode){if(!rows.length)return[];const seg=[];let cur=null;rows.forEach(r=>{const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}else{cur.end=r._traceDate;cur.count++}});return seg}
+function traceDetectReturns(seg){
+  const seen={},out=[];
+  seg.forEach((x,i)=>{const k=x.picker+'|'+x.zone;if(seen[k]!==undefined&&i-seen[k]>1)out.push({segment:x,previousIndex:seen[k],index:i});seen[k]=i});
+  return out;
+}
+function traceNegStories(rows,q,negRows){
+  const relevant=traceNegRelevant(negRows,q,rows),stories=[];
+  relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—';stories.push({n,ne,rp,src,dst,jump:!!(rp&&src!=='—'&&dst!=='—'&&src!==dst),delay:ne&&rp?rp._traceDate-ne._traceDate:null})});
+  return stories;
+}
 function traceRender(rows,mode,q,negRows=[]){
   const tl=$('traceTimeline'),sg=$('traceStreetGrid');$('traceKpiEvents').textContent=rows.length.toLocaleString('es-AR');
   if(!rows.length){$('traceKpiStart').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré confirmaciones para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';$('traceStatus').textContent='Sin eventos en Productividad para la búsqueda seleccionada.';return}
-  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate;let maxGap=0,maxGapAt=null;for(let i=1;i<rows.length;i++){const g=rows[i]._traceDate-rows[i-1]._traceDate;if(g>maxGap){maxGap=g;maxGapAt={a:rows[i-1],b:rows[i]}}}
-  $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=maxGap?traceDur(maxGap):'0 min';const actors=mode==='picker'?[...new Set(rows.map(tracePedido).filter(Boolean))]:[...new Set(rows.map(tracePicker).filter(Boolean))];$('traceKpiActors').textContent=actors.length;$('traceKpiActorsLabel').textContent=mode==='picker'?'pedidos trabajados':'pickers que tocaron el pedido';
-  const byZone={};rows.forEach(r=>{const z=traceZone(r);byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
-  const seg=traceSegments(rows,mode);let html='';seg.forEach((x,i)=>{if(i){const prev=seg[i-1],gap=x.start-prev.end;if(gap>=5*60000)html+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>'}html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>'});
+  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate,seg=traceSegments(rows,mode),returns=traceDetectReturns(seg),stories=mode==='pedido'?traceNegStories(rows,q,negRows):[],jumps=stories.filter(x=>x.jump);
+  $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=returns.length.toLocaleString('es-AR');$('traceKpiActors').textContent=jumps.length.toLocaleString('es-AR');$('traceKpiActorsLabel').textContent=mode==='pedido'?'explicados por reporte':'—';
+  const gapCard=$('traceKpiGap')?.closest('.traceKpi'),actorCard=$('traceKpiActors')?.closest('.traceKpi');gapCard?.classList.toggle('traceAlert',returns.length>0);actorCard?.classList.toggle('traceAlert',jumps.length>0);actorCard?.classList.toggle('traceGood',mode==='pedido'&&negRows.length>0&&jumps.length===0);
+  const byZone={};rows.forEach(r=>{const z=traceZone(r);if(z!=='SIN ZONA')byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
+  let html='<div class="traceSectionTitle"><b>Recorrido resumido</b><span>'+seg.length+' etapas · '+rows.length+' confirmaciones</span></div><div class="traceStory">';
+  seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});
+  html+='</div>';
   if(mode==='pedido'){
-    const relevant=traceNegRelevant(negRows,q,rows);if(relevant.length){html+='<div style="margin:18px 0 8px;font-weight:900">↪ Saltos originados en Reporte de Líneas Negadas</div>';relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—',jump=rp&&src!=='—'&&src!==dst,delay=ne&&rp?traceDur(rp._traceDate-ne._traceDate):'—';html+='<div class="traceGap '+(jump?'hot':'')+'"><span>'+(jump?'↪ SALTO DE CALLE':'⊘ LÍNEA NEGADA')+'</span><span>SKU '+esc(n.sku||'—')+' · '+esc(src)+(n.ubicacion?' / '+esc(n.ubicacion):'')+(n.cantidad?' · cant. '+esc(n.cantidad):'')+(n.motivo?' · '+esc(n.motivo):'')+(rp?' → '+esc(dst)+' · repick '+traceClock(rp._traceDate)+' por '+esc(tracePicker(rp))+' · +'+delay:' · sin repick posterior identificado')+'</span></div>'})}else{html+='<div class="traceEmpty" style="margin-top:14px">El histórico RAW de <b>Reporte de Líneas Negadas</b> todavía no está generado para esta fecha. Ejecutá el workflow actualizado y volvé a cargar.</div>'}
+    html+='<div class="traceSectionTitle"><b>Negaciones que pueden generar una vuelta</b><span>Reporte de Líneas Negadas → Productividad</span></div>';
+    if(!negRows.length){html+='<div class="traceNotice"><b>Falta el RAW del Reporte de Líneas Negadas para '+progressSelectedDate().split('-').reverse().join('/')+'.</b><br>Productividad ya está cargada, pero todavía no puedo explicar qué retorno nació de una negación de ubicación. Ejecutá <b>actualizar-operacion</b> y recargá la página.</div>'}
+    else if(!stories.length){html+='<div class="traceNotice"><b>No encontré líneas del Reporte de Líneas Negadas asociadas a este pedido.</b><br>Esto no significa que no haya retornos: arriba se detectaron '+returns.length+' vuelta(s) por secuencia. Simplemente ninguna quedó explicada todavía por el reporte.</div>'}
+    else stories.forEach(x=>{const n=x.n;html+='<div class="traceCause"><span class="traceCauseIcon">⊘</span><span><b>Negación de ubicación · SKU '+esc(n.sku||'—')+'</b><small>Origen '+esc(x.src)+(n.ubicacion?' · '+esc(n.ubicacion):'')+(n.motivo?' · motivo: '+esc(n.motivo):'')+(n.cantidad?' · '+esc(n.cantidad)+' un.':'')+'</small></span><span class="traceCauseMeta">'+(x.ne?traceClock(x.ne._traceDate):'hora no identificada')+'</span></div>'+(x.rp?'<div class="traceFlowArrow">↓</div><div class="traceRepick"><span class="traceCauseIcon">↩</span><span><b>'+(x.jump?'SALTO DE CALLE':'REPICK')+' → '+esc(x.dst)+'</b><small>Confirmado después por '+esc(tracePicker(x.rp))+' · SKU '+esc(n.sku||'—')+'</small></span><span class="traceRepickMeta">+'+traceDur(x.delay)+' · '+traceClock(x.rp._traceDate)+'</span></div>':'<div class="traceNotice">No se identificó una confirmación posterior de este SKU.</div>')});
   }
-  tl.innerHTML=html;const gapText=maxGapAt?' · mayor corte '+traceDur(maxGap)+' entre '+traceZone(maxGapAt.a)+' / '+tracePicker(maxGapAt.a)+' y '+traceZone(maxGapAt.b)+' / '+tracePicker(maxGapAt.b):'';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+traceClock(first)+' → '+traceClock(last)+gapText+(mode==='pedido'?' · '+traceNegRelevant(negRows,q,rows).length+' líneas del reporte de negadas':'');
+  let raw='';seg.forEach((x,i)=>{if(i){const prev=seg[i-1],gap=x.start-prev.end;if(gap>=5*60000)raw+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>'}raw+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>'});
+  html+='<details class="traceRawToggle"><summary>Ver detalle técnico completo ('+rows.length+' confirmaciones)</summary><div class="traceTimelineRaw">'+raw+'</div></details>';
+  tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+seg.length+' etapas · '+returns.length+' vuelta(s) detectada(s)'+(mode==='pedido'?' · '+jumps.length+' salto(s) explicado(s) por negación':'');
 }
 async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q,neg)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
 function traceOpenPedido(pedido){$('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);$('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'})}
