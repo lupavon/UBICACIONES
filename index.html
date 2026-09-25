@@ -7137,9 +7137,36 @@ async function traceLoadRows(force=false){
 function traceRelevantRows(rows,mode,q){
   const nq=timeNormName(q);
   if(mode==='picker')return rows.filter(r=>timeNormName(tracePicker(r))===nq || timeNormName(tracePicker(r)).includes(nq));
+
+  // 1) Si Productividad ya trae Pedido ERP, usar el cruce directo.
   const exact=rows.filter(r=>progressMatchId(tracePedido(r))===progressMatchId(q));
   if(exact.length)return exact;
-  return rows.filter(r=>progressMatchId(tracePicking(r))===progressMatchId(q));
+
+  // 2) Productividad normalmente identifica la confirmación por Picking/TR.
+  // Cuando el usuario busca un Pedido ERP, resolver primero todos sus Picking/TR
+  // desde Avance + Planilla diaria y recién después cruzar contra Productividad.
+  const qid=progressMatchId(q),pickings=new Set();
+  const addPick=v=>{const x=progressMatchId(v);if(x)pickings.add(x)};
+  (ORDER_PROGRESS_ROWS||[]).forEach(r=>{
+    if(progressMatchId(r?.Pedido)!==qid)return;
+    addPick(r?.Picking);addPick(r?.TR);
+    (Array.isArray(r?.Pickings)?r.Pickings:[]).forEach(addPick);
+  });
+  try{
+    const day=progressLoadStore()?.days?.[progressSelectedDate()];
+    (Array.isArray(day?.rows)?day.rows:[]).forEach(r=>{
+      if(progressMatchId(r?.Pedido)!==qid)return;
+      addPick(r?.Picking);addPick(r?.TR);
+    });
+  }catch(e){}
+
+  if(pickings.size){
+    const linked=rows.filter(r=>pickings.has(progressMatchId(tracePicking(r))));
+    if(linked.length)return linked;
+  }
+
+  // 3) Mantener compatibilidad: también permite escribir directamente un Picking/TR.
+  return rows.filter(r=>progressMatchId(tracePicking(r))===qid);
 }
 function traceSegments(rows,mode){
   if(!rows.length)return [];
@@ -7174,7 +7201,7 @@ function traceRender(rows,mode,q){
       const prev=seg[i-1],gap=x.start-prev.end;
       if(gap>=5*60000)html+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>';
     }
-    html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||'—')+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>';
+    html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>';
   });
   tl.innerHTML=html;
   const gapText=maxGapAt?' · mayor corte '+traceDur(maxGap)+' entre '+traceZone(maxGapAt.a)+' / '+tracePicker(maxGapAt.a)+' y '+traceZone(maxGapAt.b)+' / '+tracePicker(maxGapAt.b):'';
