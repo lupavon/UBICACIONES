@@ -7094,133 +7094,80 @@ async function progressCancelOrder(key){
   buildOrderProgressPanel(true);
 }
 
-// ===== vTRAZA1 · Trazabilidad Picking =====
-let TRACE_ROWS=[],TRACE_DATE='',TRACE_CACHE={};
+// ===== vTRAZA2 · Trazabilidad autónoma + reporte REAL Líneas Negadas =====
+let TRACE_ROWS=[],TRACE_DATE='',TRACE_NEG_ROWS=[],TRACE_NEG_DATE='';
 function traceNorm(v){return String(v??'').trim()}
-function tracePicker(r){return traceNorm(r?.Picker||r?.Nombres||r?.NombreEmpleado||r?.Empleado||'Sin nombre')}
-function tracePedido(r){return traceNorm(r?.Pedido||r?.pedido||r?.NumPedido||'')}
-function tracePicking(r){return traceNorm(r?.Picking||r?.picking||r?.NumPicking||'')}
+function traceField(r,names){for(const n of names){if(r&&Object.prototype.hasOwnProperty.call(r,n)&&traceNorm(r[n])!=='')return r[n]}return ''}
+function tracePicker(r){return traceNorm(traceField(r,['Picker','Nombres','nombres','NombreEmpleado','nombreEmpleado','Empleado']))||'Sin nombre'}
+function tracePedido(r){return traceNorm(traceField(r,['Pedido','pedido','NumPedido','NroPedido','PedidoERP','pedidoERP']))}
+function tracePicking(r){return traceNorm(traceField(r,['Picking','picking','NumPicking','NroPicking','TR','tr']))}
+function traceSku(r){return traceNorm(traceField(r,['SKU','sku','ean','EAN','productoean','ProductoEAN','product','Producto','ref','Referencia']))}
+function traceState(r){return traceNorm(traceField(r,['EstadoLineaTsscc','EstadoDeLinea','EstadoLinea','estadolinea','Estado','estado'])).toUpperCase()}
 function traceZone(r){
-  let z=traceNorm(r?.ZonaLineaPicking||r?.ZonaPrincipal||r?.Zona||r?.ZonaPiso||r?.zonapiso||r?.zona).toUpperCase().replace(/\s+/g,'');
-  if(/^MFCA[LR]?$/.test(z))return 'MFCA';
-  if(/^MFCB[LR]?$/.test(z))return 'MFCB';
-  if(/^MFCC[LR]?$/.test(z))return 'MFCC';
-  if(/^AR[LR]?$/.test(z))return 'AR';
-  if(/^BR[LR]?$/.test(z))return 'BR';
-  return z||'SIN ZONA';
+  let z=traceNorm(traceField(r,['ZonaLineaPicking','ZonaPrincipal','Zona','ZonaPiso','zonapiso','zona'])).toUpperCase().replace(/\s+/g,'');
+  if(/^MFCA[LR]?$/.test(z))return 'MFCA'; if(/^MFCB[LR]?$/.test(z))return 'MFCB'; if(/^MFCC[LR]?$/.test(z))return 'MFCC';
+  if(/^AR[LR]?$/.test(z))return 'AR'; if(/^BR[LR]?$/.test(z))return 'BR'; return z||'SIN ZONA';
 }
 function traceDateObj(r,date){
-  if(typeof timeDate==='function'){
-    const d=timeDate(r); if(d&&!isNaN(d))return d;
-  }
-  const raw=traceNorm(r?.FechaRegistro||r?.FechaHora||r?.fechaHora||r?.HoraRegistro||r?.Hora||'');
-  let m=raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if(!m)return null;
-  const [y,mo,da]=String(date||progressSelectedDate()).split('-').map(Number);
-  return new Date(y,mo-1,da,Number(m[1]),Number(m[2]),Number(m[3]||0));
+  const raw=traceNorm(traceField(r,['FechaHora','fechaHora','HoraRegistro','horaRegistro','horaregistro','Hora','hora','FechaRegistro','fecharegistro']));
+  let m=raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); if(!m)return null;
+  const [y,mo,da]=String(date||progressSelectedDate()).split('-').map(Number);return new Date(y,mo-1,da,+m[1],+m[2],+(m[3]||0));
 }
 function traceClock(d){return d?d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'—'}
-function traceDur(ms){
-  if(!Number.isFinite(ms)||ms<0)return '—';
-  const min=Math.round(ms/60000); if(min<60)return min+' min';
-  const h=Math.floor(min/60),m=min%60;return h+' h '+String(m).padStart(2,'0')+' min';
-}
+function traceDur(ms){if(!Number.isFinite(ms)||ms<0)return '—';const min=Math.round(ms/60000);if(min<60)return min+' min';return Math.floor(min/60)+' h '+String(min%60).padStart(2,'0')+' min'}
 async function traceLoadRows(force=false){
-  const date=progressSelectedDate();
-  if(!force&&TRACE_DATE===date&&TRACE_ROWS.length)return TRACE_ROWS;
-  const url=productivitySummaryFileForDate(date)+'?trace='+Date.now();
-  const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('Productividad HTTP '+res.status);
-  const payload=await res.json(),rows=Array.isArray(payload)?payload:(payload?.rows||[]);
+  const date=progressSelectedDate();if(!force&&TRACE_DATE===date&&TRACE_ROWS.length)return TRACE_ROWS;
+  const urls=[productivityRawFileForDate(date),productivitySummaryFileForDate(date)];let rows=[],err='';
+  for(const u of urls){try{const res=await fetch(u+'?trace='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[]);if(rows.length)break}catch(e){err=String(e.message||e)}}
+  if(!rows.length)throw new Error('Productividad sin datos '+err);
   TRACE_ROWS=rows.filter(r=>!(typeof timeIsExcluded==='function'&&timeIsExcluded(r))).map(r=>({...r,_traceDate:traceDateObj(r,date)})).filter(r=>r._traceDate&&!isNaN(r._traceDate));
   TRACE_ROWS.sort((a,b)=>a._traceDate-b._traceDate);TRACE_DATE=date;return TRACE_ROWS;
 }
+async function traceLoadNegatedLines(force=false){
+  const date=progressSelectedDate();if(!force&&TRACE_NEG_DATE===date)return TRACE_NEG_ROWS;
+  const compact=progressCompactDate(date);let rows=[];
+  try{const res=await fetch('./datos/lineas-negadas/'+compact+'.json?trace='+Date.now(),{cache:'no-store'});if(res.ok){const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[])}}
+  catch(e){}
+  TRACE_NEG_ROWS=rows;TRACE_NEG_DATE=date;return rows;
+}
 function traceRelevantRows(rows,mode,q){
-  const nq=timeNormName(q);
-  if(mode==='picker')return rows.filter(r=>timeNormName(tracePicker(r))===nq || timeNormName(tracePicker(r)).includes(nq));
-
-  // 1) Si Productividad ya trae Pedido ERP, usar el cruce directo.
-  const exact=rows.filter(r=>progressMatchId(tracePedido(r))===progressMatchId(q));
-  if(exact.length)return exact;
-
-  // 2) Productividad normalmente identifica la confirmación por Picking/TR.
-  // Cuando el usuario busca un Pedido ERP, resolver primero todos sus Picking/TR
-  // desde Avance + Planilla diaria y recién después cruzar contra Productividad.
-  const qid=progressMatchId(q),pickings=new Set();
-  const addPick=v=>{const x=progressMatchId(v);if(x)pickings.add(x)};
-  (ORDER_PROGRESS_ROWS||[]).forEach(r=>{
-    if(progressMatchId(r?.Pedido)!==qid)return;
-    addPick(r?.Picking);addPick(r?.TR);
-    (Array.isArray(r?.Pickings)?r.Pickings:[]).forEach(addPick);
-  });
-  try{
-    const day=progressLoadStore()?.days?.[progressSelectedDate()];
-    (Array.isArray(day?.rows)?day.rows:[]).forEach(r=>{
-      if(progressMatchId(r?.Pedido)!==qid)return;
-      addPick(r?.Picking);addPick(r?.TR);
-    });
-  }catch(e){}
-
-  if(pickings.size){
-    const linked=rows.filter(r=>pickings.has(progressMatchId(tracePicking(r))));
-    if(linked.length)return linked;
-  }
-
-  // 3) Mantener compatibilidad: también permite escribir directamente un Picking/TR.
+  const nq=typeof timeNormName==='function'?timeNormName(q):q.toLowerCase();
+  if(mode==='picker')return rows.filter(r=>{const n=typeof timeNormName==='function'?timeNormName(tracePicker(r)):tracePicker(r).toLowerCase();return n===nq||n.includes(nq)});
+  const qid=progressMatchId(q),byPedido=rows.filter(r=>progressMatchId(tracePedido(r))===qid);if(byPedido.length)return byPedido;
   return rows.filter(r=>progressMatchId(tracePicking(r))===qid);
 }
-function traceSegments(rows,mode){
-  if(!rows.length)return [];
-  const seg=[];let cur=null;
-  rows.forEach(r=>{
-    const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);
-    if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}
-    else{cur.end=r._traceDate;cur.count++}
-  });return seg;
+function traceNegRelevant(rows,q,events){
+  const qid=progressMatchId(q),picks=new Set(events.map(tracePicking).map(progressMatchId).filter(Boolean));
+  return rows.filter(r=>progressMatchId(tracePedido(r))===qid || picks.has(progressMatchId(tracePicking(r))));
 }
-function traceRender(rows,mode,q){
-  const tl=$('traceTimeline'),sg=$('traceStreetGrid');
-  $('traceKpiEvents').textContent=rows.length.toLocaleString('es-AR');
-  if(!rows.length){
-    $('traceKpiStart').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';
-    sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré confirmaciones para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';
-    $('traceStatus').textContent='Sin eventos en Productividad para la búsqueda seleccionada.';return;
+function traceNegInfo(r){
+  return {pedido:tracePedido(r),picking:tracePicking(r),sku:traceSku(r),ubicacion:traceNorm(traceField(r,['ubicacion','Ubicacion','ubicacion_asig','UbicacionAsignada','location','Location'])),zona:traceZone(r),motivo:traceNorm(traceField(r,['cod_motivo_niega','CodMotivoNiega','motivo','Motivo','MotivoNegacion','descripcion_motivo'])),cantidad:traceNorm(traceField(r,['cantidad','Cantidad','cant','Cant','CantidadNegada','unidades','Unidades']))};
+}
+function traceFindNegEvent(events,n){
+  const same=events.filter(e=>progressMatchId(tracePedido(e))===progressMatchId(n.pedido)&&progressMatchId(traceSku(e))===progressMatchId(n.sku)&&( !n.picking || progressMatchId(tracePicking(e))===progressMatchId(n.picking)));
+  return same.find(e=>traceState(e).includes('NEGAD'))||same[0]||null;
+}
+function traceFindRepick(events,n,negEvent){
+  const t=negEvent?negEvent._traceDate:null;
+  return events.find(e=>progressMatchId(tracePedido(e))===progressMatchId(n.pedido)&&progressMatchId(traceSku(e))===progressMatchId(n.sku)&&(!t||e._traceDate>t)&&traceState(e).includes('CONFIRM'))||null;
+}
+function traceSegments(rows,mode){if(!rows.length)return[];const seg=[];let cur=null;rows.forEach(r=>{const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}else{cur.end=r._traceDate;cur.count++}});return seg}
+function traceRender(rows,mode,q,negRows=[]){
+  const tl=$('traceTimeline'),sg=$('traceStreetGrid');$('traceKpiEvents').textContent=rows.length.toLocaleString('es-AR');
+  if(!rows.length){$('traceKpiStart').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré confirmaciones para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';$('traceStatus').textContent='Sin eventos en Productividad para la búsqueda seleccionada.';return}
+  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate;let maxGap=0,maxGapAt=null;for(let i=1;i<rows.length;i++){const g=rows[i]._traceDate-rows[i-1]._traceDate;if(g>maxGap){maxGap=g;maxGapAt={a:rows[i-1],b:rows[i]}}}
+  $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=maxGap?traceDur(maxGap):'0 min';const actors=mode==='picker'?[...new Set(rows.map(tracePedido).filter(Boolean))]:[...new Set(rows.map(tracePicker).filter(Boolean))];$('traceKpiActors').textContent=actors.length;$('traceKpiActorsLabel').textContent=mode==='picker'?'pedidos trabajados':'pickers que tocaron el pedido';
+  const byZone={};rows.forEach(r=>{const z=traceZone(r);byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
+  const seg=traceSegments(rows,mode);let html='';seg.forEach((x,i)=>{if(i){const prev=seg[i-1],gap=x.start-prev.end;if(gap>=5*60000)html+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>'}html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>'});
+  if(mode==='pedido'){
+    const relevant=traceNegRelevant(negRows,q,rows);if(relevant.length){html+='<div style="margin:18px 0 8px;font-weight:900">↪ Saltos originados en Reporte de Líneas Negadas</div>';relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—',jump=rp&&src!=='—'&&src!==dst,delay=ne&&rp?traceDur(rp._traceDate-ne._traceDate):'—';html+='<div class="traceGap '+(jump?'hot':'')+'"><span>'+(jump?'↪ SALTO DE CALLE':'⊘ LÍNEA NEGADA')+'</span><span>SKU '+esc(n.sku||'—')+' · '+esc(src)+(n.ubicacion?' / '+esc(n.ubicacion):'')+(n.cantidad?' · cant. '+esc(n.cantidad):'')+(n.motivo?' · '+esc(n.motivo):'')+(rp?' → '+esc(dst)+' · repick '+traceClock(rp._traceDate)+' por '+esc(tracePicker(rp))+' · +'+delay:' · sin repick posterior identificado')+'</span></div>'})}else{html+='<div class="traceEmpty" style="margin-top:14px">El histórico RAW de <b>Reporte de Líneas Negadas</b> todavía no está generado para esta fecha. Ejecutá el workflow actualizado y volvé a cargar.</div>'}
   }
-  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate;
-  let maxGap=0,maxGapAt=null;
-  for(let i=1;i<rows.length;i++){const g=rows[i]._traceDate-rows[i-1]._traceDate;if(g>maxGap){maxGap=g;maxGapAt={a:rows[i-1],b:rows[i]}}}
-  $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=maxGap?traceDur(maxGap):'0 min';
-  const actors=mode==='picker'?[...new Set(rows.map(tracePedido).filter(Boolean))]:[...new Set(rows.map(tracePicker).filter(Boolean))];
-  $('traceKpiActors').textContent=actors.length;$('traceKpiActorsLabel').textContent=mode==='picker'?'pedidos trabajados':'pickers que tocaron el pedido';
-  const byZone={};rows.forEach(r=>{const z=traceZone(r);byZone[z]=(byZone[z]||0)+1});
-  const target=['MFCA','MFCB','MFCC','AR','BR'];const zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()];
-  const max=Math.max(1,...zones.map(z=>byZone[z]));
-  sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/max*100)+'%"></i></div>').join('');
-  const seg=traceSegments(rows,mode);let html='';
-  seg.forEach((x,i)=>{
-    if(i){
-      const prev=seg[i-1],gap=x.start-prev.end;
-      if(gap>=5*60000)html+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>';
-    }
-    html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>';
-  });
-  tl.innerHTML=html;
-  const gapText=maxGapAt?' · mayor corte '+traceDur(maxGap)+' entre '+traceZone(maxGapAt.a)+' / '+tracePicker(maxGapAt.a)+' y '+traceZone(maxGapAt.b)+' / '+tracePicker(maxGapAt.b):'';
-  $('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+traceClock(first)+' → '+traceClock(last)+gapText;
+  tl.innerHTML=html;const gapText=maxGapAt?' · mayor corte '+traceDur(maxGap)+' entre '+traceZone(maxGapAt.a)+' / '+tracePicker(maxGapAt.a)+' y '+traceZone(maxGapAt.b)+' / '+tracePicker(maxGapAt.b):'';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+traceClock(first)+' → '+traceClock(last)+gapText+(mode==='pedido'?' · '+traceNegRelevant(negRows,q,rows).length+' líneas del reporte de negadas':'');
 }
-async function traceRun(force=false){
-  const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);
-  if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Elegí un pedido de la tabla o escribí el Pedido ERP.';return}
-  $('traceStatus').textContent='Reconstruyendo película del '+(mode==='picker'?'picker':'pedido')+'…';
-  try{const all=await traceLoadRows(force),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q)}
-  catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer Productividad.</div>'}
-}
-function traceOpenPedido(pedido){
-  $('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);
-  $('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
-$('traceLoadBtn').onclick=()=>traceRun(true);
-$('traceQuery').addEventListener('keydown',e=>{if(e.key==='Enter')traceRun(false)});
-$('traceMode').onchange=()=>{$('traceQuery').placeholder=$('traceMode').value==='picker'?'Nombre del picker…':'Pedido ERP / picking…';};
+async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q,neg)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
+function traceOpenPedido(pedido){$('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);$('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'})}
+$('traceLoadBtn').onclick=()=>traceRun(true);$('traceQuery').addEventListener('keydown',e=>{if(e.key==='Enter')traceRun(false)});$('traceMode').onchange=()=>{$('traceQuery').placeholder=$('traceMode').value==='picker'?'Nombre del picker…':'Pedido ERP / picking…'};
+
 
 function progressHistoryUrl(date){return date===progressTodayISO()?'./avance-pedidos.json':'./datos/avance/'+progressCompactDate(date)+'.json'}
 async function buildOrderProgressPanel(force=false){
