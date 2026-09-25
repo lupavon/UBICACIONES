@@ -61,6 +61,7 @@ jobs:
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
+          NEGATED_LINES_HISTORY_DIR = Path("datos/lineas-negadas")
           TIMES_FILE = Path("tiempos.json")
           TIMES_HISTORY_DIR = Path("datos/tiempos")
           PRODUCTIVITY_HISTORY_DIR = Path("datos/productividad")
@@ -1193,6 +1194,14 @@ jobs:
                       print("Motivos Líneas Negadas:", len(reason_rows), "· HTTP:", reason_http)
                   except Exception as reason_err:
                       print("AVISO: no se pudieron traer motivos de negación:", str(reason_err))
+                  # Guardar el reporte REAL Dashboard > Líneas Negadas sin transformarlo.
+                  # Esta fuente representa la negación de una ubicación y es la que usa Trazabilidad
+                  # para explicar saltos/reasignaciones de líneas entre calles.
+                  save_json_file(NEGATED_LINES_HISTORY_DIR / f"{day}.json", {
+                      "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
+                      "source": "Copernico Dashboard > Líneas Negadas (raw)",
+                      "row_count": len(reason_rows), "rows": reason_rows
+                  })
                   reason_index = build_negation_reason_index(reason_rows)
 
                   neg_prod_rows = [pr for pr in prod_rows if productivity_is_negated(pr)]
