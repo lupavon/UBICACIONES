@@ -2020,6 +2020,29 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 }
 </style>
 
+
+<style>
+/* ===== vTRAZA1 · Película del picking por pedido / picker ===== */
+.tracePanel{margin:14px 0 18px;border:1px solid #303a47;border-radius:12px;background:#0d1218;overflow:hidden}
+.traceHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #27313b;background:#111821}
+.traceHead b{display:block;font-size:15px}.traceHead small{display:block;color:#8d98a5;margin-top:3px;font-size:10px}
+.traceTools{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.traceTools label{font-size:9px;color:#8d98a5;font-weight:800}.traceTools input,.traceTools select{display:block;margin-top:4px;background:#0d131a;color:#eef1f5;border:1px solid #35404d;border-radius:7px;padding:8px 10px;min-width:170px}
+.traceKpis{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px;padding:12px 14px}
+.traceKpi{border:1px solid #29333e;background:#121921;border-radius:8px;padding:9px 10px}.traceKpi small{display:block;color:#7f8b98;font-size:8px;font-weight:900;text-transform:uppercase}.traceKpi b{display:block;margin-top:5px;font-size:19px}.traceKpi span{display:block;color:#84909d;font-size:9px;margin-top:3px}
+.traceBody{padding:0 14px 14px}.traceStatus{font-size:11px;color:#9ba6b3;padding:4px 0 10px}
+.traceTimeline{overflow:auto;border:1px solid #29333e;border-radius:9px;background:#0b1016}
+.traceEvent{display:grid;grid-template-columns:76px 110px minmax(160px,1fr) 120px 110px;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #202831;font-size:11px}
+.traceEvent:last-child{border-bottom:0}.traceEvent:hover{background:#121a23}.traceTime{font-variant-numeric:tabular-nums;font-weight:900;color:#dce4ee}.traceZone{font-weight:900;color:#67d5ff}.tracePicker{font-weight:800}.traceOrder{color:#aeb8c5}.traceState{font-size:9px;color:#8d98a5}
+.traceGap{display:grid;grid-template-columns:76px 1fr;gap:8px;padding:7px 10px;background:#2a2112;border-bottom:1px solid #4b3a1c;color:#f1c178;font-size:10px;font-weight:800}
+.traceGap.hot{background:#30191c;border-color:#5d2a30;color:#ff9da7}
+.traceStreetGrid{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:7px;margin:10px 0}
+.traceStreet{border:1px solid #29333e;background:#121921;border-radius:8px;padding:9px}.traceStreet b{display:block;font-size:11px}.traceStreet span{display:block;font-size:9px;color:#84909d;margin-top:4px}.traceStreet i{display:block;height:5px;background:#58a6ff;border-radius:4px;margin-top:7px}
+.traceEmpty{padding:24px;text-align:center;color:#84909d}
+.traceBtn{padding:5px 8px!important;font-size:10px!important;white-space:nowrap}
+@media(max-width:900px){.traceKpis{grid-template-columns:repeat(2,1fr)}.traceEvent{grid-template-columns:62px 80px minmax(130px,1fr)}.traceEvent .traceOrder,.traceEvent .traceState{display:none}.traceStreetGrid{grid-template-columns:repeat(2,1fr)}.traceTools input,.traceTools select{min-width:0;width:100%}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2486,6 +2509,30 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
       <div class="progressMicroNote" id="progressMicroNote">Seleccioná un sector de la planilla. A la derecha se muestran sus zonas/microsectores y el picker predominante por confirmaciones del día.</div>
     </section>
   </div>
+
+  <div class="tracePanel" id="tracePanel">
+    <div class="traceHead">
+      <div><b>🎬 Trazabilidad Picking · película real</b><small>Reconstruye las confirmaciones de Productividad en orden cronológico para detectar cortes, cambios de picker y tiempos sin actividad.</small></div>
+      <div class="traceTools">
+        <label>Modo<select id="traceMode"><option value="pedido">Por pedido</option><option value="picker">Por picker</option></select></label>
+        <label>Buscar<input id="traceQuery" placeholder="Pedido ERP / picker…"></label>
+        <button class="btn" id="traceLoadBtn" type="button">Ver película</button>
+      </div>
+    </div>
+    <div class="traceKpis">
+      <div class="traceKpi"><small>Confirmaciones</small><b id="traceKpiEvents">0</b><span>líneas procesadas</span></div>
+      <div class="traceKpi"><small>Inicio</small><b id="traceKpiStart">—</b><span>primera confirmación</span></div>
+      <div class="traceKpi"><small>Última</small><b id="traceKpiEnd">—</b><span>última confirmación</span></div>
+      <div class="traceKpi"><small>Mayor corte</small><b id="traceKpiGap">—</b><span>sin actividad</span></div>
+      <div class="traceKpi"><small>Pickers / pedidos</small><b id="traceKpiActors">—</b><span id="traceKpiActorsLabel">que tocaron el pedido</span></div>
+    </div>
+    <div class="traceBody">
+      <div class="traceStatus" id="traceStatus">Elegí un pedido de la tabla o escribilo arriba.</div>
+      <div class="traceStreetGrid" id="traceStreetGrid"></div>
+      <div class="traceTimeline" id="traceTimeline"><div class="traceEmpty">Sin trazabilidad seleccionada.</div></div>
+    </div>
+  </div>
+
   <div class="progressAreaGrid" id="progressAreaGrid"></div>
   <div class="progressToolbar"><input id="progressSearch" placeholder="Buscar pedido, picking o TR…"><select id="progressAreaFilter"><option value="__ALL__">Todas las zonas</option></select><select id="progressStateFilter"><option value="OPEN" selected>Abiertos</option><option value="CLOSED">Cerrados</option><option value="__ALL__">Todos</option></select></div><div class="muted" style="margin:5px 0 8px">Abiertos = pedidos iniciados con líneas pendientes. El avance se calcula línea por línea desde Copérnico; Confirmadas + Negadas = procesadas. Orden inicial: mayor avance → menor avance.</div>
   <div class="processStatus" id="progressStatus">Cargando avance…</div>
@@ -7022,6 +7069,7 @@ function progressRenderUnitarioPanel(){
   // El panel lateral anterior queda oculto. Conservamos sus nodos para no romper listeners existentes.
   if(grid)grid.innerHTML='';
   if($('progressMicroUpdated'))$('progressMicroUpdated').textContent=date.split('-').reverse().join('/');
+  document.querySelectorAll('#progressUnitarioBody [data-trace-pedido]').forEach(b=>b.onclick=()=>traceOpenPedido(b.dataset.tracePedido));
   if($('progressMicroNote'))$('progressMicroNote').textContent='';
   if($('progressZoneFilter'))$('progressZoneFilter').innerHTML='<option value="__ALL__">Todas las zonas</option>';
   if($('progressZoneCount'))$('progressZoneCount').textContent='';
@@ -7033,9 +7081,9 @@ function renderOrderProgress(){
   grid.innerHTML=ORDER_PROGRESS_AREAS.map(a=>'<div class="progressAreaCard '+(active===a.Area?'active':'')+'" data-area="'+esc(a.Area)+'"><div class="head"><b>'+esc(a.Area)+'</b><span class="pct">'+Number(a.Avance||0).toFixed(1)+'%</span></div><div class="progressBar"><i style="width:'+progressPct(a.Avance)+'%"></i></div><div class="progressMeta"><span>'+progressFmt(a.Procesadas)+' / '+progressFmt(a.TotalLineas)+' líneas</span><span>'+progressFmt(a.Pendientes)+' pendientes</span></div><div class="progressMeta" style="margin-top:5px"><span>'+progressFmt(a.Pedidos)+' pedidos</span><span>'+progressFmt(a.PedidosCompletos)+' completos</span></div></div>').join('');
   grid.querySelectorAll('[data-area]').forEach(c=>c.onclick=()=>{$('progressAreaFilter').value=c.dataset.area;renderOrderProgress();});
   const rows=progressFilteredRows(),today=progressSelectedDate()===progressTodayISO();
-  $('progressBody').innerHTML=rows.map(r=>{const faltan=(r.FaltanZonas||[]),zoneHtml=Number(r.Pendientes||0)===0?'—':faltan.length?'<div class="progressPendingZones">'+faltan.map(z=>'<span class="zoneChip" title="'+(z.exact===false?'Copérnico no devolvió detalle de zona pendiente':'Zona pendiente informada directamente por Líneas de Picking')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+(faltan.some(z=>z.exact===false)?'<span class="zoneHint">* sin detalle de zona pendiente en Copérnico</span>':'')+'</div>':'<span class="muted">Sin detalle</span>';const st=progressStallText(r);return '<tr><td><b>'+esc(r.Area||'')+'</b></td><td><b>'+esc(r.Pedido||'')+'</b></td><td>'+esc(r.Picking||((r.Pickings||[]).join(' / '))||'—')+'</td><td>'+esc(r.TR||'—')+'</td><td>'+progressStatusBadge(r)+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+zoneHtml+'</td><td><span data-progress-stall data-estado="'+esc(r.Estado||'')+'" data-pendientes="'+Number(r.Pendientes||0)+'" data-procesadas="'+Number(r.Procesadas||0)+'" data-last-epoch="'+Number(r.UltimaLineaEpoch||0)+'" class="progressStall '+st.cls+'">'+st.text+'</span></td><td>'+(today&&r.Estado!=='Completo'&&r.Estado!=='No preparar'?'<button class="btn progressActionBtn" data-progress-cancel="'+esc(r.Key||progressKey(r.Pedido,r.Picking,r.Area))+'">No preparar</button>':'—')+'</td></tr>'}).join('');progressRefreshStallCounters();progressUpdateSortMarks();
+  $('progressBody').innerHTML=rows.map(r=>{const faltan=(r.FaltanZonas||[]),zoneHtml=Number(r.Pendientes||0)===0?'—':faltan.length?'<div class="progressPendingZones">'+faltan.map(z=>'<span class="zoneChip" title="'+(z.exact===false?'Copérnico no devolvió detalle de zona pendiente':'Zona pendiente informada directamente por Líneas de Picking')+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+(faltan.some(z=>z.exact===false)?'<span class="zoneHint">* sin detalle de zona pendiente en Copérnico</span>':'')+'</div>':'<span class="muted">Sin detalle</span>';const st=progressStallText(r);return '<tr><td><b>'+esc(r.Area||'')+'</b></td><td><button class="btn traceBtn" type="button" data-trace-pedido="'+esc(r.Pedido||'')+'">🎬 '+esc(r.Pedido||'')+'</button></td><td>'+esc(r.Picking||((r.Pickings||[]).join(' / '))||'—')+'</td><td>'+esc(r.TR||'—')+'</td><td>'+progressStatusBadge(r)+'</td><td class="num">'+progressFmt(r.TotalLineas)+'</td><td class="num">'+progressFmt(r.Procesadas)+'</td><td class="num"><b>'+progressFmt(r.Pendientes)+'</b></td><td class="num">'+progressFmt(r.Negadas)+'</td><td class="orderProgressCell"><div><b>'+Number(r.Avance||0).toFixed(1)+'%</b></div><div class="progressBar"><i style="width:'+progressPct(r.Avance)+'%"></i></div><small>'+progressFmt(r.Procesadas)+' de '+progressFmt(r.TotalLineas)+'</small></td><td>'+zoneHtml+'</td><td><span data-progress-stall data-estado="'+esc(r.Estado||'')+'" data-pendientes="'+Number(r.Pendientes||0)+'" data-procesadas="'+Number(r.Procesadas||0)+'" data-last-epoch="'+Number(r.UltimaLineaEpoch||0)+'" class="progressStall '+st.cls+'">'+st.text+'</span></td><td>'+(today&&r.Estado!=='Completo'&&r.Estado!=='No preparar'?'<button class="btn progressActionBtn" data-progress-cancel="'+esc(r.Key||progressKey(r.Pedido,r.Picking,r.Area))+'">No preparar</button>':'—')+'</td></tr>'}).join('');progressRefreshStallCounters();progressUpdateSortMarks();
   $('progressEmpty').style.display=rows.length?'none':'block';
-  document.querySelectorAll('[data-progress-cancel]').forEach(b=>b.onclick=()=>progressCancelOrder(b.dataset.progressCancel));progressUpdatePlanMeta();
+  document.querySelectorAll('[data-progress-cancel]').forEach(b=>b.onclick=()=>progressCancelOrder(b.dataset.progressCancel));document.querySelectorAll('[data-trace-pedido]').forEach(b=>b.onclick=()=>traceOpenPedido(b.dataset.tracePedido));progressUpdatePlanMeta();
 }
 async function progressCancelOrder(key){
   if(progressSelectedDate()!==progressTodayISO()){alert('Para mantener el histórico, esta acción solo se puede registrar en el día de hoy.');return}
@@ -7045,6 +7093,108 @@ async function progressCancelOrder(key){
   try{await progressRemoteSave(st)}catch(e){alert(e.message||e);return}
   buildOrderProgressPanel(true);
 }
+
+// ===== vTRAZA1 · Trazabilidad Picking =====
+let TRACE_ROWS=[],TRACE_DATE='',TRACE_CACHE={};
+function traceNorm(v){return String(v??'').trim()}
+function tracePicker(r){return traceNorm(r?.Picker||r?.Nombres||r?.NombreEmpleado||r?.Empleado||'Sin nombre')}
+function tracePedido(r){return traceNorm(r?.Pedido||r?.pedido||r?.NumPedido||'')}
+function tracePicking(r){return traceNorm(r?.Picking||r?.picking||r?.NumPicking||'')}
+function traceZone(r){
+  let z=traceNorm(r?.ZonaLineaPicking||r?.ZonaPrincipal||r?.Zona||r?.ZonaPiso||r?.zonapiso||r?.zona).toUpperCase().replace(/\s+/g,'');
+  if(/^MFCA[LR]?$/.test(z))return 'MFCA';
+  if(/^MFCB[LR]?$/.test(z))return 'MFCB';
+  if(/^MFCC[LR]?$/.test(z))return 'MFCC';
+  if(/^AR[LR]?$/.test(z))return 'AR';
+  if(/^BR[LR]?$/.test(z))return 'BR';
+  return z||'SIN ZONA';
+}
+function traceDateObj(r,date){
+  if(typeof timeDate==='function'){
+    const d=timeDate(r); if(d&&!isNaN(d))return d;
+  }
+  const raw=traceNorm(r?.FechaRegistro||r?.FechaHora||r?.fechaHora||r?.HoraRegistro||r?.Hora||'');
+  let m=raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(!m)return null;
+  const [y,mo,da]=String(date||progressSelectedDate()).split('-').map(Number);
+  return new Date(y,mo-1,da,Number(m[1]),Number(m[2]),Number(m[3]||0));
+}
+function traceClock(d){return d?d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'—'}
+function traceDur(ms){
+  if(!Number.isFinite(ms)||ms<0)return '—';
+  const min=Math.round(ms/60000); if(min<60)return min+' min';
+  const h=Math.floor(min/60),m=min%60;return h+' h '+String(m).padStart(2,'0')+' min';
+}
+async function traceLoadRows(force=false){
+  const date=progressSelectedDate();
+  if(!force&&TRACE_DATE===date&&TRACE_ROWS.length)return TRACE_ROWS;
+  const url=productivitySummaryFileForDate(date)+'?trace='+Date.now();
+  const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('Productividad HTTP '+res.status);
+  const payload=await res.json(),rows=Array.isArray(payload)?payload:(payload?.rows||[]);
+  TRACE_ROWS=rows.filter(r=>!(typeof timeIsExcluded==='function'&&timeIsExcluded(r))).map(r=>({...r,_traceDate:traceDateObj(r,date)})).filter(r=>r._traceDate&&!isNaN(r._traceDate));
+  TRACE_ROWS.sort((a,b)=>a._traceDate-b._traceDate);TRACE_DATE=date;return TRACE_ROWS;
+}
+function traceRelevantRows(rows,mode,q){
+  const nq=timeNormName(q);
+  if(mode==='picker')return rows.filter(r=>timeNormName(tracePicker(r))===nq || timeNormName(tracePicker(r)).includes(nq));
+  const exact=rows.filter(r=>progressMatchId(tracePedido(r))===progressMatchId(q));
+  if(exact.length)return exact;
+  return rows.filter(r=>progressMatchId(tracePicking(r))===progressMatchId(q));
+}
+function traceSegments(rows,mode){
+  if(!rows.length)return [];
+  const seg=[];let cur=null;
+  rows.forEach(r=>{
+    const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);
+    if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}
+    else{cur.end=r._traceDate;cur.count++}
+  });return seg;
+}
+function traceRender(rows,mode,q){
+  const tl=$('traceTimeline'),sg=$('traceStreetGrid');
+  $('traceKpiEvents').textContent=rows.length.toLocaleString('es-AR');
+  if(!rows.length){
+    $('traceKpiStart').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';
+    sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré confirmaciones para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';
+    $('traceStatus').textContent='Sin eventos en Productividad para la búsqueda seleccionada.';return;
+  }
+  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate;
+  let maxGap=0,maxGapAt=null;
+  for(let i=1;i<rows.length;i++){const g=rows[i]._traceDate-rows[i-1]._traceDate;if(g>maxGap){maxGap=g;maxGapAt={a:rows[i-1],b:rows[i]}}}
+  $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=maxGap?traceDur(maxGap):'0 min';
+  const actors=mode==='picker'?[...new Set(rows.map(tracePedido).filter(Boolean))]:[...new Set(rows.map(tracePicker).filter(Boolean))];
+  $('traceKpiActors').textContent=actors.length;$('traceKpiActorsLabel').textContent=mode==='picker'?'pedidos trabajados':'pickers que tocaron el pedido';
+  const byZone={};rows.forEach(r=>{const z=traceZone(r);byZone[z]=(byZone[z]||0)+1});
+  const target=['MFCA','MFCB','MFCC','AR','BR'];const zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()];
+  const max=Math.max(1,...zones.map(z=>byZone[z]));
+  sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/max*100)+'%"></i></div>').join('');
+  const seg=traceSegments(rows,mode);let html='';
+  seg.forEach((x,i)=>{
+    if(i){
+      const prev=seg[i-1],gap=x.start-prev.end;
+      if(gap>=5*60000)html+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>';
+    }
+    html+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||'—')+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>';
+  });
+  tl.innerHTML=html;
+  const gapText=maxGapAt?' · mayor corte '+traceDur(maxGap)+' entre '+traceZone(maxGapAt.a)+' / '+tracePicker(maxGapAt.a)+' y '+traceZone(maxGapAt.b)+' / '+tracePicker(maxGapAt.b):'';
+  $('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+traceClock(first)+' → '+traceClock(last)+gapText;
+}
+async function traceRun(force=false){
+  const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);
+  if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Elegí un pedido de la tabla o escribí el Pedido ERP.';return}
+  $('traceStatus').textContent='Reconstruyendo película del '+(mode==='picker'?'picker':'pedido')+'…';
+  try{const all=await traceLoadRows(force),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q)}
+  catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer Productividad.</div>'}
+}
+function traceOpenPedido(pedido){
+  $('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);
+  $('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('traceLoadBtn').onclick=()=>traceRun(true);
+$('traceQuery').addEventListener('keydown',e=>{if(e.key==='Enter')traceRun(false)});
+$('traceMode').onchange=()=>{$('traceQuery').placeholder=$('traceMode').value==='picker'?'Nombre del picker…':'Pedido ERP / picking…';};
+
 function progressHistoryUrl(date){return date===progressTodayISO()?'./avance-pedidos.json':'./datos/avance/'+progressCompactDate(date)+'.json'}
 async function buildOrderProgressPanel(force=false){
   const date=progressSelectedDate();
