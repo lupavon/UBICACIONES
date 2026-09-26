@@ -2298,12 +2298,12 @@ jobs:
           rm -rf "$SNAP"; mkdir -p "$SNAP"
           for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
           mkdir -p "$SNAP/datos"
-          for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
+          for d in tiempos negaciones lineas-negadas productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
           for intento in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
-            for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
+            for d in tiempos negaciones lineas-negadas productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
             git add negaciones.json avance-pedidos.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/lineas-negadas datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
             if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
             git commit -m "AutoSync Copernico · operational"
