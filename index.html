@@ -2086,6 +2086,8 @@ body.light-mode .tracePassTime,body.light-mode .tracePassMeta b{color:#17202a!im
 body.light-mode .traceRouteToggle{border-color:#d9e1ea!important}body.light-mode .traceRouteToggle summary{background:#f2f5f8!important;color:#445468!important}body.light-mode .traceStage{background:#fff!important;border-color:#d9e1ea!important;color:#17202a!important}body.light-mode .traceStage:hover{background:#f5f8fb!important}body.light-mode .traceStageTime,body.light-mode .traceStageMain b,body.light-mode .traceStageCount{color:#17202a!important}body.light-mode .traceStageMain small{color:#667085!important}
 body.light-mode .traceCause{background:#fff4f5!important;border-color:#efc2c8!important}body.light-mode .traceRepick{background:#fff9eb!important;border-color:#ead6a0!important}body.light-mode .traceNotice{background:#f7f9fb!important;color:#475467!important;border-color:#d9e1ea!important}
 body.light-mode .traceRawToggle{border-color:#d9e1ea!important}body.light-mode .traceRawToggle summary{background:#f2f5f8!important;color:#475467!important}body.light-mode .traceEvent{color:#17202a!important;border-color:#e6ebf0!important}body.light-mode .traceEvent:hover{background:#f6f8fa!important}body.light-mode .traceTime,body.light-mode .tracePicker{color:#17202a!important}body.light-mode .traceOrder,body.light-mode .traceState{color:#667085!important}
+.traceJumpMatchWrap{margin:16px 0 20px}.traceJumpMatchGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:10px}.traceJumpMatch{border:1px solid #6b4b2d;background:#201a13;border-radius:12px;padding:13px 14px;box-shadow:inset 3px 0 0 #f0a34a}.traceJumpMatchTop{display:flex;align-items:center;justify-content:space-between;gap:10px}.traceJumpMatchTop b{font-size:13px;color:#ffd08a}.traceJumpMatchTop span{font-size:9px;font-weight:900;color:#aab5c0}.traceJumpMatchPos{font-size:16px;font-weight:950;color:#f4f7fa;margin:8px 0}.traceJumpMatchMeta{display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:10px;color:#9ca9b6}.traceJumpMatchMeta strong{display:block;color:#dce5ee;font-size:11px;margin-top:2px}.traceJumpMatchFoot{margin-top:10px;padding-top:9px;border-top:1px solid #493824;font-size:9px;color:#c4ad91}.traceJumpNone{border:1px dashed #44515e;border-radius:10px;padding:12px;color:#91a0ae;font-size:10px}.traceJumpMatchCount{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;background:#4a3218;color:#ffd08a;font-weight:950}.traceJumpMatchDup{font-size:8px;color:#8f9ba7;margin-top:5px}
+body.light-mode .traceJumpMatch{background:#fffaf3!important;border-color:#efd2a8!important;box-shadow:inset 3px 0 0 #e89b3f!important}body.light-mode .traceJumpMatchTop b{color:#9a5711!important}body.light-mode .traceJumpMatchTop span,body.light-mode .traceJumpMatchMeta,body.light-mode .traceJumpMatchFoot,body.light-mode .traceJumpMatchDup{color:#667085!important}body.light-mode .traceJumpMatchPos,body.light-mode .traceJumpMatchMeta strong{color:#17202a!important}body.light-mode .traceJumpMatchFoot{border-color:#eadbc8!important}body.light-mode .traceJumpMatchCount{background:#fff0d9!important;color:#9a5711!important}body.light-mode .traceJumpNone{border-color:#ccd5df!important;color:#667085!important;background:#fff!important}
 @media(max-width:700px){.traceHero{align-items:flex-start}.traceHeroNumber strong{font-size:30px}.tracePassGrid{grid-template-columns:1fr}.traceHead{padding:14px!important}}
 
 .traceInitialWrap{margin-bottom:18px}.traceInitialGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.traceInitialCard{border:1px solid #315b48;background:#101c17;border-radius:11px;padding:12px}.traceInitialCard b{display:block;color:#70cfff;font-size:12px}.traceInitialCard strong{display:block;margin-top:5px;color:#f1f6fb;font-size:14px}.traceInitialCard small{display:block;margin-top:5px;color:#8e9cac}.traceReturnGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:18px}
@@ -2577,7 +2579,7 @@ body.light-mode .traceInitialCard{background:#f3fbf6!important;border-color:#bfe
       <div class="traceKpi"><small>Fin 1ª pasada</small><b id="traceKpiFirstEnd">—</b><span>fin de preparación inicial</span></div>
       <div class="traceKpi"><small>Última actividad</small><b id="traceKpiEnd">—</b><span>confirmada o negada</span></div>
       <div class="traceKpi"><small>Vueltas adicionales</small><b id="traceKpiGap">—</b><span>reingresos al pedido</span></div>
-      <div class="traceKpi"><small>Saltos por negación</small><b id="traceKpiActors">—</b><span id="traceKpiActorsLabel">explicados por reporte</span></div>
+      <div class="traceKpi"><small>Negaciones de Picking</small><b id="traceKpiActors">—</b><span id="traceKpiActorsLabel">Reporte de Líneas Negadas</span></div>
     </div>
     <div class="traceBody">
       <div class="traceStatus" id="traceStatus">Elegí un pedido de la tabla o escribilo arriba.</div>
@@ -7149,8 +7151,9 @@ async function progressCancelOrder(key){
 let TRACE_ROWS=[],TRACE_DATE='',TRACE_NEG_ROWS=[],TRACE_NEG_DATE='';
 function traceNorm(v){return String(v??'').trim()}
 function traceField(r,names){for(const n of names){if(r&&Object.prototype.hasOwnProperty.call(r,n)&&traceNorm(r[n])!=='')return r[n]}return ''}
+function traceLooseField(r,names){if(!r)return '';const norm=k=>String(k??'').toLowerCase().replace(/[^a-z0-9]/g,'');const wanted=new Set(names.map(norm));for(const [k,v] of Object.entries(r)){if(wanted.has(norm(k))&&traceNorm(v)!=='')return v}return ''}
 function tracePicker(r){return traceNorm(traceField(r,['Picker','Nombres','nombres','NombreEmpleado','nombreEmpleado','Empleado']))||'Sin nombre'}
-function tracePedido(r){return traceNorm(traceField(r,['Pedido','pedido','NumPedido','NroPedido','PedidoERP','pedidoERP']))}
+function tracePedido(r){return traceNorm(traceLooseField(r,['Pedido','NumPedido','NroPedido','PedidoERP','pedido_id','order','orderid']))}
 function tracePicking(r){return traceNorm(traceField(r,['Picking','picking','NumPicking','NroPicking','TR','tr']))}
 function traceSku(r){return traceNorm(traceField(r,['SKU','sku','ean','EAN','productoean','ProductoEAN','product','Producto','ref','Referencia']))}
 function traceState(r){return traceNorm(traceField(r,['EstadoLineaTsscc','EstadoDeLinea','EstadoLinea','estadolinea','Estado','estado'])).toUpperCase()}
@@ -7194,10 +7197,9 @@ async function traceLoadNegatedLines(force=false){
   catch(e){}
   // El cruce causal también usa exclusivamente líneas negadas de Picking.
   rows=rows.filter(r=>{
-    const p=traceNorm(traceField(r,['Proceso','proceso','TipoProceso','tipoProceso'])).toUpperCase();
+    const p=traceNorm(traceLooseField(r,['Proceso','TipoProceso','tipotransaccion','tipo_transaccion','transaccion'])).toUpperCase();
     if(p.includes('ADUANA'))return false;
     if(p.includes('PICK'))return true;
-    // Compatibilidad con históricos antiguos sin campo Proceso: se conservan hasta que el workflow los regenere.
     return !p;
   });
   TRACE_NEG_ROWS=rows;TRACE_NEG_DATE=date;return rows;
@@ -7209,30 +7211,57 @@ function traceRelevantRows(rows,mode,q){
   return rows.filter(r=>progressMatchId(tracePicking(r))===qid);
 }
 function traceNegRelevant(rows,q,events){
-  const qid=progressMatchId(q),picks=new Set(events.map(tracePicking).map(progressMatchId).filter(Boolean));
-  return rows.filter(r=>progressMatchId(tracePedido(r))===qid || picks.has(progressMatchId(tracePicking(r))));
+  const cleanId=v=>String(v??'').trim().replace(/\.0+$/,'').replace(/\D/g,'');
+  const qid=cleanId(q),pedidos=new Set(events.map(tracePedido).map(cleanId).filter(Boolean));
+  if(qid)pedidos.add(qid);
+  return rows.filter(r=>pedidos.has(cleanId(tracePedido(r))));
 }
 function traceNegInfo(r){
-  return {pedido:tracePedido(r),picking:tracePicking(r),sku:traceSku(r),ubicacion:traceNorm(traceField(r,['ubicacion','Ubicacion','ubicacion_asig','UbicacionAsignada','location','Location'])),zona:traceZone(r),motivo:traceNorm(traceField(r,['cod_motivo_niega','CodMotivoNiega','motivo','Motivo','MotivoNegacion','descripcion_motivo'])),cantidad:traceNorm(traceField(r,['cantidad','Cantidad','cant','Cant','CantidadNegada','unidades','Unidades']))};
+  const rawZona=traceNorm(traceLooseField(r,['Zona','ubicacion','Ubicacion','ubicacion_asig','UbicacionAsignada','location','Location']));
+  const fecha=traceNorm(traceLooseField(r,['FechaRegistro','fecha_registro','FechaHora','HoraRegistro']));
+  return {
+    pedido:tracePedido(r),
+    sku:traceNorm(traceLooseField(r,['productoean','ProductoEAN','SKU','EAN','producto','ref','Referencia'])),
+    zona:rawZona||'ZONA NO INFORMADA',
+    empleado:traceNorm(traceLooseField(r,['Empleado','Nombres','Picker','NombreEmpleado']))||'Sin nombre',
+    motivo:traceNorm(traceLooseField(r,['cod_motivo_niega','CodMotivoNiega','motivo','Motivo','MotivoNegacion','descripcion_motivo'])),
+    cantidad:traceNorm(traceLooseField(r,['total_negaciones','CantidadNegada','cantidad','Cantidad','cant','unidades','Unidades'])),
+    fecha
+  };
 }
-function traceFindNegEvent(events,n){
-  const same=events.filter(e=>progressMatchId(tracePedido(e))===progressMatchId(n.pedido)&&progressMatchId(traceSku(e))===progressMatchId(n.sku)&&( !n.picking || progressMatchId(tracePicking(e))===progressMatchId(n.picking)));
-  return same.find(e=>traceState(e).includes('NEGAD'))||same[0]||null;
+function traceNegClock(raw){
+  const s=traceNorm(raw);if(!s)return '—';
+  const m=s.match(/T?(\d{1,2}):(\d{2})(?::(\d{2}))?/);return m?String(m[1]).padStart(2,'0')+':'+m[2]+':'+(m[3]||'00'):s;
 }
-function traceFindRepick(events,n,negEvent){
-  const t=negEvent?negEvent._traceDate:null;
-  return events.find(e=>progressMatchId(tracePedido(e))===progressMatchId(n.pedido)&&progressMatchId(traceSku(e))===progressMatchId(n.sku)&&(!t||e._traceDate>t)&&traceState(e).includes('CONFIRM'))||null;
+function traceNegStories(rows,q,negRows){return traceNegRelevant(negRows,q,rows).map(rr=>({n:traceNegInfo(rr)}));}
+function traceNegDateObj(raw){
+  const s=traceNorm(raw);if(!s)return null;
+  let d=new Date(s);if(!isNaN(d))return d;
+  const m=s.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  const hm=s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);if(!hm)return null;
+  const [y,mo,da]=progressSelectedDate().split('-').map(Number);return new Date(y,mo-1,da,+hm[1],+hm[2],+(hm[3]||0));
+}
+function traceJumpMatches(rows,q,negRows,passes){
+  const clean=v=>String(v??'').trim().replace(/\.0+$/,'').replace(/\D/g,'');
+  const relevant=traceNegRelevant(negRows,q,rows).map(rr=>{const n=traceNegInfo(rr);return {n,date:traceNegDateObj(n.fecha),raw:rr}}).filter(x=>x.n.sku);
+  const returns=passes.filter(p=>p.isReturn),matches=[],used=new Set();
+  returns.forEach(pass=>pass.rows.forEach(r=>{
+    const sku=clean(traceSku(r));if(!sku)return;
+    const t=r._traceDate;
+    const candidates=relevant.filter(x=>clean(x.n.sku)===sku&&x.date&&x.date<=t).sort((a,b)=>b.date-a.date);
+    if(!candidates.length)return;
+    const hit=candidates[0],key=[progressMatchId(tracePedido(r)),sku,hit.n.zona,hit.n.empleado,hit.date.getTime(),t.getTime()].join('|');
+    if(used.has(key))return;used.add(key);
+    matches.push({sku:traceSku(r)||hit.n.sku,position:hit.n.zona,negPicker:hit.n.empleado,negTime:hit.date,motivo:hit.n.motivo||'Sin motivo informado',confirmPicker:tracePicker(r),confirmTime:t,returnNo:pass.pickerPass-1,confirmZone:traceZone(r),negCount:hit.n.cantidad});
+  }));
+  return matches.sort((a,b)=>a.confirmTime-b.confirmTime);
 }
 function traceSegments(rows,mode){if(!rows.length)return[];const seg=[];let cur=null;rows.forEach(r=>{const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}else{cur.end=r._traceDate;cur.count++}});return seg}
 function traceDetectReturns(seg){
   const seen={},out=[];
   seg.forEach((x,i)=>{const k=x.picker+'|'+x.zone;if(seen[k]!==undefined&&i-seen[k]>1)out.push({segment:x,previousIndex:seen[k],index:i});seen[k]=i});
   return out;
-}
-function traceNegStories(rows,q,negRows){
-  const relevant=traceNegRelevant(negRows,q,rows),stories=[];
-  relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='ZONA NO INFORMADA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—';stories.push({n,ne,rp,src,dst,jump:!!(rp&&src!=='—'&&dst!=='—'&&src!==dst),delay:ne&&rp?rp._traceDate-ne._traceDate:null})});
-  return stories;
 }
 function traceOrderPasses(rows,allRows){
   if(!rows.length)return[];
@@ -7275,11 +7304,11 @@ function traceRender(rows,mode,q,negRows=[],allRows=[]){
   const confirmedRows=stateKnown?rows.filter(r=>traceState(r).includes('CONFIRM')):rows;
   $('traceKpiEvents').textContent=confirmedRows.length.toLocaleString('es-AR');
   if(!rows.length){$('traceKpiStart').textContent=$('traceKpiFirstEnd').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré movimientos para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';$('traceStatus').textContent='Sin eventos de Picking para la búsqueda seleccionada.';return}
-  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate,seg=traceSegments(rows,mode),passes=mode==='pedido'?traceOrderPasses(rows,allRows):[],returns=mode==='pedido'?passes.filter(p=>p.isReturn):traceDetectReturns(seg),stories=mode==='pedido'?traceNegStories(rows,q,negRows):[],jumps=stories.filter(x=>x.jump);
+  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate,seg=traceSegments(rows,mode),passes=mode==='pedido'?traceOrderPasses(rows,allRows):[],returns=mode==='pedido'?passes.filter(p=>p.isReturn):traceDetectReturns(seg),stories=mode==='pedido'?traceNegStories(rows,q,negRows):[],jumpMatches=mode==='pedido'?traceJumpMatches(rows,q,negRows,passes):[],jumps=[];
   const initialPasses=mode==='pedido'?passes.filter(p=>!p.isReturn):[];
   const firstPassEnd=initialPasses.length?new Date(Math.max(...initialPasses.map(p=>p.end.getTime()))):null;
-  $('traceKpiStart').textContent=traceClock(first);$('traceKpiFirstEnd').textContent=firstPassEnd?traceClock(firstPassEnd):'—';$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=returns.length.toLocaleString('es-AR');$('traceKpiActors').textContent=jumps.length.toLocaleString('es-AR');$('traceKpiActorsLabel').textContent=mode==='pedido'?'explicados por reporte':'—';
-  const gapCard=$('traceKpiGap')?.closest('.traceKpi'),actorCard=$('traceKpiActors')?.closest('.traceKpi');gapCard?.classList.toggle('traceAlert',returns.length>0);actorCard?.classList.toggle('traceAlert',jumps.length>0);actorCard?.classList.toggle('traceGood',mode==='pedido'&&negRows.length>0&&jumps.length===0);
+  $('traceKpiStart').textContent=traceClock(first);$('traceKpiFirstEnd').textContent=firstPassEnd?traceClock(firstPassEnd):'—';$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=returns.length.toLocaleString('es-AR');$('traceKpiActors').textContent=stories.length.toLocaleString('es-AR');$('traceKpiActorsLabel').textContent=mode==='pedido'?'Reporte de Líneas Negadas':'—';
+  const gapCard=$('traceKpiGap')?.closest('.traceKpi'),actorCard=$('traceKpiActors')?.closest('.traceKpi');gapCard?.classList.toggle('traceAlert',returns.length>0);actorCard?.classList.toggle('traceAlert',false);actorCard?.classList.toggle('traceGood',mode==='pedido'&&stories.length>0);
   const byZone={};rows.forEach(r=>{const z=traceZone(r);if(z!=='ZONA NO INFORMADA')byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
   let html='';
   if(mode==='pedido'){
@@ -7289,6 +7318,11 @@ function traceRender(rows,mode,q,negRows=[],allRows=[]){
     initial.forEach(p=>{html+='<div class="traceInitialCard"><b>'+esc(p.picker)+'</b><strong>'+traceClock(p.start)+(p.end>p.start?' → '+traceClock(p.end):'')+'</strong><small>'+p.rows.length+' línea'+(p.rows.length===1?'':'s')+' · '+esc(tracePassZones(p)||'ZONA NO INFORMADA')+'</small></div>'});html+='</div></div>';
     html+='<div class="traceSectionTitle"><b>Vueltas adicionales</b><span>solo reingresos después de trabajar otro pedido</span></div>';
     if(!returns.length)html+='<div class="traceNotice">No se detectaron vueltas adicionales para este pedido.</div>';else{html+='<div class="traceReturnGrid">';returns.forEach(p=>{html+='<div class="tracePass isReturn"><div class="tracePassNo">↩ '+esc(p.picker)+' · VUELTA '+(p.pickerPass-1)+'</div><div class="tracePassTime">'+traceClock(p.start)+(p.end>p.start?' → '+traceClock(p.end):'')+'</div><div class="tracePassPicker">'+esc(p.picker)+'</div><div class="tracePassMeta"><b>'+p.rows.length+' línea'+(p.rows.length===1?'':'s')+'</b><span>'+esc(tracePassZones(p)||'ZONA NO INFORMADA')+'</span></div><div class="traceReturnFlag">VOLVIÓ A PREPARAR ESTE PEDIDO</div></div>'});html+='</div>'}
+    html+='<div class="traceJumpMatchWrap"><div class="traceSectionTitle"><b>Líneas detectadas que generaron salto de calle</b><span>cruce: SKU confirmado en una vuelta + negación anterior del mismo SKU</span></div>';
+    if(!negRows.length)html+='<div class="traceJumpNone">Todavía no hay datos del Reporte de Líneas Negadas para hacer este cruce.</div>';
+    else if(!jumpMatches.length)html+='<div class="traceJumpNone">No encontré coincidencias entre los SKU confirmados en las vueltas y una negación anterior del mismo SKU.</div>';
+    else{html+='<div class="traceJumpMatchGrid">';jumpMatches.forEach(m=>{html+='<div class="traceJumpMatch"><div class="traceJumpMatchTop"><b>SKU '+esc(m.sku)+'</b><span class="traceJumpMatchCount">V'+m.returnNo+'</span></div><div class="traceJumpMatchPos">'+esc(m.position)+'</div><div class="traceJumpMatchMeta"><span>Picker que negó<strong>'+esc(m.negPicker)+'</strong></span><span>Hora negación<strong>'+traceClock(m.negTime)+'</strong></span><span>Motivo<strong>'+esc(m.motivo)+'</strong></span><span>Pickeado en vuelta por<strong>'+esc(m.confirmPicker)+'</strong></span></div><div class="traceJumpMatchFoot">Confirmado '+traceClock(m.confirmTime)+(m.confirmZone&&m.confirmZone!=='ZONA NO INFORMADA'?' · '+esc(m.confirmZone):'')+'</div></div>'});html+='</div>'}
+    html+='</div>';
     html+='<div class="traceSectionTitle"><b>Recorrido por calles</b><span>'+seg.length+' cambios de tramo · '+confirmedRows.length+' confirmaciones</span></div><details class="traceRouteToggle"><summary>Ver recorrido por calles</summary><div class="traceStory">';
     seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||q)+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});
     html+='</div></details>';
@@ -7297,14 +7331,18 @@ function traceRender(rows,mode,q,negRows=[],allRows=[]){
     seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||'—')+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});html+='</div>';
   }
   if(mode==='pedido'){
-    html+='<div class="traceSectionTitle"><b>Negaciones que pueden generar una vuelta</b><span>Reporte de Líneas Negadas → Productividad</span></div>';
-    if(!negRows.length){html+='<div class="traceNotice"><b>Falta el RAW del Reporte de Líneas Negadas para '+progressSelectedDate().split('-').reverse().join('/')+'.</b><br>Productividad ya está cargada, pero todavía no puedo explicar qué retorno nació de una negación de ubicación. Ejecutá <b>actualizar-operacion</b> y recargá la página.</div>'}
-    else if(!stories.length){html+='<div class="traceNotice"><b>No encontré líneas del Reporte de Líneas Negadas asociadas a este pedido.</b><br>Esto no significa que no haya retornos: arriba se detectaron '+returns.length+' vuelta(s) por secuencia. Simplemente ninguna quedó explicada todavía por el reporte.</div>'}
-    else stories.forEach(x=>{const n=x.n;html+='<div class="traceCause"><span class="traceCauseIcon">⊘</span><span><b>Negación de ubicación · SKU '+esc(n.sku||'—')+'</b><small>Origen '+esc(x.src)+(n.ubicacion?' · '+esc(n.ubicacion):'')+(n.motivo?' · motivo: '+esc(n.motivo):'')+(n.cantidad?' · '+esc(n.cantidad)+' un.':'')+'</small></span><span class="traceCauseMeta">'+(x.ne?traceClock(x.ne._traceDate):'hora no identificada')+'</span></div>'+(x.rp?'<div class="traceFlowArrow">↓</div><div class="traceRepick"><span class="traceCauseIcon">↩</span><span><b>'+(x.jump?'SALTO DE CALLE':'REPICK')+' → '+esc(x.dst)+'</b><small>Confirmado después por '+esc(tracePicker(x.rp))+' · SKU '+esc(n.sku||'—')+'</small></span><span class="traceRepickMeta">+'+traceDur(x.delay)+' · '+traceClock(x.rp._traceDate)+'</span></div>':'<div class="traceNotice">No se identificó una confirmación posterior de este SKU.</div>')});
+    html+='<div class="traceSectionTitle"><b>Negaciones de Picking</b><span>Reporte de Líneas Negadas · sin relacionarlas con las vueltas</span></div>';
+    if(!negRows.length){html+='<div class="traceNotice"><b>No hay datos cargados del Reporte de Líneas Negadas para '+progressSelectedDate().split('-').reverse().join('/')+'.</b></div>'}
+    else if(!stories.length){html+='<div class="traceNotice"><b>No encontré negaciones de Picking para este pedido en el archivo cargado.</b></div>'}
+    else {
+      html+='<div class="traceNegList">';
+      stories.forEach(x=>{const n=x.n;html+='<div class="traceCause"><span class="traceCauseIcon">⊘</span><span><b>'+esc(n.zona)+' · '+esc(n.empleado)+'</b><small>SKU '+esc(n.sku||'—')+(n.motivo?' · '+esc(n.motivo):'')+(n.cantidad?' · '+esc(n.cantidad)+' neg.':'')+'</small></span><span class="traceCauseMeta">'+esc(traceNegClock(n.fecha))+'</span></div>'});
+      html+='</div>';
+    }
   }
   let raw='';seg.forEach((x,i)=>{if(i){const prev=seg[i-1],gap=x.start-prev.end;if(gap>=5*60000)raw+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>'}raw+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>'});
   html+='<details class="traceRawToggle"><summary>Ver detalle técnico completo ('+rows.length+' movimientos)</summary><div class="traceTimelineRaw">'+raw+'</div></details>';
-  tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+confirmedRows.length+' confirmaciones · '+seg.length+' etapas · '+returns.length+' vuelta(s) detectada(s)'+(mode==='pedido'?' · '+jumps.length+' salto(s) explicado(s) por negación':'');
+  tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+confirmedRows.length+' confirmaciones · '+seg.length+' etapas · '+returns.length+' vuelta(s) detectada(s)'+(mode==='pedido'?' · '+stories.length+' negación(es) de Picking':'');
 }
 async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRenderDailySummary(all);traceRender(rows,mode,q,neg,all)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
 function traceOpenPedido(pedido){$('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);$('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'})}
