@@ -2061,6 +2061,30 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 .traceNotice{padding:14px;border:1px dashed #536171;border-radius:10px;background:#10161d;color:#aeb9c5;font-size:11px;line-height:1.5}.traceNotice b{color:#e5edf5}
 @media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}
 </style>
+
+<style id="traceTasteV4">
+/* TASTE CODE · Trazabilidad Picking centrada en reingresos reales */
+.tracePanel{border-radius:16px!important;box-shadow:0 12px 34px rgba(0,0,0,.14);border-color:#2b3744!important}
+.traceHead{padding:18px 20px!important}.traceHead b{font-size:18px!important;letter-spacing:-.2px}.traceHead small{font-size:11px!important;line-height:1.45}
+.traceKpis{gap:10px!important;padding:14px 18px!important}.traceKpi{border-radius:11px!important;padding:12px 13px!important}.traceKpi b{font-size:24px!important}
+.traceHero{margin:4px 0 16px;padding:18px 20px;border:1px solid #33475c;border-radius:14px;background:linear-gradient(135deg,#111c28,#0d151e);display:flex;justify-content:space-between;gap:20px;align-items:center}
+.traceHero .traceEyebrow{display:block;font-size:9px;font-weight:950;letter-spacing:1.1px;color:#6ebcff;margin-bottom:7px}.traceHero b{display:block;font-size:20px;color:#f4f8fc}.traceHero small{display:block;margin-top:6px;max-width:760px;color:#9babbc;line-height:1.45}.traceHeroNumber{text-align:center;min-width:100px}.traceHeroNumber strong{display:block;font-size:38px;line-height:1;color:#ff8f9b}.traceHeroNumber span{display:block;font-size:9px;font-weight:950;letter-spacing:1px;color:#bd7a82;margin-top:5px}
+.tracePassGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:18px}.tracePass{position:relative;border:1px solid #2d3946;background:#111923;border-radius:12px;padding:13px 14px;min-height:132px}.tracePass.firstPass{border-color:#315b48;background:#101c17}.tracePass.isReturn{border-color:#6a3840;background:#211419;box-shadow:inset 3px 0 0 #ff7180}.tracePassNo{font-size:9px;font-weight:950;letter-spacing:.65px;color:#8fa0b1}.tracePass.isReturn .tracePassNo{color:#ff98a3}.tracePassTime{font-size:15px;font-weight:950;margin-top:8px;color:#f1f6fb;font-variant-numeric:tabular-nums}.tracePassPicker{font-size:12px;font-weight:800;margin-top:5px;color:#70cfff}.tracePassMeta{display:flex;justify-content:space-between;gap:10px;margin-top:10px;font-size:10px;color:#8e9cac}.tracePassMeta b{color:#dce6f0}.traceReturnFlag{margin-top:10px;padding:6px 8px;border-radius:7px;background:#4a2027;color:#ffb2ba;font-size:8px;font-weight:950;text-align:center;letter-spacing:.35px}
+.traceRouteToggle{border:1px solid #2a3642;border-radius:11px;overflow:hidden;margin-bottom:14px}.traceRouteToggle summary{padding:11px 13px;cursor:pointer;font-size:10px;font-weight:900;color:#9eacba;background:#101821}.traceRouteToggle .traceStory{padding:10px}
+.traceStage{border-radius:11px!important}.traceStreet{border-radius:10px!important}.traceTimeline{border-radius:12px!important}.traceRawToggle{opacity:.9}
+body.light-mode .tracePanel{background:#f8fafc!important;border-color:#d9e1ea!important;color:#17202a!important;box-shadow:0 12px 34px rgba(25,39,52,.08)!important}
+body.light-mode .traceHead{background:#fff!important;border-color:#e0e6ed!important}body.light-mode .traceHead b,body.light-mode .traceSectionTitle b{color:#17202a!important}
+body.light-mode .traceKpi,body.light-mode .traceStreet{background:#fff!important;border-color:#d9e1ea!important;color:#17202a!important}body.light-mode .traceKpi b,body.light-mode .traceStreet b{color:#17202a!important}
+body.light-mode .traceKpi.traceAlert{background:#fff5f6!important;border-color:#f0c4ca!important}body.light-mode .traceKpi.traceGood{background:#f1fbf5!important;border-color:#bfe3cc!important}
+body.light-mode .traceBody{background:#f8fafc!important}.light-mode .traceTimeline{background:#fff!important;border-color:#d9e1ea!important}
+body.light-mode .traceHero{background:linear-gradient(135deg,#f7fbff,#eef6ff)!important;border-color:#cbdff3!important}body.light-mode .traceHero b{color:#132238!important}body.light-mode .traceHero small{color:#61758a!important}
+body.light-mode .tracePass{background:#fff!important;border-color:#d9e1ea!important;color:#17202a!important}body.light-mode .tracePass.firstPass{background:#f3fbf6!important;border-color:#bfe0ca!important}body.light-mode .tracePass.isReturn{background:#fff5f6!important;border-color:#efc0c6!important;box-shadow:inset 3px 0 0 #dc5362!important}
+body.light-mode .tracePassTime,body.light-mode .tracePassMeta b{color:#17202a!important}body.light-mode .tracePassPicker{color:#1769aa!important}body.light-mode .tracePassMeta{color:#667085!important}body.light-mode .traceReturnFlag{background:#ffe3e6!important;color:#a72f3c!important}
+body.light-mode .traceRouteToggle{border-color:#d9e1ea!important}body.light-mode .traceRouteToggle summary{background:#f2f5f8!important;color:#445468!important}body.light-mode .traceStage{background:#fff!important;border-color:#d9e1ea!important;color:#17202a!important}body.light-mode .traceStage:hover{background:#f5f8fb!important}body.light-mode .traceStageTime,body.light-mode .traceStageMain b,body.light-mode .traceStageCount{color:#17202a!important}body.light-mode .traceStageMain small{color:#667085!important}
+body.light-mode .traceCause{background:#fff4f5!important;border-color:#efc2c8!important}body.light-mode .traceRepick{background:#fff9eb!important;border-color:#ead6a0!important}body.light-mode .traceNotice{background:#f7f9fb!important;color:#475467!important;border-color:#d9e1ea!important}
+body.light-mode .traceRawToggle{border-color:#d9e1ea!important}body.light-mode .traceRawToggle summary{background:#f2f5f8!important;color:#475467!important}body.light-mode .traceEvent{color:#17202a!important;border-color:#e6ebf0!important}body.light-mode .traceEvent:hover{background:#f6f8fa!important}body.light-mode .traceTime,body.light-mode .tracePicker{color:#17202a!important}body.light-mode .traceOrder,body.light-mode .traceState{color:#667085!important}
+@media(max-width:700px){.traceHero{align-items:flex-start}.traceHeroNumber strong{font-size:30px}.tracePassGrid{grid-template-columns:1fr}.traceHead{padding:14px!important}}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -7192,16 +7216,51 @@ function traceNegStories(rows,q,negRows){
   relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—';stories.push({n,ne,rp,src,dst,jump:!!(rp&&src!=='—'&&dst!=='—'&&src!==dst),delay:ne&&rp?rp._traceDate-ne._traceDate:null})});
   return stories;
 }
-function traceRender(rows,mode,q,negRows=[]){
+function traceOrderPasses(rows,allRows){
+  if(!rows.length)return[];
+  const targetPedidos=new Set(rows.map(tracePedido).map(progressMatchId).filter(Boolean));
+  const targetPickings=new Set(rows.map(tracePicking).map(progressMatchId).filter(Boolean));
+  const pickers=[...new Set(rows.map(tracePicker))];
+  const isTarget=r=>targetPedidos.has(progressMatchId(tracePedido(r)))||targetPickings.has(progressMatchId(tracePicking(r)));
+  const passes=[];
+  pickers.forEach(picker=>{
+    const stream=(allRows.length?allRows:rows).filter(r=>tracePicker(r)===picker).sort((a,b)=>a._traceDate-b._traceDate);
+    let cur=null, passNo=0;
+    stream.forEach(r=>{
+      if(isTarget(r)){
+        if(!cur){passNo++;cur={picker,passNo,start:r._traceDate,end:r._traceDate,rows:[],zones:{},leftFor:[]};passes.push(cur)}
+        cur.end=r._traceDate;cur.rows.push(r);const z=traceZone(r);cur.zones[z]=(cur.zones[z]||0)+1;
+      }else if(cur){
+        const op=tracePedido(r),pk=tracePicking(r);if(op||pk)cur.leftFor.push({pedido:op,picking:pk,time:r._traceDate});cur=null;
+      }
+    });
+  });
+  passes.sort((a,b)=>a.start-b.start);
+  const byPicker={};passes.forEach(p=>{byPicker[p.picker]=(byPicker[p.picker]||0)+1;p.pickerPass=byPicker[p.picker];p.isReturn=p.pickerPass>1});
+  return passes;
+}
+function tracePassZones(p){return Object.entries(p.zones).sort((a,b)=>b[1]-a[1]).map(([z,n])=>z+' '+n).join(' · ')}
+function traceRender(rows,mode,q,negRows=[],allRows=[]){
   const tl=$('traceTimeline'),sg=$('traceStreetGrid');$('traceKpiEvents').textContent=rows.length.toLocaleString('es-AR');
   if(!rows.length){$('traceKpiStart').textContent=$('traceKpiEnd').textContent=$('traceKpiGap').textContent=$('traceKpiActors').textContent='—';sg.innerHTML='';tl.innerHTML='<div class="traceEmpty">No encontré confirmaciones para <b>'+esc(q)+'</b> en '+progressSelectedDate().split('-').reverse().join('/')+'.</div>';$('traceStatus').textContent='Sin eventos en Productividad para la búsqueda seleccionada.';return}
-  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate,seg=traceSegments(rows,mode),returns=traceDetectReturns(seg),stories=mode==='pedido'?traceNegStories(rows,q,negRows):[],jumps=stories.filter(x=>x.jump);
+  const first=rows[0]._traceDate,last=rows[rows.length-1]._traceDate,seg=traceSegments(rows,mode),passes=mode==='pedido'?traceOrderPasses(rows,allRows):[],returns=mode==='pedido'?passes.filter(p=>p.isReturn):traceDetectReturns(seg),stories=mode==='pedido'?traceNegStories(rows,q,negRows):[],jumps=stories.filter(x=>x.jump);
   $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=returns.length.toLocaleString('es-AR');$('traceKpiActors').textContent=jumps.length.toLocaleString('es-AR');$('traceKpiActorsLabel').textContent=mode==='pedido'?'explicados por reporte':'—';
   const gapCard=$('traceKpiGap')?.closest('.traceKpi'),actorCard=$('traceKpiActors')?.closest('.traceKpi');gapCard?.classList.toggle('traceAlert',returns.length>0);actorCard?.classList.toggle('traceAlert',jumps.length>0);actorCard?.classList.toggle('traceGood',mode==='pedido'&&negRows.length>0&&jumps.length===0);
   const byZone={};rows.forEach(r=>{const z=traceZone(r);if(z!=='SIN ZONA')byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
-  let html='<div class="traceSectionTitle"><b>Recorrido resumido</b><span>'+seg.length+' etapas · '+rows.length+' confirmaciones</span></div><div class="traceStory">';
-  seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});
-  html+='</div>';
+  let html='';
+  if(mode==='pedido'){
+    const totalPasses=passes.length, totalReturns=returns.length;
+    html+='<div class="traceHero"><div><span class="traceEyebrow">LECTURA OPERATIVA</span><b>Este pedido fue preparado '+totalPasses+' vez'+(totalPasses===1?'':'es')+'</b><small>'+totalReturns+' de esas preparaciones fueron vueltas al pedido después de que el picker había pasado a otro pedido.</small></div><div class="traceHeroNumber"><strong>'+totalReturns+'</strong><span>VUELTA'+(totalReturns===1?'':'S')+'</span></div></div>';
+    html+='<div class="traceSectionTitle"><b>Pasadas por el pedido</b><span>cada tarjeta = una preparación continua del picker</span></div><div class="tracePassGrid">';
+    passes.forEach((p,i)=>{const dur=p.end-p.start;html+='<div class="tracePass '+(p.isReturn?'isReturn':'firstPass')+'"><div class="tracePassNo">'+(p.isReturn?'↩ VUELTA '+(p.pickerPass-1):'▶ PRIMERA PASADA')+'</div><div class="tracePassTime">'+traceClock(p.start)+(p.end>p.start?' → '+traceClock(p.end):'')+'</div><div class="tracePassPicker">'+esc(p.picker)+'</div><div class="tracePassMeta"><b>'+p.rows.length+' línea'+(p.rows.length===1?'':'s')+'</b><span>'+esc(tracePassZones(p)||'SIN ZONA')+'</span></div>'+(p.isReturn?'<div class="traceReturnFlag">VOLVIÓ A PREPARAR ESTE PEDIDO</div>':'')+'</div>'});
+    html+='</div>';
+    html+='<div class="traceSectionTitle"><b>Recorrido por calles</b><span>'+seg.length+' cambios de tramo · '+rows.length+' confirmaciones</span></div><details class="traceRouteToggle"><summary>Ver recorrido por calles</summary><div class="traceStory">';
+    seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||q)+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});
+    html+='</div></details>';
+  }else{
+    html+='<div class="traceSectionTitle"><b>Recorrido resumido</b><span>'+seg.length+' etapas · '+rows.length+' confirmaciones</span></div><div class="traceStory">';
+    seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||'—')+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});html+='</div>';
+  }
   if(mode==='pedido'){
     html+='<div class="traceSectionTitle"><b>Negaciones que pueden generar una vuelta</b><span>Reporte de Líneas Negadas → Productividad</span></div>';
     if(!negRows.length){html+='<div class="traceNotice"><b>Falta el RAW del Reporte de Líneas Negadas para '+progressSelectedDate().split('-').reverse().join('/')+'.</b><br>Productividad ya está cargada, pero todavía no puedo explicar qué retorno nació de una negación de ubicación. Ejecutá <b>actualizar-operacion</b> y recargá la página.</div>'}
@@ -7212,7 +7271,7 @@ function traceRender(rows,mode,q,negRows=[]){
   html+='<details class="traceRawToggle"><summary>Ver detalle técnico completo ('+rows.length+' confirmaciones)</summary><div class="traceTimelineRaw">'+raw+'</div></details>';
   tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+seg.length+' etapas · '+returns.length+' vuelta(s) detectada(s)'+(mode==='pedido'?' · '+jumps.length+' salto(s) explicado(s) por negación':'');
 }
-async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q,neg)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
+async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q,neg,all)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
 function traceOpenPedido(pedido){$('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);$('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'})}
 $('traceLoadBtn').onclick=()=>traceRun(true);$('traceQuery').addEventListener('keydown',e=>{if(e.key==='Enter')traceRun(false)});$('traceMode').onchange=()=>{$('traceQuery').placeholder=$('traceMode').value==='picker'?'Nombre del picker…':'Pedido ERP / picking…'};
 
