@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/3 * * * *"
   workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "Días anteriores de Productividad/Picking a reconstruir (0 = automático)"
+        required: false
+        default: "30"
 
 permissions:
   contents: write
@@ -25,6 +30,7 @@ jobs:
           COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
           COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
           SYNC_MODE: operational
+          BACKFILL_DAYS: ${{ github.event.inputs.backfill_days || '0' }}
         run: |
           python3 <<'PY'
           import os
@@ -1101,6 +1107,53 @@ jobs:
                   save_json_file(PICKING_HISTORY_DIR / f"{day}.json", pick_payload)
                   save_json_file(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload)
                   print("Productividad persistida:", day, "· raw:", len(prod_rows), "· picking:", len(pick_rows), "· resumen 06-14:", summary_payload["lineas_productividad_06_14"], "· pickers:", summary_payload["pickers_count"])
+
+                  # Histórico de Picking/Productividad. En ejecución manual se puede
+                  # reconstruir N días anteriores; en el cron se completa 1 fecha
+                  # faltante por corrida para no castigar la API de Copérnico.
+                  try:
+                      manual_backfill = int(os.environ.get("BACKFILL_DAYS", "0") or 0)
+                  except Exception:
+                      manual_backfill = 0
+                  history_window = manual_backfill if manual_backfill > 0 else 45
+                  history_limit = manual_backfill if manual_backfill > 0 else 1
+                  history_done = 0
+                  ar_now = now_utc().astimezone(ar_tz)
+                  for delta in range(1, history_window + 1):
+                      if history_done >= history_limit:
+                          break
+                      prev_dt = ar_now - timedelta(days=delta)
+                      prev_day = prev_dt.strftime("%Y%m%d")
+                      prev_label = prev_dt.strftime("%d/%m/%Y")
+                      prev_prod_file = PRODUCTIVITY_HISTORY_DIR / f"{prev_day}.json"
+                      prev_pick_file = PICKING_HISTORY_DIR / f"{prev_day}.json"
+                      prev_sum_file = PRODUCTIVITY_SUMMARY_DIR / f"{prev_day}.json"
+                      if prev_prod_file.exists() and prev_pick_file.exists() and prev_sum_file.exists():
+                          continue
+                      try:
+                          prev_prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
+                              "fecha": prev_day, "tipo_productividad": "ProductividadPIK"
+                          })
+                          prev_pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({"fecha": prev_day})
+                          prev_prod_response, _, _ = request_json(prev_prod_url, jwt=jwt, timeout=180)
+                          prev_pick_response, _, _ = request_json(prev_pick_url, jwt=jwt, timeout=180)
+                          prev_prod_rows = extract_rows(prev_prod_response)
+                          prev_pick_rows = extract_rows(prev_pick_response)
+                          if not prev_prod_rows and not prev_pick_rows:
+                              print("Histórico sin datos:", prev_day)
+                              history_done += 1
+                              continue
+                          prev_prod_payload = {"updated_at": now_iso, "fecha": prev_label, "fecha_query": prev_day, "source": "Copernico ProductividadPIK · histórico", "row_count": len(prev_prod_rows), "rows": prev_prod_rows}
+                          prev_pick_payload = {"updated_at": now_iso, "fecha": prev_label, "fecha_query": prev_day, "source": "Copernico Líneas de Picking · histórico", "row_count": len(prev_pick_rows), "rows": prev_pick_rows}
+                          prev_summary = build_summary(prev_prod_rows, prev_pick_rows, prev_day, prev_label, now_iso)
+                          save_json_file(prev_prod_file, prev_prod_payload)
+                          save_json_file(prev_pick_file, prev_pick_payload)
+                          save_json_file(prev_sum_file, prev_summary)
+                          history_done += 1
+                          print("Histórico Picking reconstruido:", prev_day, "· productividad:", len(prev_prod_rows), "· picking:", len(prev_pick_rows))
+                      except Exception as hist_err:
+                          print("AVISO histórico", prev_day, ":", str(hist_err))
+                          history_done += 1
 
                   # Avance de pedidos ya fue generado arriba, de forma independiente.
                   # A partir de aquí continúan Negaciones y Tiempos.
@@ -2298,12 +2351,12 @@ jobs:
           rm -rf "$SNAP"; mkdir -p "$SNAP"
           for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
           mkdir -p "$SNAP/datos"
-          for d in tiempos negaciones lineas-negadas productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
+          for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
           for intento in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
-            for d in tiempos negaciones lineas-negadas productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
+            for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
             git add negaciones.json avance-pedidos.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/lineas-negadas datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
             if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
             git commit -m "AutoSync Copernico · operational"
