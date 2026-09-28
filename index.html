@@ -2059,7 +2059,10 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 .traceSectionTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:15px 0 8px}.traceSectionTitle b{font-size:12px}.traceSectionTitle span{font-size:9px;color:#83909e}
 .traceRawToggle{margin-top:12px;border:1px solid #28333e;border-radius:9px;overflow:hidden}.traceRawToggle summary{cursor:pointer;padding:10px 12px;background:#101821;font-size:10px;font-weight:900;color:#9ca9b7}.traceRawToggle .traceTimelineRaw{max-height:430px;overflow:auto}
 .traceNotice{padding:14px;border:1px dashed #536171;border-radius:10px;background:#10161d;color:#aeb9c5;font-size:11px;line-height:1.5}.traceNotice b{color:#e5edf5}
-@media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}\n/* ===== Trazabilidad Picking · integración completa con modo claro ===== */
+@media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}\n
+.traceRoute{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px;border:1px solid #28333e;border-radius:10px;background:#101821}.traceRouteChip{font-weight:950;color:#67d5ff;border:1px solid #334454;background:#0d151e;border-radius:999px;padding:7px 12px}.traceRouteArrow{color:#718090;font-weight:900}.traceReturnCard,.traceJumpCard{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;border:1px solid #6b5727;background:#251f11;border-radius:11px;padding:12px 14px;margin-bottom:8px}.traceReturnNo{font-size:9px;font-weight:950;letter-spacing:.05em;color:#ffd783;border:1px solid #6b5727;border-radius:6px;padding:6px 8px}.traceReturnCard b,.traceJumpCard b{color:#ffd783}.traceReturnCard small,.traceJumpCard small{display:block;color:#c8b98d;margin-top:4px}.traceReturnOrders{opacity:.8}.traceReturnTime,.traceJumpTime{text-align:right}.traceReturnTime b,.traceJumpTime b{display:block}.traceReturnTime span,.traceJumpTime span{display:block;font-size:9px;color:#c8b98d;margin-top:3px}.traceJumpCard{grid-template-columns:1fr auto;border-color:#684048;background:#26161a}.traceJumpCard b{color:#ffadb5}.traceJumpCard small{color:#c5a4a8}.traceJumpTime b{color:#ffadb5}@media(max-width:700px){.traceReturnCard{grid-template-columns:1fr}.traceReturnTime{text-align:left}.traceJumpCard{grid-template-columns:1fr}.traceJumpTime{text-align:left}}
+body.light-mode .traceRoute{background:#f8fafc!important;border-color:#dfe6ee!important}body.light-mode .traceRouteChip{background:#fff!important;border-color:#cfe0ee!important;color:#1479b8!important}body.light-mode .traceRouteArrow{color:#8ca0b3!important}body.light-mode .traceReturnCard{background:#fffbef!important;border-color:#ead9a5!important;color:#263548!important}body.light-mode .traceReturnNo{color:#8a6509!important;border-color:#dec98c!important;background:#fffdf6!important}body.light-mode .traceReturnCard b{color:#7a5908!important}body.light-mode .traceReturnCard small,body.light-mode .traceReturnTime span{color:#766b4c!important}body.light-mode .traceJumpCard{background:#fff6f7!important;border-color:#efc6cb!important;color:#263548!important}body.light-mode .traceJumpCard b,body.light-mode .traceJumpTime b{color:#b83d49!important}body.light-mode .traceJumpCard small,body.light-mode .traceJumpTime span{color:#7d6266!important}
+/* ===== Trazabilidad Picking · integración completa con modo claro ===== */
 body.light-mode .tracePanel{background:#fff!important;color:#17212b!important;border-color:#dfe6ee!important;box-shadow:0 1px 2px rgba(15,23,42,.025),0 7px 20px rgba(15,23,42,.02)!important}
 body.light-mode .traceHead{background:#fff!important;border-color:#e7ecf2!important;color:#17212b!important}
 body.light-mode .traceHead b{color:#17212b!important}body.light-mode .traceHead small{color:#738195!important}
@@ -7270,9 +7273,7 @@ function traceFindRepick(events,n,negEvent){
 }
 function traceSegments(rows,mode){if(!rows.length)return[];const seg=[];let cur=null;rows.forEach(r=>{const key=(mode==='picker'?tracePedido(r):tracePicker(r))+'|'+traceZone(r)+'|'+tracePedido(r);if(!cur||cur.key!==key){cur={key,start:r._traceDate,end:r._traceDate,zone:traceZone(r),picker:tracePicker(r),pedido:tracePedido(r),picking:tracePicking(r),count:1};seg.push(cur)}else{cur.end=r._traceDate;cur.count++}});return seg}
 function traceDetectReturns(allRows,targetRows,mode,q){
-  // Una vuelta real existe sólo si el picker trabajó este pedido, luego OTRO pedido,
-  // y más tarde volvió a confirmar este pedido. Los cambios de calle dentro del mismo
-  // pedido NO cuentan como vuelta.
+  // Vuelta real: mismo picker trabaja este pedido, pasa a uno o más pedidos distintos y luego regresa.
   if(mode!=='pedido'||!targetRows.length)return [];
   const targetPedido=progressMatchId(tracePedido(targetRows[0])||q);
   const targetPickings=new Set(targetRows.map(tracePicking).map(progressMatchId).filter(Boolean));
@@ -7281,24 +7282,29 @@ function traceDetectReturns(allRows,targetRows,mode,q){
   const out=[];
   pickerKeys.forEach(pk=>{
     const seq=allRows.filter(r=>(typeof timeNormName==='function'?timeNormName(tracePicker(r)):tracePicker(r).toLowerCase())===pk).sort((a,b)=>a._traceDate-b._traceDate);
-    let hadTarget=false,workedOther=false,lastOther=null,inReturnEpisode=false;
+    let hadTarget=false,workedOther=false,lastOther=null,lastTarget=null,inReturnEpisode=false,otherOrders=new Set();
     seq.forEach(r=>{
       if(isTarget(r)){
         if(hadTarget&&workedOther&&!inReturnEpisode){
-          out.push({row:r,picker:tracePicker(r),zone:traceZone(r),pedido:tracePedido(r)||q,picking:tracePicking(r),time:r._traceDate,afterPedido:lastOther?tracePedido(lastOther):'',afterTime:lastOther?lastOther._traceDate:null});
-          inReturnEpisode=true;
+          out.push({row:r,picker:tracePicker(r),zone:traceZone(r),pedido:tracePedido(r)||q,picking:tracePicking(r),time:r._traceDate,leftTime:lastTarget?lastTarget._traceDate:null,afterPedido:lastOther?tracePedido(lastOther):'',afterTime:lastOther?lastOther._traceDate:null,otherOrders:[...otherOrders]});
+          inReturnEpisode=true;workedOther=false;otherOrders=new Set();
         }
-        hadTarget=true;
+        hadTarget=true;lastTarget=r;
       }else if(hadTarget&&tracePedido(r)){
-        workedOther=true;lastOther=r;inReturnEpisode=false;
+        workedOther=true;lastOther=r;otherOrders.add(tracePedido(r));inReturnEpisode=false;
       }
     });
   });
   return out.sort((a,b)=>a.time-b.time);
 }
 function traceNegStories(rows,q,negRows){
-  const relevant=traceNegRelevant(negRows,q,rows),stories=[];
-  relevant.forEach(rr=>{const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—';stories.push({n,ne,rp,src,dst,jump:!!(rp&&src!=='—'&&dst!=='—'&&src!==dst),delay:ne&&rp?rp._traceDate-ne._traceDate:null})});
+  const relevant=traceNegRelevant(negRows,q,rows),stories=[],seen=new Set();
+  relevant.forEach(rr=>{
+    const n=traceNegInfo(rr),ne=traceFindNegEvent(rows,n),rp=traceFindRepick(rows,n,ne),src=n.zona!=='SIN ZONA'?n.zona:(ne?traceZone(ne):'—'),dst=rp?traceZone(rp):'—';
+    const key=[progressMatchId(n.pedido),progressMatchId(n.picking),progressMatchId(n.sku),String(n.ubicacion||'').toUpperCase(),String(n.motivo||'').toUpperCase(),ne?ne._traceDate.getTime():''].join('|');
+    if(seen.has(key))return;seen.add(key);
+    stories.push({n,ne,rp,src,dst,jump:!!(rp&&src!=='—'&&dst!=='—'&&src!==dst),delay:ne&&rp?rp._traceDate-ne._traceDate:null});
+  });
   return stories;
 }
 function traceRender(rows,mode,q,negRows=[],allRows=[]){
@@ -7308,21 +7314,23 @@ function traceRender(rows,mode,q,negRows=[],allRows=[]){
   $('traceKpiStart').textContent=traceClock(first);$('traceKpiEnd').textContent=traceClock(last);$('traceKpiGap').textContent=returns.length.toLocaleString('es-AR');$('traceKpiActors').textContent=jumps.length.toLocaleString('es-AR');$('traceKpiActorsLabel').textContent=mode==='pedido'?'explicados por reporte':'—';
   const gapCard=$('traceKpiGap')?.closest('.traceKpi'),actorCard=$('traceKpiActors')?.closest('.traceKpi');gapCard?.classList.toggle('traceAlert',returns.length>0);actorCard?.classList.toggle('traceAlert',jumps.length>0);actorCard?.classList.toggle('traceGood',mode==='pedido'&&negRows.length>0&&jumps.length===0);
   const byZone={};rows.forEach(r=>{const z=traceZone(r);if(z!=='SIN ZONA')byZone[z]=(byZone[z]||0)+1});const target=['MFCA','MFCB','MFCC','AR','BR'],zones=[...target.filter(z=>byZone[z]),...Object.keys(byZone).filter(z=>!target.includes(z)).sort()],mx=Math.max(1,...zones.map(z=>byZone[z]));sg.innerHTML=zones.map(z=>'<div class="traceStreet"><b>'+esc(z)+'</b><span>'+byZone[z]+' confirmaciones</span><i style="width:'+Math.max(4,byZone[z]/mx*100)+'%"></i></div>').join('');
-  let html='<div class="traceSectionTitle"><b>Recorrido resumido</b><span>'+seg.length+' etapas · '+rows.length+' confirmaciones</span></div><div class="traceStory">';
-  seg.forEach((x,i)=>{if(i)html+='<div class="traceFlowArrow">↓</div>';html+='<div class="traceStage"><span class="traceStageTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceStageZone">'+esc(x.zone)+'</span><span class="traceStageMain"><b>'+esc(x.picker)+'</b><small>Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+(x.picking?' · Picking '+esc(x.picking):'')+'</small></span><span class="traceStageCount">'+x.count+' línea'+(x.count===1?'':'s')+'</span></div>'});
-  html+='</div>';
+  const initialEnd=returns.length&&returns[0].leftTime?returns[0].leftTime:last;
+  const initialRows=rows.filter(r=>r._traceDate<=initialEnd),route=[];initialRows.forEach(r=>{const z=traceZone(r);if(z!=='SIN ZONA'&&route[route.length-1]!==z)route.push(z)});
+  let html='<div class="traceSectionTitle"><b>Recorrido inicial</b><span>antes de la primera vuelta real</span></div>';
+  html+='<div class="traceRoute">'+(route.length?route.map((z,i)=>(i?'<span class="traceRouteArrow">→</span>':'')+'<span class="traceRouteChip">'+esc(z)+'</span>').join(''):'<span class="muted">Sin zonas identificadas</span>')+'</div>';
   if(mode==='pedido'){
-    html+='<div class="traceSectionTitle"><b>Vueltas reales al pedido</b><span>mismo picker → otro pedido → vuelve a este pedido</span></div>';
+    html+='<div class="traceSectionTitle"><b>Vueltas reales al pedido</b><span>'+returns.length+' retorno'+(returns.length===1?'':'s')+' detectado'+(returns.length===1?'':'s')+'</span></div>';
     if(!returns.length){html+='<div class="traceNotice"><b>No se detectaron vueltas adicionales.</b><br>Ningún picker volvió a este pedido después de haber trabajado otro pedido.</div>'}
-    else returns.forEach(v=>{html+='<div class="traceRepick"><span class="traceCauseIcon">↩</span><span><b>'+esc(v.picker)+' volvió al pedido</b><small>'+esc(v.zone)+(v.picking?' · Picking '+esc(v.picking):'')+(v.afterPedido?' · después de trabajar pedido '+esc(v.afterPedido):'')+'</small></span><span class="traceRepickMeta">'+traceClock(v.time)+'</span></div>'});
-    html+='<div class="traceSectionTitle"><b>Negaciones que pueden generar una vuelta</b><span>Reporte de Líneas Negadas → Productividad</span></div>';
-    if(!negRows.length){html+='<div class="traceNotice"><b>Falta el RAW del Reporte de Líneas Negadas para '+progressSelectedDate().split('-').reverse().join('/')+'.</b><br>Productividad ya está cargada, pero todavía no puedo explicar qué retorno nació de una negación de ubicación. Ejecutá <b>actualizar-operacion</b> y recargá la página.</div>'}
-    else if(!stories.length){html+='<div class="traceNotice"><b>No encontré líneas del Reporte de Líneas Negadas asociadas a este pedido.</b><br>Esto no significa que no haya retornos: arriba se detectaron '+returns.length+' vuelta(s) por secuencia. Simplemente ninguna quedó explicada todavía por el reporte.</div>'}
-    else stories.forEach(x=>{const n=x.n;html+='<div class="traceCause"><span class="traceCauseIcon">⊘</span><span><b>Negación de ubicación · SKU '+esc(n.sku||'—')+'</b><small>Origen '+esc(x.src)+(n.ubicacion?' · '+esc(n.ubicacion):'')+(n.motivo?' · motivo: '+esc(n.motivo):'')+(n.cantidad?' · '+esc(n.cantidad)+' un.':'')+'</small></span><span class="traceCauseMeta">'+(x.ne?traceClock(x.ne._traceDate):'hora no identificada')+'</span></div>'+(x.rp?'<div class="traceFlowArrow">↓</div><div class="traceRepick"><span class="traceCauseIcon">↩</span><span><b>'+(x.jump?'SALTO DE CALLE':'REPICK')+' → '+esc(x.dst)+'</b><small>Confirmado después por '+esc(tracePicker(x.rp))+' · SKU '+esc(n.sku||'—')+'</small></span><span class="traceRepickMeta">+'+traceDur(x.delay)+' · '+traceClock(x.rp._traceDate)+'</span></div>':'<div class="traceNotice">No se identificó una confirmación posterior de este SKU.</div>')});
+    else returns.forEach((v,i)=>{const away=v.leftTime?traceDur(v.time-v.leftTime):'—',orders=v.otherOrders?.filter(Boolean)||[];html+='<div class="traceReturnCard"><div class="traceReturnNo">VUELTA '+(i+1)+'</div><div><b>'+esc(v.picker)+'</b><small>Volvió a <strong>'+esc(v.zone)+'</strong>'+(v.picking?' · Picking '+esc(v.picking):'')+'</small><small>Estuvo fuera <strong>'+away+'</strong>'+(orders.length?' · trabajó '+orders.length+' pedido'+(orders.length===1?'':'s')+' intermedio'+(orders.length===1?'':'s'):'')+'</small>'+(orders.length?'<small class="traceReturnOrders">'+esc(orders.slice(0,4).join(' · '))+(orders.length>4?' · …':'')+'</small>':'')+'</div><div class="traceReturnTime"><b>'+traceClock(v.time)+'</b><span>regreso</span></div></div>'});
+    html+='<div class="traceSectionTitle"><b>Saltos explicados por negación</b><span>'+jumps.length+' salto'+(jumps.length===1?'':'s')+' de calle</span></div>';
+    if(!negRows.length){html+='<div class="traceNotice"><b>No está disponible el Reporte de Líneas Negadas de este día.</b><br>Las vueltas reales de arriba siguen siendo válidas, pero no puedo atribuir su causa a una negación.</div>'}
+    else if(!stories.length){html+='<div class="traceNotice"><b>No hay negaciones asociadas a este pedido.</b><br>Las '+returns.length+' vuelta(s) detectada(s) provienen de la secuencia real de trabajo, sin una negación vinculada en el reporte.</div>'}
+    else if(!jumps.length){html+='<div class="traceNotice"><b>Hay '+stories.length+' negación'+(stories.length===1?'':'es')+', pero ninguna produjo un salto de calle identificable.</b></div>'}
+    else jumps.forEach(x=>{const n=x.n;html+='<div class="traceJumpCard"><div><b>SKU '+esc(n.sku||'—')+'</b><small>'+esc(x.src)+' → <strong>'+esc(x.dst)+'</strong>'+(n.motivo?' · '+esc(n.motivo):'')+'</small><small>Repick: '+esc(tracePicker(x.rp))+'</small></div><div class="traceJumpTime"><b>+'+traceDur(x.delay)+'</b><span>'+traceClock(x.rp._traceDate)+'</span></div></div>'});
   }
   let raw='';seg.forEach((x,i)=>{if(i){const prev=seg[i-1],gap=x.start-prev.end;if(gap>=5*60000)raw+='<div class="traceGap '+(gap>=20*60000?'hot':'')+'"><span>⚠ '+traceDur(gap)+'</span><span>Sin confirmaciones · '+traceClock(prev.end)+' → '+traceClock(x.start)+'</span></div>'}raw+='<div class="traceEvent"><span class="traceTime">'+traceClock(x.start)+(x.end>x.start?'–'+traceClock(x.end).slice(0,5):'')+'</span><span class="traceZone">'+esc(x.zone)+'</span><span class="tracePicker">'+esc(x.picker)+'</span><span class="traceOrder">Pedido '+esc(x.pedido||(mode==='pedido'?q:'—'))+'</span><span class="traceState">'+x.count+' línea'+(x.count===1?'':'s')+(x.picking?' · '+esc(x.picking):'')+'</span></div>'});
-  html+='<details class="traceRawToggle"><summary>Ver detalle técnico completo ('+rows.length+' confirmaciones)</summary><div class="traceTimelineRaw">'+raw+'</div></details>';
-  tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+seg.length+' etapas · '+returns.length+' vuelta(s) detectada(s)'+(mode==='pedido'?' · '+jumps.length+' salto(s) explicado(s) por negación':'');
+  html+='<details class="traceRawToggle"><summary>Ver detalle técnico ('+rows.length+' confirmaciones)</summary><div class="traceTimelineRaw">'+raw+'</div></details>';
+  tl.innerHTML='<div style="padding:10px">'+html+'</div>';$('traceStatus').textContent=(mode==='picker'?'Picker ':'Pedido ')+q+' · '+rows.length+' confirmaciones · '+returns.length+' vuelta(s) real(es) · '+jumps.length+' salto(s) por negación';
 }
 async function traceRun(force=false){const mode=$('traceMode').value,q=traceNorm($('traceQuery').value);if(!q){$('traceStatus').textContent=mode==='picker'?'Escribí el nombre del picker.':'Escribí el Pedido ERP.';return}$('traceStatus').textContent='Reconstruyendo película y cruzando Reporte de Líneas Negadas…';try{const [all,neg]=await Promise.all([traceLoadRows(force),traceLoadNegatedLines(force)]),rows=traceRelevantRows(all,mode,q);traceRender(rows,mode,q,neg,all)}catch(e){$('traceStatus').textContent='No se pudo cargar la trazabilidad: '+String(e.message||e);$('traceTimeline').innerHTML='<div class="traceEmpty">Error al leer las fuentes.</div>'}}
 function traceOpenPedido(pedido){$('traceMode').value='pedido';$('traceQuery').value=pedido;traceRun(false);$('tracePanel')?.scrollIntoView({behavior:'smooth',block:'start'})}
