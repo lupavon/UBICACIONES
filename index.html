@@ -2084,6 +2084,10 @@ body.light-mode .traceNotice{background:#f8fafc!important;color:#536477!importan
 body.light-mode .traceEmpty{background:#fff!important;color:#738195!important}
 
 </style>
+
+<style id="productivity-simple-v1">
+@media(max-width:900px){#productivityView>div[style*="grid-template-columns:minmax(300px,1fr)"]{grid-template-columns:1fr!important}}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2668,6 +2672,27 @@ body.light-mode .traceEmpty{background:#fff!important;color:#738195!important}
       <button class="btn" id="productivityNextDay" title="Día siguiente">→</button>
       <button class="btn" id="productivityYesterdayBtn">Ayer</button>
       <button class="btn" id="productivityTodayBtn">Hoy</button>
+    </div>
+  </div>
+
+  <div class="processKpis" style="grid-template-columns:minmax(220px,360px);margin-top:14px;margin-bottom:14px">
+    <div class="processKpi"><small>PRODUCTIVIDAD GENERAL DEL DÍA</small><b id="productivityGeneralDailySimple">0.0</b><span>líneas/h · sólo pickers operativos</span></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:14px;margin-top:0;align-items:start">
+    <div class="receiptSupplierCard" style="margin-top:0">
+      <div class="receiptSupplierHead"><div><b>Productividad diaria por sector</b><small>Sólo sector y productividad promedio</small></div></div>
+      <div class="receiptSupplierWrap" style="overflow:auto">
+        <table class="receiptSupplierTable"><thead><tr><th>Sector</th><th>Productividad promedio</th></tr></thead><tbody id="productivitySectorDailyBody"></tbody></table>
+        <div id="productivitySectorDailyEmpty" class="receiptSupplierEmpty" style="display:none">Sin datos de Picking para este día.</div>
+      </div>
+    </div>
+    <div class="receiptSupplierCard" style="margin-top:0">
+      <div class="receiptSupplierHead"><div><b>Productividad general por día</b><small>Histórico del mes seleccionado</small></div></div>
+      <div class="receiptSupplierWrap" style="overflow:auto;max-height:420px">
+        <table class="receiptSupplierTable"><thead><tr><th>Fecha</th><th>Productividad general</th></tr></thead><tbody id="productivityGeneralHistoryBody"></tbody></table>
+        <div id="productivityGeneralHistoryEmpty" class="receiptSupplierEmpty" style="display:none">Sin histórico disponible para este mes.</div>
+      </div>
     </div>
   </div>
 
@@ -5644,7 +5669,15 @@ function fmtDur(mins){
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 function timeNormName(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
-function timeIsExcluded(r){return timeNormName(r?.Nombres||r?.Picker)==='nestor diaz';}
+function timeIsExcluded(r){
+  const name=timeNormName(r?.Nombres||r?.Picker||r?.Empleado||'');
+  const id=String(r?.IdEmpleado||r?.idEmpleado||r?.Empleado||r?.empleado||'').trim();
+  // Usuarios que pueden confirmar líneas ocasionalmente pero NO son pickers operativos.
+  // Se conservan en la trazabilidad; sólo se excluyen de KPIs/promedios de Productividad.
+  if(['3887','3891'].includes(id))return true; // Noelia Juarez (supervisión / usuario alternativo)
+  if(name==='noelia juarez'||name==='lucas pavon'||name==='nestor diaz')return true;
+  return false;
+}
 function timeRawZone(r){
   return String(r?.ZonaLineaPicking||r?.ZonaPrincipal||r?.Zona||r?.ZonaPiso||r?.zonapiso||r?.zona||'').trim().toUpperCase();
 }
@@ -5726,6 +5759,33 @@ function renderTimes(){
 
 let PRODUCTIVITY_SORT={key:'avg',dir:-1};
 let productivityCalendarAnchor='';
+function productivitySectorLabel(rows){
+  const z=timePickerZones(rows);
+  if(z==='MFCS'||z==='MFCS (VOL)')return 'MFCS / MFCVOL';
+  return z||'—';
+}
+function renderProductivitySectorDaily(pickers){
+  const body=$('productivitySectorDailyBody'),empty=$('productivitySectorDailyEmpty'); if(!body)return;
+  const groups={};
+  (pickers||[]).forEach(p=>{
+    const sector=productivitySectorLabel(p.rows); if(!sector||sector==='—')return;
+    if(!groups[sector])groups[sector]=[]; groups[sector].push(p.rows.length/6.5);
+  });
+  const rows=Object.entries(groups).map(([sector,vals])=>({sector,avg:vals.reduce((a,b)=>a+b,0)/vals.length}))
+    .sort((a,b)=>a.sector.localeCompare(b.sector,'es',{numeric:true,sensitivity:'base'}));
+  body.innerHTML=rows.map(x=>'<tr><td><b>'+esc(x.sector)+'</b></td><td><b>'+x.avg.toFixed(1)+' lín/h</b></td></tr>').join('');
+  if(empty)empty.style.display=rows.length?'none':'block';
+}
+function renderProductivityGeneralHistory(daysData){
+  const body=$('productivityGeneralHistoryBody'),empty=$('productivityGeneralHistoryEmpty'); if(!body)return;
+  const rows=(daysData||[]).map(x=>{
+    const by={}; (x.rows||[]).filter(r=>!timeIsExcluded(r)).forEach(r=>{const n=productivityPickerNameFromRow(r);if(!by[n])by[n]=0;by[n]++;});
+    const vals=Object.values(by); const total=vals.reduce((a,b)=>a+b,0);
+    return {day:x.day,avg:vals.length?total/(vals.length*6.5):null};
+  }).filter(x=>x.avg!==null).sort((a,b)=>b.day.localeCompare(a.day));
+  body.innerHTML=rows.map(x=>'<tr><td><b>'+x.day.split('-').reverse().join('/')+'</b></td><td><b>'+x.avg.toFixed(1)+' lín/h</b></td></tr>').join('');
+  if(empty)empty.style.display=rows.length?'none':'block';
+}
 function renderProductivityDaily(pickers){
   if(!$('productivityDailyBody'))return;
   const k=PRODUCTIVITY_SORT.key,d=PRODUCTIVITY_SORT.dir;
@@ -5742,6 +5802,8 @@ function renderProductivityDaily(pickers){
   $('productivityTotalLines').textContent=total.toLocaleString('es-AR');
   $('productivityPickerCount').textContent=arr.length;
   $('productivityGeneralAvg').textContent=avg.toFixed(1);
+  if($('productivityGeneralDailySimple'))$('productivityGeneralDailySimple').textContent=avg.toFixed(1);
+  renderProductivitySectorDaily(arr);
   productivityUpdateMonthPicker(arr);
   productivityLoadMonth($('productivityDateFilter')?.value||TIME_SELECTED_DATE||timeYesterdayISO(),false);
 }
@@ -5784,6 +5846,7 @@ async function productivityLoadMonth(iso,force=false){
   if(!force && PRODUCTIVITY_MONTH_CACHE[month]){
     productivityUpdateMonthPickerFromMonth(PRODUCTIVITY_MONTH_CACHE[month]);
     renderProductivityMonthChart(month,PRODUCTIVITY_MONTH_CACHE[month]);
+    renderProductivityGeneralHistory(PRODUCTIVITY_MONTH_CACHE[month]);
     return;
   }
   PRODUCTIVITY_MONTH_LOADING=true;
@@ -5810,6 +5873,7 @@ async function productivityLoadMonth(iso,force=false){
     PRODUCTIVITY_MONTH_CACHE[month]=result;
     productivityUpdateMonthPickerFromMonth(result);
     renderProductivityMonthChart(month,result);
+    renderProductivityGeneralHistory(result);
   }finally{
     PRODUCTIVITY_MONTH_LOADING=false;
   }
