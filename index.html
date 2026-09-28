@@ -2059,7 +2059,30 @@ body:not(.light-mode) .sanMoveCard,body:not(.light-mode) .sanMixedCard,body:not(
 .traceSectionTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:15px 0 8px}.traceSectionTitle b{font-size:12px}.traceSectionTitle span{font-size:9px;color:#83909e}
 .traceRawToggle{margin-top:12px;border:1px solid #28333e;border-radius:9px;overflow:hidden}.traceRawToggle summary{cursor:pointer;padding:10px 12px;background:#101821;font-size:10px;font-weight:900;color:#9ca9b7}.traceRawToggle .traceTimelineRaw{max-height:430px;overflow:auto}
 .traceNotice{padding:14px;border:1px dashed #536171;border-radius:10px;background:#10161d;color:#aeb9c5;font-size:11px;line-height:1.5}.traceNotice b{color:#e5edf5}
-@media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.traceStage{grid-template-columns:72px 62px 1fr}.traceStageCount{grid-column:3}.traceCause,.traceRepick{grid-template-columns:28px 1fr}.traceCauseMeta,.traceRepickMeta{grid-column:2;text-align:left}.traceKpis{grid-template-columns:repeat(2,1fr)}}\n/* ===== Trazabilidad Picking · integración completa con modo claro ===== */
+body.light-mode .tracePanel{background:#fff!important;color:#17212b!important;border-color:#dfe6ee!important;box-shadow:0 1px 2px rgba(15,23,42,.025),0 7px 20px rgba(15,23,42,.02)!important}
+body.light-mode .traceHead{background:#fff!important;border-color:#e7ecf2!important;color:#17212b!important}
+body.light-mode .traceHead b{color:#17212b!important}body.light-mode .traceHead small{color:#738195!important}
+body.light-mode .traceTools label{color:#738195!important}body.light-mode .traceTools input,body.light-mode .traceTools select{background:#fff!important;color:#17212b!important;border-color:#cbd5e1!important}
+body.light-mode .traceKpi{background:#fff!important;color:#17212b!important;border-color:#dfe6ee!important;box-shadow:0 1px 2px rgba(15,23,42,.02)!important}
+body.light-mode .traceKpi small{color:#738195!important}body.light-mode .traceKpi b{color:#17212b!important}body.light-mode .traceKpi span{color:#7b899a!important}
+body.light-mode .traceKpi.traceAlert{background:#fff7f8!important;border-color:#efc3c8!important}body.light-mode .traceKpi.traceAlert b{color:#c43f4d!important}
+body.light-mode .traceKpi.traceGood{background:#f2fbf6!important;border-color:#b8dfca!important}body.light-mode .traceKpi.traceGood b{color:#147553!important}
+body.light-mode .traceBody{background:#fff!important;color:#17212b!important}body.light-mode .traceStatus{color:#667586!important}
+body.light-mode .traceStreet{background:#fff!important;color:#17212b!important;border-color:#dfe6ee!important}body.light-mode .traceStreet b{color:#263548!important}body.light-mode .traceStreet span{color:#738195!important}body.light-mode .traceStreet i{background:#4b9fe1!important}
+body.light-mode .traceTimeline,body.light-mode .traceTimelineRaw{background:#fff!important;color:#17212b!important;border-color:#dfe6ee!important}
+body.light-mode .traceEvent{background:#fff!important;border-color:#e8edf3!important;color:#263548!important}body.light-mode .traceEvent:hover{background:#f7fafc!important}
+body.light-mode .traceTime{color:#17212b!important}body.light-mode .traceZone{color:#1479b8!important}body.light-mode .tracePicker{color:#263548!important}body.light-mode .traceOrder{color:#667586!important}body.light-mode .traceState{color:#7b899a!important}
+body.light-mode .traceGap{background:#fff9ea!important;border-color:#ecd9a5!important;color:#8b6208!important}body.light-mode .traceGap.hot{background:#fff4f5!important;border-color:#efc2c7!important;color:#b43c48!important}
+body.light-mode .traceStage{background:#fff!important;color:#263548!important;border-color:#dfe6ee!important;box-shadow:0 1px 2px rgba(15,23,42,.02)!important}body.light-mode .traceStage:hover{background:#f7fafc!important}
+body.light-mode .traceStageTime{color:#17212b!important}body.light-mode .traceStageZone{color:#1479b8!important}body.light-mode .traceStageMain b{color:#263548!important}body.light-mode .traceStageMain small{color:#738195!important}body.light-mode .traceStageCount{color:#34465a!important}
+body.light-mode .traceCause{background:#fff6f7!important;border-color:#efc6cb!important;color:#263548!important}body.light-mode .traceCause b{color:#b83d49!important}body.light-mode .traceCause small{color:#7d6266!important}body.light-mode .traceCauseMeta{color:#b83d49!important}
+body.light-mode .traceRepick{background:#fffbef!important;border-color:#ead9a5!important;color:#263548!important}body.light-mode .traceRepick b{color:#8a6509!important}body.light-mode .traceRepick small{color:#766b4c!important}body.light-mode .traceRepickMeta{color:#8a6509!important}
+body.light-mode .traceFlowArrow{color:#8ca0b3!important}body.light-mode .traceSectionTitle b{color:#263548!important}body.light-mode .traceSectionTitle span{color:#7b899a!important}
+body.light-mode .traceRawToggle{background:#fff!important;border-color:#dfe6ee!important}body.light-mode .traceRawToggle summary{background:#f7f9fc!important;color:#536477!important;border-color:#dfe6ee!important}
+body.light-mode .traceNotice{background:#f8fafc!important;color:#536477!important;border-color:#cbd6e2!important}body.light-mode .traceNotice b{color:#223145!important}
+body.light-mode .traceEmpty{background:#fff!important;color:#738195!important}
+
 </style>
 </head>
 <body>
