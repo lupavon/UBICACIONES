@@ -2126,6 +2126,27 @@ body.light-mode .prodView #productivityCalendar button:disabled{background:#f8fa
 body.light-mode .prodView #productivityCalendar button[style*="75c8ff"]{background:#eaf4fc!important;color:#173a5e!important;border-color:#75b7e8!important}
 body.light-mode .prodView .prodExports{background:#fff!important;border-color:#edf1f5!important}
 </style>
+
+<style>
+/* vProductividad · histórico mensual en barras cronológicas */
+.prodMonthlyBarWrap{padding:18px 16px 14px;overflow-x:auto;overflow-y:hidden}
+.prodMonthlyBars{min-width:720px;height:285px}
+.prodMonthChartArea{position:relative;height:100%;padding-top:24px}
+.prodMonthBarsGrid{position:absolute;inset:24px 0 0;display:grid;grid-template-columns:repeat(31,minmax(14px,1fr));gap:5px;align-items:stretch;border-bottom:1px solid var(--pline);background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),var(--pline) 25%)}
+.prodMonthBarCol{min-width:0;display:grid;grid-template-rows:18px 1fr 20px;align-items:end;text-align:center;position:relative;z-index:2}
+.prodMonthValue{font-size:8px;font-weight:800;color:var(--pmuted);white-space:nowrap;overflow:visible;opacity:0;transition:.12s}
+.prodMonthBarCol:hover .prodMonthValue{opacity:1}
+.prodMonthBarSlot{height:100%;display:flex;align-items:flex-end;justify-content:center;min-height:0}
+.prodMonthBar{display:block;width:min(18px,78%);min-width:7px;background:#4f8fca;border-radius:5px 5px 2px 2px;transition:transform .12s ease,filter .12s ease;box-shadow:0 1px 2px rgba(15,23,42,.12)}
+.prodMonthBarCol:hover .prodMonthBar:not(.isEmpty){transform:scaleX(1.12);filter:brightness(1.08)}
+.prodMonthBar.isEmpty{height:2px!important;background:var(--pline);box-shadow:none}
+.prodMonthBarCol>span{font-size:8px;color:var(--pmuted);padding-top:5px;font-variant-numeric:tabular-nums}
+.prodMonthAvgLine{position:absolute;left:0;right:0;border-top:1px dashed #d29922;z-index:3;pointer-events:none}
+.prodMonthAvgLine em{position:absolute;right:2px;bottom:3px;font-size:8px;font-style:normal;font-weight:900;color:#9a6a00;background:var(--pcard);padding:2px 5px;border-radius:5px}
+body:not(.light-mode) .prodMonthAvgLine em{color:#ffd36b}
+@media(max-width:900px){.prodMonthlyBars{min-width:680px;height:250px}.prodMonthBarsGrid{gap:4px}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2727,7 +2748,7 @@ body.light-mode .prodView .prodExports{background:#fff!important;border-color:#e
     </section>
     <section class="prodCard prodHistoryCard">
       <div class="prodCardHead"><div><span class="prodLabel">TENDENCIA</span><h3>Productividad general del mes</h3><p>Lectura diaria para detectar tendencia y desvíos</p></div><small id="productivityHistoryMonth"></small></div>
-      <div class="prodHistoryWrap"><table class="prodTable prodHistoryTable"><thead><tr><th>Fecha</th><th>Productividad general</th></tr></thead><tbody id="productivityGeneralHistoryBody"></tbody></table><div id="productivityGeneralHistoryEmpty" class="receiptSupplierEmpty" style="display:none">Sin histórico disponible para este mes.</div></div>
+      <div class="prodMonthlyBarWrap"><div id="productivityGeneralHistoryBody" class="prodMonthlyBars" aria-label="Gráfico de productividad general del mes"></div><div id="productivityGeneralHistoryEmpty" class="receiptSupplierEmpty" style="display:none">Sin histórico disponible para este mes.</div></div>
     </section>
   </div>
 
@@ -5771,16 +5792,29 @@ function renderProductivitySectorDaily(pickers){
   if(empty)empty.style.display=rows.length?'none':'block';
 }
 function renderProductivityGeneralHistory(daysData){
-  const body=$('productivityGeneralHistoryBody'),empty=$('productivityGeneralHistoryEmpty'); if(!body)return;
-  const rows=(daysData||[]).map(x=>{
+  const host=$('productivityGeneralHistoryBody'),empty=$('productivityGeneralHistoryEmpty'); if(!host)return;
+  const raw=(daysData||[]).map(x=>{
     const by={}; (x.rows||[]).filter(r=>!timeIsExcluded(r)).forEach(r=>{const n=productivityPickerNameFromRow(r);if(!by[n])by[n]=0;by[n]++;});
-    const vals=Object.values(by); const total=vals.reduce((a,b)=>a+b,0);
+    const vals=Object.values(by),total=vals.reduce((a,b)=>a+b,0);
     return {day:x.day,avg:vals.length?total/(vals.length*6.5):null};
-  }).filter(x=>x.avg!==null).sort((a,b)=>b.day.localeCompare(a.day));
-  const max=Math.max(1,...rows.map(x=>x.avg));
-  body.innerHTML=rows.map(x=>'<tr><td><b>'+x.day.split('-').reverse().join('/')+'</b></td><td><div class="prodHistoryMetric"><div class="prodBar"><i style="width:'+Math.max(4,x.avg/max*100).toFixed(0)+'%"></i></div><b>'+x.avg.toFixed(1)+' lín/h</b></div></td></tr>').join('');
-  if($('productivityHistoryMonth') && rows.length)$('productivityHistoryMonth').textContent=rows[0].day.slice(0,7).split('-').reverse().join('/');
-  if(empty)empty.style.display=rows.length?'none':'block';
+  }).filter(x=>x.day);
+  if(!raw.length){host.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  const month=raw[0].day.slice(0,7), [yy,mm]=month.split('-').map(Number);
+  const daysInMonth=new Date(yy,mm,0).getDate();
+  const byDay=Object.fromEntries(raw.map(x=>[x.day,x.avg]));
+  const vals=raw.map(x=>x.avg).filter(v=>v!==null&&isFinite(v));
+  const max=Math.max(10,...vals)*1.12;
+  const avgMonth=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+  const avgPct=Math.max(0,Math.min(100,avgMonth/max*100));
+  const bars=[];
+  for(let d=1;d<=daysInMonth;d++){
+    const iso=month+'-'+String(d).padStart(2,'0'), v=byDay[iso];
+    const has=v!==null&&v!==undefined&&isFinite(v), h=has?Math.max(2,v/max*100):0;
+    bars.push('<div class="prodMonthBarCol" title="'+(has?(String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+' · '+v.toFixed(1)+' lín/h'):(String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+' · sin datos'))+'"><div class="prodMonthValue">'+(has?v.toFixed(1):'')+'</div><div class="prodMonthBarSlot"><i class="prodMonthBar'+(has?'':' isEmpty')+'" style="height:'+h.toFixed(1)+'%"></i></div><span>'+String(d).padStart(2,'0')+'</span></div>');
+  }
+  host.innerHTML='<div class="prodMonthChartArea"><div class="prodMonthAvgLine" style="bottom:'+avgPct.toFixed(1)+'%"><em>Prom. '+avgMonth.toFixed(1)+'</em></div><div class="prodMonthBarsGrid">'+bars.join('')+'</div></div>';
+  if($('productivityHistoryMonth'))$('productivityHistoryMonth').textContent=String(mm).padStart(2,'0')+'/'+yy;
 }
 function renderProductivityDaily(pickers){
   if(!$('productivityDailyBody'))return;
