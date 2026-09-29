@@ -2166,6 +2166,58 @@ body:not(.light-mode) .prodMonthAvgLine em{color:#ffd36b}
 .prodMonthNoOp{font-size:7px!important;color:var(--pmuted);opacity:.75}
 @media(max-width:900px){.prodMonthExecStrip{grid-template-columns:repeat(2,1fr)}.prodMonthExecKpi:first-child{grid-column:1/-1}}
 </style>
+
+<style id="theme-polish-v1">
+/* ===== Tema visual unificado · claro/oscuro ===== */
+.modebar{flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin;gap:4px!important;padding:8px 18px!important;margin:0!important;border-bottom:1px solid var(--p-border,#dfe7ef)!important}
+.modebar .btn{flex:0 0 auto!important;white-space:nowrap!important;border:0!important;border-radius:7px!important;padding:8px 10px!important;box-shadow:none!important}
+.modebar .btn.active{background:#173f67!important;color:#fff!important}
+body.light-mode{--ui-bg:#f4f7fa;--ui-surface:#fff;--ui-surface-2:#f8fafc;--ui-border:#dce5ee;--ui-text:#172638;--ui-muted:#6f8194;--ui-blue:#1f5d91;--ui-hover:#eef5fb;--ui-shadow:0 3px 12px rgba(31,63,92,.055);background:var(--ui-bg)!important;color:var(--ui-text)!important;color-scheme:light}
+body.light-mode .top{background:#fff!important;border-color:var(--ui-border)!important;color:var(--ui-text)!important;box-shadow:0 1px 5px rgba(31,63,92,.035)!important}
+body.light-mode .brand h1,body.light-mode h1,body.light-mode h2,body.light-mode h3,body.light-mode h4,body.light-mode b,body.light-mode strong{color:var(--ui-text)}
+body.light-mode .brand small,body.light-mode .muted,body.light-mode .authNotice,body.light-mode small{color:var(--ui-muted)}
+body.light-mode .main,body.light-mode .layout,body.light-mode #dashboardView,body.light-mode .prodView,body.light-mode .timesView,body.light-mode .negView{background:var(--ui-bg)!important;color:var(--ui-text)!important}
+body.light-mode .modebar{background:#fff!important;border-color:var(--ui-border)!important}
+body.light-mode .modebar .btn{background:transparent!important;color:#425d77!important}
+body.light-mode .modebar .btn:hover{background:var(--ui-hover)!important;color:#173f67!important}
+body.light-mode .modebar .btn.active{background:#173f67!important;color:#fff!important}
+body.light-mode .btn,body.light-mode .filelabel,body.light-mode .prodSoftBtn,body.light-mode .prodIconBtn{background:#fff!important;color:#27445f!important;border-color:#d4e0eb!important}
+body.light-mode .btn:hover,body.light-mode .filelabel:hover,body.light-mode .prodSoftBtn:hover,body.light-mode .prodIconBtn:hover{background:#f1f6fb!important;border-color:#bfd2e3!important}
+body.light-mode input,body.light-mode select,body.light-mode textarea,body.light-mode .search{background:#fff!important;color:#17324c!important;border-color:#d4e0eb!important;color-scheme:light!important}
+body.light-mode input::placeholder,body.light-mode textarea::placeholder{color:#91a0af!important}
+body.light-mode .opsKpiCard,body.light-mode .opsSection,body.light-mode .opsPanel,body.light-mode .processKpi,body.light-mode .processTableWrap,body.light-mode .receiptTableWrap,body.light-mode .receiptSupplierCard,body.light-mode .sanControls,body.light-mode .sanKpi,body.light-mode .sanStage,body.light-mode .sanCard,body.light-mode .detailCard,body.light-mode .moveCard,body.light-mode .mixTraceBox,body.light-mode .progressPlanPanel,body.light-mode .progressAreaCard,body.light-mode .progressUnitarioPanel,body.light-mode .progressMicroPanel,body.light-mode .progressMicroCard,body.light-mode .progressPlanKpi,body.light-mode .progressDailyDrop,body.light-mode .prodCard,body.light-mode .prodKpi,body.light-mode .prodMonthExecKpi,body.light-mode .prodMonthExecutiveRead{background:#fff!important;color:var(--ui-text)!important;border-color:var(--ui-border)!important;box-shadow:var(--ui-shadow)!important}
+body.light-mode .opsSectionHead,body.light-mode .opsPanelHead,body.light-mode .prodCardHead,body.light-mode .receiptSupplierHead,body.light-mode .prodExports{background:#fff!important;color:var(--ui-text)!important;border-color:#e6edf3!important}
+body.light-mode table,body.light-mode .opsTable,body.light-mode .prodTable,body.light-mode .processTable,body.light-mode .receiptTable,body.light-mode .usersTable{background:#fff!important;color:var(--ui-text)!important}
+body.light-mode table th,body.light-mode .opsTable th,body.light-mode .prodTable th,body.light-mode .processTable th,body.light-mode .receiptTable th,body.light-mode .usersTable th{background:#f6f9fc!important;color:#60778d!important;border-color:#e0e8f0!important}
+body.light-mode table td,body.light-mode .opsTable td,body.light-mode .prodTable td,body.light-mode .processTable td,body.light-mode .receiptTable td,body.light-mode .usersTable td{background:#fff!important;color:#213d58!important;border-color:#e9eef3!important}
+body.light-mode table tbody tr:hover td,body.light-mode .opsTable tbody tr:hover td,body.light-mode .prodTable tbody tr:hover td,body.light-mode .processTable tr:hover td,body.light-mode .receiptTable tr:hover td{background:#f3f8fc!important}
+body.light-mode .processStatus,body.light-mode .prodSub,body.light-mode .prodEyebrow,body.light-mode .prodCardHead p,body.light-mode .prodMonthExecutiveRead{color:var(--ui-muted)!important}
+body.light-mode .prodBar,body.light-mode .opsPctTrack{background:#e8eef4!important}
+body.light-mode .prodBar>i,body.light-mode .opsPctFill{background:#4b91cc!important}
+body.light-mode .detailSection,body.light-mode .side{background:#f8fafc!important;border-color:var(--ui-border)!important;color:var(--ui-text)!important}
+body.light-mode .rack{background:#f0f4f8!important;border-color:#b8c4cf!important;box-shadow:inset 0 0 0 1px #d6dfe7!important}
+body.light-mode .slot{background:#fff!important;border-color:#d3dde6!important;color:#29435c!important}
+body.light-mode .slot.occupied{background:linear-gradient(180deg,#f1d4ae,#e3ba87)!important;color:#263442!important;border-color:#d4a96f!important}
+body.light-mode .slot.multi{background:linear-gradient(180deg,#df6570,#c64552)!important;color:#fff!important;border-color:#c94d59!important}
+body.light-mode .slot.bad{background:linear-gradient(180deg,#f5ca79,#e7a842)!important;color:#342718!important;border-color:#d99a34!important}
+body.light-mode .slot.unknown{background:#e8edf2!important;color:#53677b!important;border-color:#c7d2dc!important}
+body.light-mode .layoutHeatViewport{background:#fff!important;border-color:var(--ui-border)!important;box-shadow:var(--ui-shadow)!important}
+body.light-mode .layoutHeatTitle,body.light-mode .layoutHeatSectionLabel,body.light-mode .viewtitle{color:var(--ui-text)!important}
+body.light-mode .layoutHeatSubtitle,body.light-mode .layoutHeatHint,body.light-mode .layoutHeatLegend{color:var(--ui-muted)!important}
+body.light-mode .layoutHeatGrid{background:#fff!important}
+body.light-mode .layoutHeatCell.zero,body.light-mode .occCell.o0{background:#edf1f5!important;color:#607286!important;border-color:#d5dee7!important}
+body.light-mode .usersPanel{background:transparent!important;color:var(--ui-text)!important}
+body.light-mode .modalCard,body.light-mode .loginCard{background:#fff!important;color:var(--ui-text)!important;border-color:var(--ui-border)!important;box-shadow:0 24px 70px rgba(27,54,78,.16)!important}
+body.light-mode .pill{background:#f1f5f9!important;color:#40576e!important;border-color:#d7e1ea!important}
+/* Oscuro: un poco más uniforme, sin negro puro */
+body:not(.light-mode){--ui-dark-bg:#0f141b;--ui-dark-surface:#151c24;--ui-dark-border:#2a3541;background:var(--ui-dark-bg)!important}
+body:not(.light-mode) .modebar{background:#121820!important;border-color:var(--ui-dark-border)!important}
+body:not(.light-mode) .modebar .btn{color:#aebdcb!important;background:transparent!important}
+body:not(.light-mode) .modebar .btn:hover{background:#1c2631!important;color:#eef5fb!important}
+body:not(.light-mode) .modebar .btn.active{background:#245b8c!important;color:#fff!important}
+@media(max-width:1100px){.modebar{padding-left:10px!important;padding-right:10px!important}.modebar .btn{padding:8px 9px!important;font-size:11px!important}}
+</style>
+
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2177,17 +2229,17 @@ body:not(.light-mode) .prodMonthAvgLine em{color:#ffd36b}
 <main class="main">
 <div class="modebar">
 <button class="btn active" id="dashboardModeBtn">🏠 Operación</button>
-<button class="btn" id="progressModeBtn">📦 Avance pedidos</button>
-<button class="btn" id="rackModeBtn">Vista racks</button>
-<button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
-<button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
-<button class="btn" id="kpiModeBtn">📊 KPIs</button>
-<button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
-<button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
-<button class="btn" id="receiptModeBtn">📥 En recibo</button>
-<button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
 <button class="btn" id="productivityModeBtn">📈 Productividad</button>
+<button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
+<button class="btn" id="receiptModeBtn">📥 En recibo</button>
+<button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
+<button class="btn" id="progressModeBtn">📦 Avance pedidos</button>
+<button class="btn" id="kpiModeBtn">📊 KPIs</button>
+<button class="btn" id="rackModeBtn">Vista racks</button>
+<button class="btn" id="occupancyModeBtn">📦 Mapa de calor · ocupación</button>
+<button class="btn" id="heatModeBtn">🔥 Mapa de calor · mezcla SKU</button>
+<button class="btn" id="sanitationModeBtn">🧹 Saneamiento 1 SKU por posición</button>
 <button class="btn adminOnly" id="usersModeBtn">👥 Usuarios</button>
 </div>
 <div class="zonebar rackOnlyZonebar" id="rackZonebar"><button class="btn zonebtn active" data-view="MFCA-L">MFCA L</button><button class="btn zonebtn" data-view="MFCA-R">MFCA R</button><button class="btn zonebtn" data-view="MFCB-L">MFCB L</button><button class="btn zonebtn" data-view="MFCB-R">MFCB R</button><button class="btn zonebtn" data-view="MFCC-L">MFCC L</button><button class="btn zonebtn" data-view="MFCC-R">MFCC R</button><button class="btn zonebtn" data-view="AR">AR</button><button class="btn zonebtn" data-view="BR">BR</button></div>
@@ -5839,7 +5891,7 @@ function renderProductivityGeneralHistory(daysData){
   const fmtDay=x=>x?x.day.slice(8,10)+'/'+x.day.slice(5,7):'—';
   const trendTxt=trendPct===null?'—':(trendPct>=0?'+':'')+trendPct.toFixed(1)+'%';
   const stats='<div class="prodMonthExecStrip">'+
-    '<div class="prodMonthExecKpi"><small>MTD ponderado</small><b>'+avgMonth.toFixed(1)+' lín/h</b><span>'+totalLines.toLocaleString('es-AR')+' líneas · '+activeDays+' días operativos</span></div>'+
+    '<div class="prodMonthExecKpi"><small>Productividad acumulada del mes</small><b>'+avgMonth.toFixed(1)+' lín/h</b><span>'+totalLines.toLocaleString('es-AR')+' líneas · '+activeDays+' días operativos</span></div>'+
     '<div class="prodMonthExecKpi"><small>Últimos 5 días</small><b>'+last5Avg.toFixed(1)+' lín/h</b><span>ritmo operativo reciente</span></div>'+
     '<div class="prodMonthExecKpi"><small>Tendencia</small><b>'+trendTxt+'</b><span>últimos 5 vs primeros 5</span></div>'+
     '<div class="prodMonthExecKpi"><small>Mejor día</small><b>'+(best?best.avg.toFixed(1)+' lín/h':'—')+'</b><span>'+fmtDay(best)+'</span></div>'+
@@ -5853,8 +5905,8 @@ function renderProductivityGeneralHistory(daysData){
     const tip=String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+(has?' · '+v.toFixed(1)+' lín/h · '+rec.lines+' líneas · '+rec.pickers+' pickers':' · sin operación/datos');
     bars.push('<div class="prodMonthBarCol" title="'+tip+'"><div class="prodMonthValue">'+(has?v.toFixed(1):'')+'</div><div class="prodMonthBarSlot"><i class="prodMonthBar'+(has?'':' isEmpty')+cls+'" style="height:'+h.toFixed(1)+'%"></i></div><span class="'+(has?'':'prodMonthNoOp')+'">'+String(d).padStart(2,'0')+'</span></div>');
   }
-  const read='<div class="prodMonthExecutiveRead"><b>Lectura ejecutiva:</b> MTD '+avgMonth.toFixed(1)+' lín/h · últimos 5 días '+last5Avg.toFixed(1)+' lín/h'+(trendPct===null?'':' · '+(trendPct>=0?'↑ ':'↓ ')+Math.abs(trendPct).toFixed(1)+'% vs primeros 5 días')+(best?' · máximo '+best.avg.toFixed(1)+' el '+fmtDay(best):'')+'. <span style="opacity:.8">Verde = máximo · naranja = mínimo · línea punteada = MTD ponderado.</span></div>';
-  host.innerHTML=stats+'<div class="prodMonthChartArea"><div class="prodMonthPlot"><div class="prodMonthAvgLine" style="bottom:'+avgPct.toFixed(1)+'%"><em>MTD '+avgMonth.toFixed(1)+'</em></div><div class="prodMonthBarsGrid">'+bars.join('')+'</div></div></div>'+read;
+  const read='<div class="prodMonthExecutiveRead"><b>Lectura ejecutiva:</b> Acumulado del mes '+avgMonth.toFixed(1)+' lín/h · últimos 5 días '+last5Avg.toFixed(1)+' lín/h'+(trendPct===null?'':' · '+(trendPct>=0?'↑ ':'↓ ')+Math.abs(trendPct).toFixed(1)+'% vs primeros 5 días')+(best?' · máximo '+best.avg.toFixed(1)+' el '+fmtDay(best):'')+'. <span style="opacity:.8">Verde = máximo · naranja = mínimo · línea punteada = productividad acumulada del mes.</span></div>';
+  host.innerHTML=stats+'<div class="prodMonthChartArea"><div class="prodMonthPlot"><div class="prodMonthAvgLine" style="bottom:'+avgPct.toFixed(1)+'%"><em>Acum. mes '+avgMonth.toFixed(1)+'</em></div><div class="prodMonthBarsGrid">'+bars.join('')+'</div></div></div>'+read;
   if($('productivityHistoryMonth'))$('productivityHistoryMonth').textContent=String(mm).padStart(2,'0')+'/'+yy;
 }
 function renderProductivityDaily(pickers){
