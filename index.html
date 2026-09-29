@@ -2147,6 +2147,25 @@ body:not(.light-mode) .prodMonthAvgLine em{color:#ffd36b}
 @media(max-width:900px){.prodMonthlyBars{min-width:680px;height:250px}.prodMonthBarsGrid{gap:4px}}
 </style>
 
+
+<style>
+/* vProductividad gerencial · resumen MTD */
+.prodMonthlyBars{height:auto!important;min-height:330px}
+.prodMonthExecStrip{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px;margin:0 0 14px}
+.prodMonthExecKpi{border:1px solid var(--pline);background:color-mix(in srgb,var(--pcard) 92%,#4f8fca 8%);border-radius:10px;padding:9px 10px;min-width:0}
+.prodMonthExecKpi small{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:var(--pmuted);font-weight:900}
+.prodMonthExecKpi b{display:block;margin-top:4px;font-size:16px;color:var(--ptext);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prodMonthExecKpi span{display:block;margin-top:2px;font-size:8px;color:var(--pmuted)}
+.prodMonthExecutiveRead{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--pcard) 94%,#4f8fca 6%);border:1px solid var(--pline);font-size:10px;color:var(--pmuted);line-height:1.4}
+.prodMonthExecutiveRead b{color:var(--ptext)}
+.prodMonthChartArea{height:285px!important;padding-top:24px!important}
+.prodMonthPlot{position:absolute;inset:24px 0 0}
+.prodMonthPlot .prodMonthBarsGrid{inset:0!important}
+.prodMonthPlot .prodMonthAvgLine{left:0;right:0}
+.prodMonthBar.isBest{background:#2f855a!important}.prodMonthBar.isWorst{background:#c05621!important}
+.prodMonthNoOp{font-size:7px!important;color:var(--pmuted);opacity:.75}
+@media(max-width:900px){.prodMonthExecStrip{grid-template-columns:repeat(2,1fr)}.prodMonthExecKpi:first-child{grid-column:1/-1}}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -5795,25 +5814,47 @@ function renderProductivityGeneralHistory(daysData){
   const host=$('productivityGeneralHistoryBody'),empty=$('productivityGeneralHistoryEmpty'); if(!host)return;
   const raw=(daysData||[]).map(x=>{
     const by={}; (x.rows||[]).filter(r=>!timeIsExcluded(r)).forEach(r=>{const n=productivityPickerNameFromRow(r);if(!by[n])by[n]=0;by[n]++;});
-    const vals=Object.values(by),total=vals.reduce((a,b)=>a+b,0);
-    return {day:x.day,avg:vals.length?total/(vals.length*6.5):null};
+    const vals=Object.values(by),total=vals.reduce((a,b)=>a+b,0),pickers=vals.length;
+    return {day:x.day,lines:total,pickers,productiveHours:pickers*6.5,avg:pickers?total/(pickers*6.5):null};
   }).filter(x=>x.day);
   if(!raw.length){host.innerHTML='';if(empty)empty.style.display='block';return;}
   if(empty)empty.style.display='none';
   const month=raw[0].day.slice(0,7), [yy,mm]=month.split('-').map(Number);
   const daysInMonth=new Date(yy,mm,0).getDate();
-  const byDay=Object.fromEntries(raw.map(x=>[x.day,x.avg]));
-  const vals=raw.map(x=>x.avg).filter(v=>v!==null&&isFinite(v));
+  const active=raw.filter(x=>x.avg!==null&&isFinite(x.avg)&&x.lines>0);
+  const byDay=Object.fromEntries(raw.map(x=>[x.day,x]));
+  const vals=active.map(x=>x.avg);
   const max=Math.max(10,...vals)*1.12;
-  const avgMonth=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+  // MTD ponderado: todas las líneas / todas las horas-pick de los días con operación.
+  const totalLines=active.reduce((a,x)=>a+x.lines,0);
+  const totalHours=active.reduce((a,x)=>a+x.productiveHours,0);
+  const avgMonth=totalHours?totalLines/totalHours:0;
+  const best=active.length?active.reduce((a,b)=>b.avg>a.avg?b:a):null;
+  const worst=active.length?active.reduce((a,b)=>b.avg<a.avg?b:a):null;
+  const last5=active.slice(-5), first5=active.slice(0,5);
+  const weighted=a=>{const l=a.reduce((s,x)=>s+x.lines,0),h=a.reduce((s,x)=>s+x.productiveHours,0);return h?l/h:0};
+  const last5Avg=weighted(last5), first5Avg=weighted(first5);
+  const trendPct=first5Avg?((last5Avg/first5Avg)-1)*100:null;
+  const activeDays=active.length;
+  const fmtDay=x=>x?x.day.slice(8,10)+'/'+x.day.slice(5,7):'—';
+  const trendTxt=trendPct===null?'—':(trendPct>=0?'+':'')+trendPct.toFixed(1)+'%';
+  const stats='<div class="prodMonthExecStrip">'+
+    '<div class="prodMonthExecKpi"><small>MTD ponderado</small><b>'+avgMonth.toFixed(1)+' lín/h</b><span>'+totalLines.toLocaleString('es-AR')+' líneas · '+activeDays+' días operativos</span></div>'+
+    '<div class="prodMonthExecKpi"><small>Últimos 5 días</small><b>'+last5Avg.toFixed(1)+' lín/h</b><span>ritmo operativo reciente</span></div>'+
+    '<div class="prodMonthExecKpi"><small>Tendencia</small><b>'+trendTxt+'</b><span>últimos 5 vs primeros 5</span></div>'+
+    '<div class="prodMonthExecKpi"><small>Mejor día</small><b>'+(best?best.avg.toFixed(1)+' lín/h':'—')+'</b><span>'+fmtDay(best)+'</span></div>'+
+    '<div class="prodMonthExecKpi"><small>Menor día</small><b>'+(worst?worst.avg.toFixed(1)+' lín/h':'—')+'</b><span>'+fmtDay(worst)+'</span></div></div>';
   const avgPct=Math.max(0,Math.min(100,avgMonth/max*100));
   const bars=[];
   for(let d=1;d<=daysInMonth;d++){
-    const iso=month+'-'+String(d).padStart(2,'0'), v=byDay[iso];
-    const has=v!==null&&v!==undefined&&isFinite(v), h=has?Math.max(2,v/max*100):0;
-    bars.push('<div class="prodMonthBarCol" title="'+(has?(String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+' · '+v.toFixed(1)+' lín/h'):(String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+' · sin datos'))+'"><div class="prodMonthValue">'+(has?v.toFixed(1):'')+'</div><div class="prodMonthBarSlot"><i class="prodMonthBar'+(has?'':' isEmpty')+'" style="height:'+h.toFixed(1)+'%"></i></div><span>'+String(d).padStart(2,'0')+'</span></div>');
+    const iso=month+'-'+String(d).padStart(2,'0'), rec=byDay[iso], v=rec?.avg;
+    const has=v!==null&&v!==undefined&&isFinite(v)&&rec.lines>0, h=has?Math.max(2,v/max*100):0;
+    const cls=has&&best&&iso===best.day?' isBest':has&&worst&&iso===worst.day?' isWorst':'';
+    const tip=String(d).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy+(has?' · '+v.toFixed(1)+' lín/h · '+rec.lines+' líneas · '+rec.pickers+' pickers':' · sin operación/datos');
+    bars.push('<div class="prodMonthBarCol" title="'+tip+'"><div class="prodMonthValue">'+(has?v.toFixed(1):'')+'</div><div class="prodMonthBarSlot"><i class="prodMonthBar'+(has?'':' isEmpty')+cls+'" style="height:'+h.toFixed(1)+'%"></i></div><span class="'+(has?'':'prodMonthNoOp')+'">'+String(d).padStart(2,'0')+'</span></div>');
   }
-  host.innerHTML='<div class="prodMonthChartArea"><div class="prodMonthAvgLine" style="bottom:'+avgPct.toFixed(1)+'%"><em>Prom. '+avgMonth.toFixed(1)+'</em></div><div class="prodMonthBarsGrid">'+bars.join('')+'</div></div>';
+  const read='<div class="prodMonthExecutiveRead"><b>Lectura ejecutiva:</b> MTD '+avgMonth.toFixed(1)+' lín/h · últimos 5 días '+last5Avg.toFixed(1)+' lín/h'+(trendPct===null?'':' · '+(trendPct>=0?'↑ ':'↓ ')+Math.abs(trendPct).toFixed(1)+'% vs primeros 5 días')+(best?' · máximo '+best.avg.toFixed(1)+' el '+fmtDay(best):'')+'. <span style="opacity:.8">Verde = máximo · naranja = mínimo · línea punteada = MTD ponderado.</span></div>';
+  host.innerHTML=stats+'<div class="prodMonthChartArea"><div class="prodMonthPlot"><div class="prodMonthAvgLine" style="bottom:'+avgPct.toFixed(1)+'%"><em>MTD '+avgMonth.toFixed(1)+'</em></div><div class="prodMonthBarsGrid">'+bars.join('')+'</div></div></div>'+read;
   if($('productivityHistoryMonth'))$('productivityHistoryMonth').textContent=String(mm).padStart(2,'0')+'/'+yy;
 }
 function renderProductivityDaily(pickers){
