@@ -7705,41 +7705,17 @@ function pickerLiveColor(name){return PICKER_LIVE_COLORS[pickerLiveHash(name)%PI
 async function buildPickerLivePanel(force=false){
  const grid=$('pickerLiveGrid');if(!grid)return;grid.innerHTML='<div class="pickerLiveEmpty">Cargando detalle real de Copérnico…</div>';
  try{
-  const res=await fetch('picking-en-curso.json?ts='+(force?Date.now():'live'),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json(),realOrders=Array.isArray(data.orders)?data.orders:[];
-  const dateEl=$('pickerLiveDate');let selectedDate=dateEl?.value||'';
-  if(!selectedDate&&data.fecha_query&&/^\d{8}$/.test(data.fecha_query)){selectedDate=data.fecha_query.slice(0,4)+'-'+data.fecha_query.slice(4,6)+'-'+data.fecha_query.slice(6,8);if(dateEl)dateEl.value=selectedDate}
-  if(!selectedDate)selectedDate=new Date().toISOString().slice(0,10);
-
-  // La planificación manda: conserva exactamente el orden cargado en UNITARIO SECO.
-  const daily=typeof progressDailyPlan==='function'?progressDailyPlan(selectedDate):null;
-  const sec=(daily?.sectors||[]).find(x=>String(typeof progressNormalizeSectorKey==='function'?progressNormalizeSectorKey(x.name):x.name||'').includes('UNITARIO SECO'));
-  const planned=Array.isArray(sec?.rows)?sec.rows:[];
-  const byPicking=new Map(),byPedido=new Map();
-  realOrders.forEach(o=>{if(o?.picking!=null)byPicking.set(String(o.picking).trim(),o);if(o?.pedido!=null)byPedido.set(String(o.pedido).trim(),o)});
-  const planValue=(r,keys)=>{for(const k of keys){const v=r?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=='')return v}return ''};
-  let orders=[];
-  if(planned.length){
-    orders=planned.map((r,idx)=>{
-      const pedido=String(planValue(r,['Pedido','Pedido ERP','PedidoERP','pedido'])).trim();
-      const picking=String(planValue(r,['Picking','TR','picking'])).trim();
-      const tienda=String(planValue(r,['Tienda','TIENDA','Destino','NombreTienda','Sucursal'])).trim();
-      const real=byPicking.get(picking)||byPedido.get(pedido)||{};
-      const planLines=Number(planValue(r,['TotalLineas','Lineas','Líneas','LINEAS','LÍNEAS'])||0);
-      const planUnits=Number(planValue(r,['Unidades','UNIDADES','Units'])||0);
-      return {...real,pedido:real.pedido||pedido,picking:real.picking||picking,tienda:tienda||real.tienda||'',plan_index:idx+1,plan_lineas:planLines,unidades:planUnits};
-    });
-  }else orders=realOrders.map((o,i)=>({...o,plan_index:i+1,tienda:o.tienda||''}));
-
-  const active=orders.filter(o=>o.picker_actual?.nombre&&Number(o.avance)<100);$('pickerLiveCount').textContent=new Set(active.map(o=>o.picker_actual.nombre)).size.toLocaleString('es-AR');$('pickerLiveOrders').textContent=orders.filter(o=>Number(o.avance)<100&&Number(o.ejecutadas)>0).length.toLocaleString('es-AR');$('pickerLiveLines').textContent=orders.reduce((a,o)=>a+Number(o.lineas||o.plan_lineas||0),0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=(data.updated_at?new Date(data.updated_at):new Date()).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  if(!orders.length){grid.innerHTML='<div class="pickerLiveEmpty">No hay planificación UNITARIO SECO cargada para esta fecha.</div>';return}
+  const res=await fetch('picking-en-curso.json?ts='+(force?Date.now():'live'),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json(),orders=Array.isArray(data.orders)?data.orders:[];
+  const date=$('pickerLiveDate');if(date&&data.fecha_query&&/^\d{8}$/.test(data.fecha_query)){date.value=data.fecha_query.slice(0,4)+'-'+data.fecha_query.slice(4,6)+'-'+data.fecha_query.slice(6,8)}
+  const active=orders.filter(o=>o.picker_actual?.nombre&&Number(o.avance)<100);$('pickerLiveCount').textContent=new Set(active.map(o=>o.picker_actual.nombre)).size.toLocaleString('es-AR');$('pickerLiveOrders').textContent=orders.filter(o=>Number(o.avance)<100&&Number(o.ejecutadas)>0).length.toLocaleString('es-AR');$('pickerLiveLines').textContent=orders.reduce((a,o)=>a+Number(o.lineas||0),0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=(data.updated_at?new Date(data.updated_at):new Date()).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  if(!orders.length){grid.innerHTML='<div class="pickerLiveEmpty">Todavía no hay pedidos MFC/AR consolidados. Ejecutá el workflow actualizado una vez.</div>';return}
   const zones=['MFCA','MFCB','MFCC','AR'];
-  grid.innerHTML='<table class="pickerOrderTable"><thead><tr><th>#</th><th class="left">Tienda</th><th>Pedido ERP</th><th>Picking</th><th>Líneas</th><th>Ejecut.</th><th>Pend.</th><th>Estado</th><th>Avance</th><th class="left">Picker actual</th>'+zones.map(z=>'<th>'+z+'</th>').join('')+'<th>Últ. mov.</th></tr></thead><tbody>'+orders.map((o,i)=>{
-    const hasReal=Number(o.lineas||0)>0||Number(o.ejecutadas||0)>0;const total=Number(o.lineas||o.plan_lineas||0),exec=Number(o.ejecutadas||0),pend=hasReal?Number(o.pendientes??Math.max(0,total-exec)):total,pct=hasReal?Number(o.avance||0):0;
-    const state=hasReal?(pct>=100?'FINALIZADO':exec>0?'INICIADO':'PENDIENTE'):'PENDIENTE',pc=o.picker_actual||null,color=pickerLiveColor(pc?.nombre||o.picking),chip=pc?.nombre?'<span class="pickerChip" style="--pc:'+color+'"><i></i>'+esc(pc.nombre)+' <small>'+esc(pc.zona||'—')+'</small></span>':'—';
-    return '<tr><td>'+Number(o.plan_index||i+1)+'</td><td class="left"><b>'+esc(o.tienda||'—')+'</b></td><td class="pedido">'+esc(o.pedido||'—')+'</td><td>'+esc(o.picking||'—')+'</td><td class="num">'+total.toLocaleString('es-AR')+'</td><td class="num">'+exec.toLocaleString('es-AR')+'</td><td class="num">'+pend.toLocaleString('es-AR')+'</td><td><span class="statePill '+(state==='FINALIZADO'?'done':state==='INICIADO'?'run':'wait')+'">'+state+'</span></td><td><span class="livePct">'+pct.toFixed(1).replace('.',',')+'%</span><div class="liveBar"><i style="width:'+Math.min(100,pct)+'%"></i></div></td><td class="left">'+chip+'</td>'+zones.map(z=>{const q=o.zonas?.[z]||{},act=pc?.zona===z;return '<td class="zoneReal '+(act?'active':'')+'"><b>'+(hasReal?Number(q.total||0).toLocaleString('es-AR'):'—')+'</b><small>'+(hasReal?(Number(q.ejecutadas||0)+' hechas · '+Number(q.pendientes||0)+' pend.'):'sin iniciar')+'</small></td>'}).join('')+'<td>'+(pc?.hora?esc(pc.hora):'—')+'</td></tr>';
-  }).join('')+'</tbody></table>';
+  // El JSON ya viene en el orden exacto de la Planilla de Preparación. No reordenar por estado/avance.
+  const rows=orders.slice().sort((a,b)=>Number(a.orden_plan||99999)-Number(b.orden_plan||99999));
+  grid.innerHTML='<table class="pickerOrderTable"><thead><tr><th>#</th><th class="left">Tienda</th><th>Pedido ERP</th><th>Picking</th><th>Líneas</th><th>Ejecut.</th><th>Pend.</th><th>Estado</th><th>Avance</th><th class="left">Picker actual</th>'+zones.map(z=>'<th>'+z+'</th>').join('')+'<th>Últ. mov.</th></tr></thead><tbody>'+rows.map((o,i)=>{const pct=Number(o.avance||0),state=pct>=100?'FINALIZADO':Number(o.ejecutadas)>0?'INICIADO':'PENDIENTE',pc=o.picker_actual||null,color=pickerLiveColor(pc?.nombre||o.picking),chip=pc?.nombre?'<span class="pickerChip" style="--pc:'+color+'"><i></i>'+esc(pc.nombre)+' <small>'+esc(pc.zona||'—')+'</small></span>':'—';return '<tr><td>'+esc(o.orden_plan||i+1)+'</td><td class="left"><b>'+esc(o.tienda||'—')+'</b></td><td class="pedido">'+esc(o.pedido||'—')+'</td><td>'+esc(o.picking||'—')+'</td><td class="num">'+Number(o.lineas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.ejecutadas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.pendientes||0).toLocaleString('es-AR')+'</td><td><span class="statePill '+(state==='FINALIZADO'?'done':state==='INICIADO'?'run':'wait')+'">'+state+'</span></td><td><span class="livePct">'+pct.toFixed(1).replace('.',',')+'%</span><div class="liveBar"><i style="width:'+Math.min(100,pct)+'%"></i></div></td><td class="left">'+chip+'</td>'+zones.map(z=>{const q=o.zonas?.[z]||{},act=pc?.zona===z;return '<td class="zoneReal '+(act?'active':'')+'"><b>'+Number(q.total||0).toLocaleString('es-AR')+'</b><small>'+Number(q.ejecutadas||0)+' hechas · '+Number(q.pendientes||0)+' pend.</small></td>'}).join('')+'<td>'+(pc?.hora?esc(pc.hora):'—')+'</td></tr>'}).join('')+'</tbody></table>';
  }catch(e){grid.innerHTML='<div class="pickerLiveEmpty">No se pudo cargar picking-en-curso.json: '+esc(e.message||e)+'</div>'}
 }
+
 $('opsDashRefreshBtn').onclick=()=>buildOperationalDashboard(true);
 document.querySelectorAll('[data-ops-open]').forEach(el=>el.onclick=()=>setDisplayMode(el.dataset.opsOpen));
 
