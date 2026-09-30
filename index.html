@@ -7698,22 +7698,177 @@ async function buildOperationalDashboard(force=false){
   }finally{OPS_DASH_LOADING=false;}
 }
 
-// ===== Picking en curso · detalle REAL de Copérnico, agrupado por pedido =====
+// ===== Picking en curso · Cloudflare Worker + planificación diaria =====
+const PICKER_LIVE_API='https://ubicaciones-operacion.pavonlucas-m.workers.dev';
 const PICKER_LIVE_COLORS=['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#db2777','#4f46e5','#65a30d','#9333ea','#ea580c','#0f766e'];
+let PICKER_LIVE_LAST_ORDERS=[];
+let PICKER_LIVE_TIMER=null;
+
 function pickerLiveHash(v){let h=0;for(const c of String(v||''))h=((h<<5)-h)+c.charCodeAt(0)|0;return Math.abs(h)}
 function pickerLiveColor(name){return PICKER_LIVE_COLORS[pickerLiveHash(name)%PICKER_LIVE_COLORS.length]}
-async function buildPickerLivePanel(force=false){
- const grid=$('pickerLiveGrid');if(!grid)return;grid.innerHTML='<div class="pickerLiveEmpty">Cargando detalle real de Copérnico…</div>';
- try{
-  const res=await fetch('picking-en-curso.json?ts='+(force?Date.now():'live'),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json(),orders=Array.isArray(data.orders)?data.orders:[];
-  const date=$('pickerLiveDate');if(date&&data.fecha_query&&/^\d{8}$/.test(data.fecha_query)){date.value=data.fecha_query.slice(0,4)+'-'+data.fecha_query.slice(4,6)+'-'+data.fecha_query.slice(6,8)}
-  const active=orders.filter(o=>o.picker_actual?.nombre&&Number(o.avance)<100);$('pickerLiveCount').textContent=new Set(active.map(o=>o.picker_actual.nombre)).size.toLocaleString('es-AR');$('pickerLiveOrders').textContent=orders.filter(o=>Number(o.avance)<100&&Number(o.ejecutadas)>0).length.toLocaleString('es-AR');$('pickerLiveLines').textContent=orders.reduce((a,o)=>a+Number(o.lineas||0),0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=(data.updated_at?new Date(data.updated_at):new Date()).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  if(!orders.length){grid.innerHTML='<div class="pickerLiveEmpty">Todavía no hay pedidos MFC/AR consolidados. Ejecutá el workflow actualizado una vez.</div>';return}
+function pickerLiveToday(){return typeof progressTodayISO==='function'?progressTodayISO():new Date().toISOString().slice(0,10)}
+function pickerLiveSelectedDate(){return $('pickerLiveDate')?.value||pickerLiveToday()}
+
+function pickerLivePlanRows(date){
+  try{
+    const daily=typeof progressDailyPlan==='function'?progressDailyPlan(date):null;
+    if(!daily?.sectors?.length)return [];
+    const out=[];
+    let orden=0;
+    daily.sectors.forEach(sec=>{
+      (sec.rows||[]).forEach(r=>{
+        const picking=String(r.Picking||r.TR||'').trim().replace(/\.0+$/,'');
+        if(!/^\d+$/.test(picking))return;
+        orden++;
+        out.push({
+          orden_plan:orden,
+          tienda:String(r.Tienda||r.TiendaNombre||r.Nombre||'').trim(),
+          pedido:String(r.Pedido||r.PedidoERP||'').trim().replace(/\.0+$/,''),
+          picking,
+          sector:String(sec.name||'')
+        });
+      });
+    });
+    return out;
+  }catch(e){
+    console.warn('Picking en curso: no se pudo leer planificación diaria',e);
+    return [];
+  }
+}
+
+async function pickerLiveLegacyPickers(force=false){
+  // Conserva picker/último movimiento del flujo existente mientras migramos esa fuente.
+  try{
+    const res=await fetch('picking-en-curso.json?ts='+(force?Date.now():'live'),{cache:'no-store'});
+    if(!res.ok)return new Map();
+    const data=await res.json();
+    const map=new Map();
+    (Array.isArray(data?.orders)?data.orders:[]).forEach(o=>{
+      const keys=[String(o?.picking||'').trim(),String(o?.pedido||'').trim()].filter(Boolean);
+      keys.forEach(k=>map.set(k,{picker_actual:o?.picker_actual||null}));
+    });
+    return map;
+  }catch(e){
+    console.warn('Picking en curso: fuente auxiliar de picker no disponible',e);
+    return new Map();
+  }
+}
+
+function pickerLiveRender(orders,updatedAt){
+  const grid=$('pickerLiveGrid');if(!grid)return;
   const zones=['MFCA','MFCB','MFCC','AR'];
-  // El JSON ya viene en el orden exacto de la Planilla de Preparación. No reordenar por estado/avance.
-  const rows=orders.slice().sort((a,b)=>Number(a.orden_plan||99999)-Number(b.orden_plan||99999));
-  grid.innerHTML='<table class="pickerOrderTable"><thead><tr><th>#</th><th class="left">Tienda</th><th>Pedido ERP</th><th>Picking</th><th>Líneas</th><th>Ejecut.</th><th>Pend.</th><th>Estado</th><th>Avance</th><th class="left">Picker actual</th>'+zones.map(z=>'<th>'+z+'</th>').join('')+'<th>Últ. mov.</th></tr></thead><tbody>'+rows.map((o,i)=>{const pct=Number(o.avance||0),state=pct>=100?'FINALIZADO':Number(o.ejecutadas)>0?'INICIADO':'PENDIENTE',pc=o.picker_actual||null,color=pickerLiveColor(pc?.nombre||o.picking),chip=pc?.nombre?'<span class="pickerChip" style="--pc:'+color+'"><i></i>'+esc(pc.nombre)+' <small>'+esc(pc.zona||'—')+'</small></span>':'—';return '<tr><td>'+esc(o.orden_plan||i+1)+'</td><td class="left"><b>'+esc(o.tienda||'—')+'</b></td><td class="pedido">'+esc(o.pedido||'—')+'</td><td>'+esc(o.picking||'—')+'</td><td class="num">'+Number(o.lineas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.ejecutadas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.pendientes||0).toLocaleString('es-AR')+'</td><td><span class="statePill '+(state==='FINALIZADO'?'done':state==='INICIADO'?'run':'wait')+'">'+state+'</span></td><td><span class="livePct">'+pct.toFixed(1).replace('.',',')+'%</span><div class="liveBar"><i style="width:'+Math.min(100,pct)+'%"></i></div></td><td class="left">'+chip+'</td>'+zones.map(z=>{const q=o.zonas?.[z]||{},act=pc?.zona===z;return '<td class="zoneReal '+(act?'active':'')+'"><b>'+Number(q.total||0).toLocaleString('es-AR')+'</b><small>'+Number(q.ejecutadas||0)+' hechas · '+Number(q.pendientes||0)+' pend.</small></td>'}).join('')+'<td>'+(pc?.hora?esc(pc.hora):'—')+'</td></tr>'}).join('')+'</tbody></table>';
- }catch(e){grid.innerHTML='<div class="pickerLiveEmpty">No se pudo cargar picking-en-curso.json: '+esc(e.message||e)+'</div>'}
+  const rows=(orders||[]).slice().sort((a,b)=>Number(a.orden_plan||99999)-Number(b.orden_plan||99999));
+
+  const active=rows.filter(o=>o.picker_actual?.nombre&&Number(o.avance)<100);
+  $('pickerLiveCount').textContent=new Set(active.map(o=>o.picker_actual.nombre)).size.toLocaleString('es-AR');
+  $('pickerLiveOrders').textContent=rows.filter(o=>Number(o.avance)<100&&Number(o.ejecutadas)>0).length.toLocaleString('es-AR');
+  $('pickerLiveLines').textContent=rows.reduce((a,o)=>a+Number(o.lineas||0),0).toLocaleString('es-AR');
+  $('pickerLiveUpdated').textContent=(updatedAt?new Date(updatedAt):new Date()).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+
+  if(!rows.length){
+    grid.innerHTML='<div class="pickerLiveEmpty">No hay pickings en la Planilla de Preparación para la fecha seleccionada.</div>';
+    return;
+  }
+
+  grid.innerHTML='<table class="pickerOrderTable"><thead><tr><th>#</th><th class="left">Tienda</th><th>Pedido ERP</th><th>Picking</th><th>Líneas</th><th>Ejecut.</th><th>Pend.</th><th>Estado</th><th>Avance</th><th class="left">Picker actual</th>'+zones.map(z=>'<th>'+z+'</th>').join('')+'<th>Últ. mov.</th></tr></thead><tbody>'+
+  rows.map((o,i)=>{
+    const pct=Number(o.avance||0);
+    const state=o.estado||(pct>=100?'FINALIZADO':Number(o.ejecutadas)>0?'INICIADO':'PENDIENTE');
+    const pc=o.picker_actual||null;
+    const color=pickerLiveColor(pc?.nombre||o.picking);
+    const chip=pc?.nombre?'<span class="pickerChip" style="--pc:'+color+'"><i></i>'+esc(pc.nombre)+' <small>'+esc(pc.zona||'—')+'</small></span>':'—';
+    const err=o.error?'<div style="font-size:9px;color:#ef8e98;margin-top:3px">'+esc(o.error)+'</div>':'';
+    return '<tr>'+
+      '<td>'+esc(o.orden_plan||i+1)+'</td>'+
+      '<td class="left"><b>'+esc(o.tienda||'—')+'</b></td>'+
+      '<td class="pedido">'+esc(o.pedido||'—')+'</td>'+
+      '<td>'+esc(o.picking||'—')+err+'</td>'+
+      '<td class="num">'+Number(o.lineas||0).toLocaleString('es-AR')+'</td>'+
+      '<td class="num">'+Number(o.ejecutadas||0).toLocaleString('es-AR')+'</td>'+
+      '<td class="num">'+Number(o.pendientes||0).toLocaleString('es-AR')+'</td>'+
+      '<td><span class="statePill '+(state==='FINALIZADO'?'done':state==='INICIADO'?'run':'wait')+'">'+esc(state)+'</span></td>'+
+      '<td><span class="livePct">'+pct.toFixed(1).replace('.',',')+'%</span><div class="liveBar"><i style="width:'+Math.min(100,pct)+'%"></i></div></td>'+
+      '<td class="left">'+chip+'</td>'+
+      zones.map(z=>{const q=o.zonas?.[z]||{},act=pc?.zona===z;return '<td class="zoneReal '+(act?'active':'')+'"><b>'+Number(q.total||0).toLocaleString('es-AR')+'</b><small>'+Number(q.ejecutadas||0)+' hechas · '+Number(q.pendientes||0)+' pend.</small></td>'}).join('')+
+      '<td>'+(pc?.hora?esc(pc.hora):'—')+'</td>'+
+    '</tr>';
+  }).join('')+'</tbody></table>';
+}
+
+async function buildPickerLivePanel(force=false){
+  const grid=$('pickerLiveGrid');if(!grid)return;
+  const date=pickerLiveSelectedDate();
+  if($('pickerLiveDate')&&!$('pickerLiveDate').value)$('pickerLiveDate').value=date;
+
+  const plan=pickerLivePlanRows(date);
+  if(!plan.length){
+    PICKER_LIVE_LAST_ORDERS=[];
+    pickerLiveRender([],new Date().toISOString());
+    return;
+  }
+
+  // Mostrar lo anterior mientras actualiza: no vaciar la pantalla ante una demora/error.
+  if(!PICKER_LIVE_LAST_ORDERS.length)grid.innerHTML='<div class="pickerLiveEmpty">Consultando Copérnico en tiempo real…</div>';
+
+  try{
+    const numeros=[...new Set(plan.map(x=>x.picking))];
+    const [res,pickerMap]=await Promise.all([
+      fetch(PICKER_LIVE_API+'/pickings?numeros='+encodeURIComponent(numeros.join(','))+(force?'&ts='+Date.now():''),{cache:'no-store'}),
+      pickerLiveLegacyPickers(force)
+    ]);
+
+    if(!res.ok)throw new Error('Worker HTTP '+res.status);
+    const data=await res.json();
+    const apiRows=Array.isArray(data?.pickings)?data.pickings:[];
+    const byPicking=new Map(apiRows.map(x=>[String(x?.picking||'').trim(),x]));
+
+    const merged=plan.map(p=>{
+      const live=byPicking.get(p.picking);
+      const prior=PICKER_LIVE_LAST_ORDERS.find(x=>String(x.picking)===p.picking);
+      if(!live?.ok){
+        // Si un picking puntual falla, conservar su último dato bueno.
+        return prior?{...prior,...p,error:live?.error||'Sin respuesta actual'}:{
+          ...p,lineas:0,unidades:0,ejecutadas:0,pendientes:0,avance:0,estado:'PENDIENTE',
+          zonas:{MFCA:{total:0,ejecutadas:0,pendientes:0},MFCB:{total:0,ejecutadas:0,pendientes:0},MFCC:{total:0,ejecutadas:0,pendientes:0},AR:{total:0,ejecutadas:0,pendientes:0}},
+          error:live?.error||'Sin respuesta actual'
+        };
+      }
+      const aux=pickerMap.get(p.picking)||pickerMap.get(String(live.pedido||p.pedido||'').trim())||{};
+      return {
+        ...p,
+        pedido:String(live.pedido||p.pedido||''),
+        lineas:Number(live.lineas||0),
+        unidades:Number(live.unidades||0),
+        ejecutadas:Number(live.ejecutadas||0),
+        pendientes:Number(live.pendientes||0),
+        avance:Number(live.avance||0),
+        estado:String(live.estado||'PENDIENTE'),
+        zonas:live.zonas||{},
+        picker_actual:aux.picker_actual||prior?.picker_actual||null,
+        error:''
+      };
+    });
+
+    PICKER_LIVE_LAST_ORDERS=merged;
+    pickerLiveRender(merged,data.updated_at||new Date().toISOString());
+
+    if(PICKER_LIVE_TIMER)clearInterval(PICKER_LIVE_TIMER);
+    PICKER_LIVE_TIMER=null;
+    if(date===pickerLiveToday()){
+      // El Worker abre una sesión por picking: refresco moderado para no castigar licencias.
+      PICKER_LIVE_TIMER=setInterval(()=>{
+        if(displayMode==='pickerLive'&&pickerLiveSelectedDate()===pickerLiveToday())buildPickerLivePanel(true);
+      },120000);
+    }
+  }catch(e){
+    console.error('Picking en curso Worker',e);
+    if(PICKER_LIVE_LAST_ORDERS.length){
+      pickerLiveRender(PICKER_LIVE_LAST_ORDERS,new Date().toISOString());
+      grid.insertAdjacentHTML('afterbegin','<div class="processStatus bad" style="margin:0 0 8px">No se pudo actualizar Copérnico: '+esc(e.message||e)+' · se conservan los últimos datos.</div>');
+    }else{
+      grid.innerHTML='<div class="pickerLiveEmpty">No se pudo consultar el Worker de Copérnico: '+esc(e.message||e)+'</div>';
+    }
+  }
 }
 
 $('opsDashRefreshBtn').onclick=()=>buildOperationalDashboard(true);
