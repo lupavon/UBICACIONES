@@ -2239,6 +2239,10 @@ body:not(.light-mode) .modebar>.btn.active{background:transparent!important;colo
 body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 @media(max-width:900px){.modebar{padding:0!important;gap:1px!important}.modebar>.btn{padding:11px 9px 10px!important}.modebar>.btn.active::after{left:8px;right:8px}}
 </style>
+
+<style id="picker-live-real-v3">
+.pickerOrderTableWrap{overflow:auto;background:#fff;border:1px solid #dfe7ef;border-radius:12px;box-shadow:0 4px 14px rgba(24,54,86,.04)}.pickerOrderTable{width:100%;border-collapse:collapse;min-width:1240px;font-size:11px}.pickerOrderTable th{background:#eef2f6;color:#52677c;text-transform:uppercase;font-size:9px;font-weight:900;padding:9px 10px;border-bottom:1px solid #d7e0e9;white-space:nowrap}.pickerOrderTable td{padding:9px 10px;border-bottom:1px solid #e8edf2;color:#1d3044;text-align:center;vertical-align:middle}.pickerOrderTable .left{text-align:left}.pickerOrderTable .pedido{font-weight:900}.pickerOrderTable .num{font-weight:900}.pickerChip{--pc:#2563eb;display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:color-mix(in srgb,var(--pc) 8%,white);border:1px solid color-mix(in srgb,var(--pc) 30%,#dfe7ef);font-weight:800;white-space:nowrap}.pickerChip i{width:9px;height:9px;border-radius:50%;background:var(--pc)}.pickerChip small{font-size:8px;color:#6e8194}.zoneReal b{display:block;font-size:12px}.zoneReal small{font-size:8px;color:#7b8b9c}.zoneReal.active{background:#f4f9fd}.livePct{font-weight:900}.liveBar{width:70px;height:5px;background:#e7edf3;border-radius:5px;overflow:hidden;margin:4px auto}.liveBar i{display:block;height:100%;background:#4b91cc}.statePill{display:inline-block;padding:4px 7px;border-radius:999px;font-size:9px;font-weight:900}.statePill.done{background:#dff4e7;color:#17663a}.statePill.run{background:#fff1d6;color:#8a5700}.statePill.wait{background:#edf1f5;color:#607286}body:not(.light-mode) .pickerOrderTableWrap{background:#151b23;border-color:#29333e}body:not(.light-mode) .pickerOrderTable th{background:#1a222c;color:#9eacba;border-color:#303b47}body:not(.light-mode) .pickerOrderTable td{color:#e7edf4;border-color:#242e39}body:not(.light-mode) .pickerChip{background:color-mix(in srgb,var(--pc) 14%,#151b23);color:#e7edf4}body:not(.light-mode) .zoneReal small,body:not(.light-mode) .pickerChip small{color:#8f9cab}body:not(.light-mode) .liveBar{background:#26313d}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2812,9 +2816,9 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 </div>
 
 <div id="pickerLiveView" class="pickerLiveView">
-  <div class="pickerLiveHero"><div><div class="prodEyebrow">OPERACIÓN · PICKING EN VIVO</div><h2>¿En qué pedido está cada picker?</h2><p>Última confirmación del picker + líneas registradas del pedido en MFCA, MFCB, MFCC y AR.</p></div><div class="pickerLiveTools"><input id="pickerLiveDate" type="date"><button class="btn" id="pickerLiveRefreshBtn">↻ Actualizar</button></div></div>
-  <div class="pickerLiveSummary"><div class="pickerLiveKpi"><small>Pickers activos</small><b id="pickerLiveCount">—</b></div><div class="pickerLiveKpi"><small>Pedidos en preparación</small><b id="pickerLiveOrders">—</b></div><div class="pickerLiveKpi"><small>Líneas visibles</small><b id="pickerLiveLines">—</b></div><div class="pickerLiveKpi"><small>Actualizado</small><b id="pickerLiveUpdated" style="font-size:17px">—</b></div></div>
-  <div id="pickerLiveGrid" class="pickerOrderGrid"></div>
+  <div class="pickerLiveHero"><div><div class="prodEyebrow">OPERACIÓN · PICKING EN VIVO</div><h2>Picking en curso por pedido</h2><p>Líneas reales de Copérnico por pedido, avance por zona y picker de la última confirmación.</p></div><div class="pickerLiveTools"><input id="pickerLiveDate" type="date"><button class="btn" id="pickerLiveRefreshBtn">↻ Actualizar</button></div></div>
+  <div class="pickerLiveSummary"><div class="pickerLiveKpi"><small>Pickers activos</small><b id="pickerLiveCount">—</b></div><div class="pickerLiveKpi"><small>Pedidos en preparación</small><b id="pickerLiveOrders">—</b></div><div class="pickerLiveKpi"><small>Líneas reales</small><b id="pickerLiveLines">—</b></div><div class="pickerLiveKpi"><small>Actualizado</small><b id="pickerLiveUpdated" style="font-size:17px">—</b></div></div>
+  <div id="pickerLiveGrid" class="pickerOrderTableWrap"></div>
 </div>
 <div id="productivityView" class="prodView" style="display:none">
   <div class="prodHero">
@@ -7694,40 +7698,21 @@ async function buildOperationalDashboard(force=false){
   }finally{OPS_DASH_LOADING=false;}
 }
 
-// ===== Picking en curso · pedido actual por picker =====
-let PICKER_LIVE_ROWS=[],PICKER_LIVE_DATE='';
+// ===== Picking en curso · detalle REAL de Copérnico, agrupado por pedido =====
 const PICKER_LIVE_COLORS=['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#db2777','#4f46e5','#65a30d','#9333ea','#ea580c','#0f766e'];
 function pickerLiveHash(v){let h=0;for(const c of String(v||''))h=((h<<5)-h)+c.charCodeAt(0)|0;return Math.abs(h)}
-function pickerLiveColor(name){return PICKER_LIVE_COLORS[pickerLiveHash(typeof timeNormName==='function'?timeNormName(name):name)%PICKER_LIVE_COLORS.length]}
-function pickerLiveZone(r){return traceZone(r)}
-function pickerLiveOrder(r){return tracePedido(r)}
-function pickerLiveName(r){return tracePicker(r)}
-function pickerLiveTime(r,date){return traceDateObj(r,date)}
-function pickerLiveFmtAgo(d){if(!d)return '—';const m=Math.max(0,Math.round((Date.now()-d.getTime())/60000));if(m<1)return 'ahora';if(m<60)return 'hace '+m+' min';return traceClock(d)}
+function pickerLiveColor(name){return PICKER_LIVE_COLORS[pickerLiveHash(name)%PICKER_LIVE_COLORS.length]}
 async function buildPickerLivePanel(force=false){
-  const date=$('pickerLiveDate')?.value||timeTodayISO(); if($('pickerLiveDate')&&!$('pickerLiveDate').value)$('pickerLiveDate').value=date;
-  const grid=$('pickerLiveGrid'); if(!grid)return; grid.innerHTML='<div class="pickerLiveEmpty">Cargando actividad de Picking…</div>';
-  try{
-    if(force||PICKER_LIVE_DATE!==date||!PICKER_LIVE_ROWS.length){
-      const urls=[productivityRawFileForDate(date),productivitySummaryFileForDate(date)];let rows=[];
-      for(const u of urls){try{const res=await fetch(u+'?live='+Date.now(),{cache:'no-store'});if(!res.ok)continue;const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[]);if(rows.length)break}catch(e){}}
-      PICKER_LIVE_ROWS=rows.filter(r=>{if(typeof timeIsExcluded==='function'&&timeIsExcluded(r))return false;const proc=traceNorm(traceField(r,['Proceso','proceso','TipoProceso','tipoProceso'])).toUpperCase();return !proc.includes('ADUANA')&&['MFCA','MFCB','MFCC','AR'].includes(pickerLiveZone(r));}).map(r=>({...r,_liveDate:pickerLiveTime(r,date)})).filter(r=>r._liveDate&&!isNaN(r._liveDate));
-      PICKER_LIVE_DATE=date;
-    }
-    const rows=PICKER_LIVE_ROWS.slice().sort((a,b)=>a._liveDate-b._liveDate),byPicker={};
-    rows.forEach(r=>{const n=pickerLiveName(r);(byPicker[n]||(byPicker[n]=[])).push(r)});
-    const cards=[];
-    Object.entries(byPicker).forEach(([name,pr])=>{
-      const last=pr[pr.length-1],order=pickerLiveOrder(last);if(!order)return;
-      const orderRows=rows.filter(r=>pickerLiveOrder(r)===order),counts={MFCA:0,MFCB:0,MFCC:0,AR:0};orderRows.forEach(r=>{const z=pickerLiveZone(r);if(z in counts)counts[z]++});
-      const total=Object.values(counts).reduce((a,b)=>a+b,0),lastZone=pickerLiveZone(last),color=pickerLiveColor(name);
-      cards.push({name,order,last,lastZone,counts,total,color});
-    });
-    cards.sort((a,b)=>b.last._liveDate-a.last._liveDate);
-    $('pickerLiveCount').textContent=cards.length.toLocaleString('es-AR');$('pickerLiveOrders').textContent=new Set(cards.map(x=>x.order)).size.toLocaleString('es-AR');$('pickerLiveLines').textContent=cards.reduce((a,x)=>a+x.total,0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    if(!cards.length){grid.innerHTML='<div class="pickerLiveEmpty">No encontré actividad de Picking en MFCA, MFCB, MFCC o AR para la fecha seleccionada.</div>';return}
-    grid.innerHTML=cards.map(c=>'<article class="pickerOrderCard" style="--picker-color:'+c.color+'"><div class="pickerOrderHead"><div class="pickerIdentity"><span class="pickerDot"></span><div><b>'+esc(c.name)+'</b><small>Última zona: '+esc(c.lastZone)+' · '+esc(pickerLiveFmtAgo(c.last._liveDate))+'</small></div></div><div class="pickerOrderNo"><small>PEDIDO ACTUAL</small><b>'+esc(c.order)+'</b></div></div><div class="pickerZones">'+['MFCA','MFCB','MFCC','AR'].map(z=>'<div class="pickerZone '+(z===c.lastZone?'active':'')+'"><small>'+z+'</small><b>'+c.counts[z].toLocaleString('es-AR')+'</b><small>líneas registradas</small></div>').join('')+'</div><div class="pickerOrderFoot"><span><strong>'+c.total.toLocaleString('es-AR')+'</strong> líneas visibles del pedido</span><span>Última confirmación <strong>'+traceClock(c.last._liveDate)+'</strong></span></div></article>').join('');
-  }catch(e){grid.innerHTML='<div class="pickerLiveEmpty">No se pudo cargar Picking en curso: '+esc(e.message||e)+'</div>'}
+ const grid=$('pickerLiveGrid');if(!grid)return;grid.innerHTML='<div class="pickerLiveEmpty">Cargando detalle real de Copérnico…</div>';
+ try{
+  const res=await fetch('picking-en-curso.json?ts='+(force?Date.now():'live'),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json(),orders=Array.isArray(data.orders)?data.orders:[];
+  const date=$('pickerLiveDate');if(date&&data.fecha_query&&/^\d{8}$/.test(data.fecha_query)){date.value=data.fecha_query.slice(0,4)+'-'+data.fecha_query.slice(4,6)+'-'+data.fecha_query.slice(6,8)}
+  const active=orders.filter(o=>o.picker_actual?.nombre&&Number(o.avance)<100);$('pickerLiveCount').textContent=new Set(active.map(o=>o.picker_actual.nombre)).size.toLocaleString('es-AR');$('pickerLiveOrders').textContent=orders.filter(o=>Number(o.avance)<100&&Number(o.ejecutadas)>0).length.toLocaleString('es-AR');$('pickerLiveLines').textContent=orders.reduce((a,o)=>a+Number(o.lineas||0),0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=(data.updated_at?new Date(data.updated_at):new Date()).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  if(!orders.length){grid.innerHTML='<div class="pickerLiveEmpty">Todavía no hay pedidos MFC/AR consolidados. Ejecutá el workflow actualizado una vez.</div>';return}
+  const zones=['MFCA','MFCB','MFCC','AR'];
+  const rows=orders.slice().sort((a,b)=>{const aa=Number(a.avance||0),bb=Number(b.avance||0);if((aa>=100)!=(bb>=100))return aa>=100?1:-1;if((aa>0)!=(bb>0))return aa>0?-1:1;return String(a.pedido).localeCompare(String(b.pedido),'es',{numeric:true})});
+  grid.innerHTML='<table class="pickerOrderTable"><thead><tr><th>#</th><th>Pedido ERP</th><th>Picking</th><th>Líneas</th><th>Ejecut.</th><th>Pend.</th><th>Estado</th><th>Avance</th><th class="left">Picker actual</th>'+zones.map(z=>'<th>'+z+'</th>').join('')+'<th>Últ. mov.</th></tr></thead><tbody>'+rows.map((o,i)=>{const pct=Number(o.avance||0),state=pct>=100?'FINALIZADO':Number(o.ejecutadas)>0?'INICIADO':'PENDIENTE',pc=o.picker_actual||null,color=pickerLiveColor(pc?.nombre||o.picking),chip=pc?.nombre?'<span class="pickerChip" style="--pc:'+color+'"><i></i>'+esc(pc.nombre)+' <small>'+esc(pc.zona||'—')+'</small></span>':'—';return '<tr><td>'+(i+1)+'</td><td class="pedido">'+esc(o.pedido||'—')+'</td><td>'+esc(o.picking||'—')+'</td><td class="num">'+Number(o.lineas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.ejecutadas||0).toLocaleString('es-AR')+'</td><td class="num">'+Number(o.pendientes||0).toLocaleString('es-AR')+'</td><td><span class="statePill '+(state==='FINALIZADO'?'done':state==='INICIADO'?'run':'wait')+'">'+state+'</span></td><td><span class="livePct">'+pct.toFixed(1).replace('.',',')+'%</span><div class="liveBar"><i style="width:'+Math.min(100,pct)+'%"></i></div></td><td class="left">'+chip+'</td>'+zones.map(z=>{const q=o.zonas?.[z]||{},act=pc?.zona===z;return '<td class="zoneReal '+(act?'active':'')+'"><b>'+Number(q.total||0).toLocaleString('es-AR')+'</b><small>'+Number(q.ejecutadas||0)+' hechas · '+Number(q.pendientes||0)+' pend.</small></td>'}).join('')+'<td>'+(pc?.hora?esc(pc.hora):'—')+'</td></tr>'}).join('')+'</tbody></table>';
+ }catch(e){grid.innerHTML='<div class="pickerLiveEmpty">No se pudo cargar picking-en-curso.json: '+esc(e.message||e)+'</div>'}
 }
 
 $('opsDashRefreshBtn').onclick=()=>buildOperationalDashboard(true);
