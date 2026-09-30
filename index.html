@@ -2219,6 +2219,12 @@ body:not(.light-mode) .modebar .btn.active{background:#245b8c!important;color:#f
 </style>
 
 
+
+<style id="picker-live-v1">
+.pickerLiveView{display:none;padding:8px 0 30px}.pickerLiveHero{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:18px 0}.pickerLiveHero h2{margin:3px 0 5px;font-size:27px}.pickerLiveHero p{margin:0;color:#718096;font-size:12px}.pickerLiveTools{display:flex;gap:8px;align-items:center}.pickerLiveTools input{border:1px solid #d9e3ed;background:#fff;color:#152235;border-radius:8px;padding:9px 11px}.pickerLiveSummary{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin-bottom:14px}.pickerLiveKpi,.pickerOrderCard{background:#fff;border:1px solid #dfe7ef;border-radius:12px;box-shadow:0 4px 14px rgba(24,54,86,.04)}.pickerLiveKpi{padding:13px 15px}.pickerLiveKpi small{display:block;color:#77889b;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.pickerLiveKpi b{display:block;color:#152235;font-size:24px;margin-top:5px}.pickerOrderGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pickerOrderCard{overflow:hidden;border-left:5px solid var(--picker-color)}.pickerOrderHead{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid #edf1f5}.pickerIdentity{display:flex;align-items:center;gap:10px;min-width:0}.pickerDot{width:12px;height:12px;border-radius:50%;background:var(--picker-color);box-shadow:0 0 0 4px color-mix(in srgb,var(--picker-color) 15%,transparent)}.pickerIdentity b{font-size:15px;color:#17263a}.pickerIdentity small,.pickerOrderHead>small{display:block;color:#7b8b9c;font-size:10px;margin-top:2px}.pickerOrderNo{text-align:right}.pickerOrderNo b{display:block;color:#17263a;font-size:16px}.pickerZones{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:13px 16px}.pickerZone{background:#f6f8fb;border:1px solid #e6edf4;border-radius:9px;padding:10px}.pickerZone.active{box-shadow:inset 0 0 0 1px var(--picker-color);background:color-mix(in srgb,var(--picker-color) 6%,white)}.pickerZone small{font-size:9px;color:#78899b;font-weight:900}.pickerZone b{display:block;font-size:21px;color:#17263a;margin-top:3px}.pickerOrderFoot{display:flex;justify-content:space-between;gap:10px;padding:0 16px 14px;color:#718096;font-size:10px}.pickerOrderFoot strong{color:#34495e}.pickerLiveEmpty{padding:38px;text-align:center;color:#7b8b9c;background:#fff;border:1px dashed #d9e3ed;border-radius:12px;grid-column:1/-1}
+body:not(.light-mode) .pickerLiveHero p,body:not(.light-mode) .pickerOrderFoot,body:not(.light-mode) .pickerIdentity small,body:not(.light-mode) .pickerOrderHead>small{color:#8f9cab}body:not(.light-mode) .pickerLiveTools input,body:not(.light-mode) .pickerLiveKpi,body:not(.light-mode) .pickerOrderCard,body:not(.light-mode) .pickerLiveEmpty{background:#151b23;color:#eef3f8;border-color:#29333e}body:not(.light-mode) .pickerLiveKpi b,body:not(.light-mode) .pickerIdentity b,body:not(.light-mode) .pickerOrderNo b,body:not(.light-mode) .pickerZone b{color:#eef3f8}body:not(.light-mode) .pickerZone{background:#111820;border-color:#29333e}body:not(.light-mode) .pickerOrderHead{border-bottom-color:#29333e}
+@media(max-width:1000px){.pickerOrderGrid{grid-template-columns:1fr}.pickerLiveSummary{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.pickerLiveHero{align-items:flex-start;flex-direction:column}.pickerZones{grid-template-columns:repeat(2,1fr)}.pickerLiveSummary{grid-template-columns:1fr 1fr}}
+</style>
 <style id="nav-polish-v1">
 /* Navegación principal: estado activo liviano, sin bloque rectangular */
 .modebar{gap:4px!important;border-bottom:1px solid #dfe6ee;padding:0 6px!important;background:transparent!important;align-items:stretch!important}
@@ -2244,6 +2250,7 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 <main class="main">
 <div class="modebar">
 <button class="btn active" id="dashboardModeBtn">🏠 Operación</button>
+<button class="btn" id="pickerLiveModeBtn">🧭 Picking en curso</button>
 <button class="btn" id="productivityModeBtn">📈 Productividad</button>
 <button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
@@ -2802,6 +2809,12 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
     </table>
     <div class="processEmpty" id="negEmpty" style="display:none">No hay negaciones para el filtro seleccionado.</div>
   </div>
+</div>
+
+<div id="pickerLiveView" class="pickerLiveView">
+  <div class="pickerLiveHero"><div><div class="prodEyebrow">OPERACIÓN · PICKING EN VIVO</div><h2>¿En qué pedido está cada picker?</h2><p>Última confirmación del picker + líneas registradas del pedido en MFCA, MFCB, MFCC y AR.</p></div><div class="pickerLiveTools"><input id="pickerLiveDate" type="date"><button class="btn" id="pickerLiveRefreshBtn">↻ Actualizar</button></div></div>
+  <div class="pickerLiveSummary"><div class="pickerLiveKpi"><small>Pickers activos</small><b id="pickerLiveCount">—</b></div><div class="pickerLiveKpi"><small>Pedidos en preparación</small><b id="pickerLiveOrders">—</b></div><div class="pickerLiveKpi"><small>Líneas visibles</small><b id="pickerLiveLines">—</b></div><div class="pickerLiveKpi"><small>Actualizado</small><b id="pickerLiveUpdated" style="font-size:17px">—</b></div></div>
+  <div id="pickerLiveGrid" class="pickerOrderGrid"></div>
 </div>
 <div id="productivityView" class="prodView" style="display:none">
   <div class="prodHero">
@@ -3716,6 +3729,7 @@ function setDisplayMode(mode){
   placeDetailForMode(mode);
 
   $('dashboardView').style.display=mode==='dashboard'?'block':'none';
+  $('pickerLiveView').style.display=mode==='pickerLive'?'block':'none';
   $('dashboardView').classList.toggle('active',mode==='dashboard');
   $('progressView').style.display=mode==='progress'?'block':'none';
   $('rackView').style.display=mode==='rack'?'block':'none';
@@ -3730,6 +3744,7 @@ function setDisplayMode(mode){
   $('timesView').style.display=mode==='times'?'block':'none';
 
   $('dashboardModeBtn').classList.toggle('active',mode==='dashboard');
+  $('pickerLiveModeBtn').classList.toggle('active',mode==='pickerLive');
   $('progressModeBtn').classList.toggle('active',mode==='progress');
   $('rackModeBtn').classList.toggle('active',mode==='rack');
   $('heatModeBtn').classList.toggle('active',mode==='heat');
@@ -3743,6 +3758,7 @@ function setDisplayMode(mode){
   $('timesModeBtn').classList.toggle('active',mode==='times');
 
   if(mode==='dashboard') buildOperationalDashboard();
+  if(mode==='pickerLive') buildPickerLivePanel();
   if(mode==='progress') buildOrderProgressPanel();
   if(mode==='rack') rebuild();
   if(mode==='heat') buildHeatmap();
@@ -7677,9 +7693,49 @@ async function buildOperationalDashboard(force=false){
     $('opsDashUpdated').textContent='Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   }finally{OPS_DASH_LOADING=false;}
 }
+
+// ===== Picking en curso · pedido actual por picker =====
+let PICKER_LIVE_ROWS=[],PICKER_LIVE_DATE='';
+const PICKER_LIVE_COLORS=['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#db2777','#4f46e5','#65a30d','#9333ea','#ea580c','#0f766e'];
+function pickerLiveHash(v){let h=0;for(const c of String(v||''))h=((h<<5)-h)+c.charCodeAt(0)|0;return Math.abs(h)}
+function pickerLiveColor(name){return PICKER_LIVE_COLORS[pickerLiveHash(typeof timeNormName==='function'?timeNormName(name):name)%PICKER_LIVE_COLORS.length]}
+function pickerLiveZone(r){return traceZone(r)}
+function pickerLiveOrder(r){return tracePedido(r)}
+function pickerLiveName(r){return tracePicker(r)}
+function pickerLiveTime(r,date){return traceDateObj(r,date)}
+function pickerLiveFmtAgo(d){if(!d)return '—';const m=Math.max(0,Math.round((Date.now()-d.getTime())/60000));if(m<1)return 'ahora';if(m<60)return 'hace '+m+' min';return traceClock(d)}
+async function buildPickerLivePanel(force=false){
+  const date=$('pickerLiveDate')?.value||timeTodayISO(); if($('pickerLiveDate')&&!$('pickerLiveDate').value)$('pickerLiveDate').value=date;
+  const grid=$('pickerLiveGrid'); if(!grid)return; grid.innerHTML='<div class="pickerLiveEmpty">Cargando actividad de Picking…</div>';
+  try{
+    if(force||PICKER_LIVE_DATE!==date||!PICKER_LIVE_ROWS.length){
+      const urls=[productivityRawFileForDate(date),productivitySummaryFileForDate(date)];let rows=[];
+      for(const u of urls){try{const res=await fetch(u+'?live='+Date.now(),{cache:'no-store'});if(!res.ok)continue;const p=await res.json();rows=Array.isArray(p)?p:(p?.rows||[]);if(rows.length)break}catch(e){}}
+      PICKER_LIVE_ROWS=rows.filter(r=>{if(typeof timeIsExcluded==='function'&&timeIsExcluded(r))return false;const proc=traceNorm(traceField(r,['Proceso','proceso','TipoProceso','tipoProceso'])).toUpperCase();return !proc.includes('ADUANA')&&['MFCA','MFCB','MFCC','AR'].includes(pickerLiveZone(r));}).map(r=>({...r,_liveDate:pickerLiveTime(r,date)})).filter(r=>r._liveDate&&!isNaN(r._liveDate));
+      PICKER_LIVE_DATE=date;
+    }
+    const rows=PICKER_LIVE_ROWS.slice().sort((a,b)=>a._liveDate-b._liveDate),byPicker={};
+    rows.forEach(r=>{const n=pickerLiveName(r);(byPicker[n]||(byPicker[n]=[])).push(r)});
+    const cards=[];
+    Object.entries(byPicker).forEach(([name,pr])=>{
+      const last=pr[pr.length-1],order=pickerLiveOrder(last);if(!order)return;
+      const orderRows=rows.filter(r=>pickerLiveOrder(r)===order),counts={MFCA:0,MFCB:0,MFCC:0,AR:0};orderRows.forEach(r=>{const z=pickerLiveZone(r);if(z in counts)counts[z]++});
+      const total=Object.values(counts).reduce((a,b)=>a+b,0),lastZone=pickerLiveZone(last),color=pickerLiveColor(name);
+      cards.push({name,order,last,lastZone,counts,total,color});
+    });
+    cards.sort((a,b)=>b.last._liveDate-a.last._liveDate);
+    $('pickerLiveCount').textContent=cards.length.toLocaleString('es-AR');$('pickerLiveOrders').textContent=new Set(cards.map(x=>x.order)).size.toLocaleString('es-AR');$('pickerLiveLines').textContent=cards.reduce((a,x)=>a+x.total,0).toLocaleString('es-AR');$('pickerLiveUpdated').textContent=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    if(!cards.length){grid.innerHTML='<div class="pickerLiveEmpty">No encontré actividad de Picking en MFCA, MFCB, MFCC o AR para la fecha seleccionada.</div>';return}
+    grid.innerHTML=cards.map(c=>'<article class="pickerOrderCard" style="--picker-color:'+c.color+'"><div class="pickerOrderHead"><div class="pickerIdentity"><span class="pickerDot"></span><div><b>'+esc(c.name)+'</b><small>Última zona: '+esc(c.lastZone)+' · '+esc(pickerLiveFmtAgo(c.last._liveDate))+'</small></div></div><div class="pickerOrderNo"><small>PEDIDO ACTUAL</small><b>'+esc(c.order)+'</b></div></div><div class="pickerZones">'+['MFCA','MFCB','MFCC','AR'].map(z=>'<div class="pickerZone '+(z===c.lastZone?'active':'')+'"><small>'+z+'</small><b>'+c.counts[z].toLocaleString('es-AR')+'</b><small>líneas registradas</small></div>').join('')+'</div><div class="pickerOrderFoot"><span><strong>'+c.total.toLocaleString('es-AR')+'</strong> líneas visibles del pedido</span><span>Última confirmación <strong>'+traceClock(c.last._liveDate)+'</strong></span></div></article>').join('');
+  }catch(e){grid.innerHTML='<div class="pickerLiveEmpty">No se pudo cargar Picking en curso: '+esc(e.message||e)+'</div>'}
+}
+
 $('opsDashRefreshBtn').onclick=()=>buildOperationalDashboard(true);
 document.querySelectorAll('[data-ops-open]').forEach(el=>el.onclick=()=>setDisplayMode(el.dataset.opsOpen));
 
+$('pickerLiveModeBtn').onclick=()=>setDisplayMode('pickerLive');
+$('pickerLiveRefreshBtn').onclick=()=>buildPickerLivePanel(true);
+$('pickerLiveDate').onchange=()=>buildPickerLivePanel(true);
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('productivityModeBtn').onclick=()=>setDisplayMode('productivity');
