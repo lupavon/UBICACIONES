@@ -50,6 +50,7 @@ jobs:
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
           PRODUCTIVITY_URL = "https://services.copernicowms.com/backweb25/kpi/productividad/empleados"
           PICKING_LINES_URL = "https://services.copernicowms.com/backweb25/pasillos/lineas/picking"
+          PICKING_DETAIL_URL = "https://services.copernicowms.com/backweb25/dwh_picking/picking"
           NEGATION_REASONS_URL = "https://services.copernicowms.com/backweb25/kpi/dashboard/lineas-negadas"
           CAJA_API_BASE = "https://services.copernicowms.com/backweb25/caja/"
           LOGOUT_URL = "https://services.copernicowms.com/users/api/logout"
@@ -65,6 +66,7 @@ jobs:
           TRACE_FILE = Path("trazabilidad-cajas.json")
           NEGATIONS_FILE = Path("negaciones.json")
           ORDER_PROGRESS_FILE = Path("avance-pedidos.json")
+          PICKING_LIVE_FILE = Path("picking-en-curso.json")
           ORDER_PROGRESS_HISTORY_DIR = Path("datos/avance")
           NEGATIONS_HISTORY_DIR = Path("datos/negaciones")
           NEGATED_LINES_HISTORY_DIR = Path("datos/lineas-negadas")
@@ -1090,6 +1092,110 @@ jobs:
 
                   prod_response, prod_http, _ = request_json(prod_url, jwt=jwt, timeout=180)
                   prod_rows = extract_rows(prod_response)
+
+                  # Picking en curso: detalle REAL por Picking desde dwh_picking.
+                  # El listado maestro sale de las Líneas de Picking del día; no
+                  # publicamos JWT ni credenciales, sólo el consolidado sanitizado.
+                  print("=== 2C.1 PICKING EN CURSO · DETALLE REAL ===")
+                  try:
+                      def live_sval(row, *names):
+                          v = field(row, *names)
+                          return str(v if v is not None else "").strip()
+
+                      def live_zone(value):
+                          z = norm_value(value)
+                          if z.startswith("MFCA"): return "MFCA"
+                          if z.startswith("MFCB"): return "MFCB"
+                          if z.startswith("MFCC"): return "MFCC"
+                          if z == "AR" or z.startswith("AR "): return "AR"
+                          return ""
+
+                      # Picking -> Pedido detectados en la consulta diaria.
+                      candidates = {}
+                      for r in pick_rows:
+                          pk = live_sval(r, "NumPicking", "Picking", "picking")
+                          pe = live_sval(r, "pedido", "Pedido", "NumPedido")
+                          if pk:
+                              candidates.setdefault(pk, pe)
+
+                      # Picker actual = última confirmación de Productividad por Picking.
+                      picker_by_picking = {}
+                      for r in prod_rows:
+                          proc = norm_value(live_sval(r, "Proceso", "proceso"))
+                          if proc and "PICK" not in proc:
+                              continue
+                          pk = live_sval(r, "Picking", "picking", "NumPicking")
+                          if not pk:
+                              continue
+                          z = live_zone(live_sval(r, "ZonaPiso", "zonapiso", "Zona", "zona"))
+                          if not z:
+                              continue
+                          stamp = live_sval(r, "fecharegistro", "FechaRegistro") + " " + live_sval(r, "horaRegistro", "HoraRegistro")
+                          ts = parse_date(stamp)
+                          name = live_sval(r, "Nombres", "nombres", "NombreEmpleado", "nombreEmpleado") or live_sval(r, "Empleado", "empleado")
+                          prev = picker_by_picking.get(pk)
+                          if prev is None or ts >= prev["_ts"]:
+                              picker_by_picking[pk] = {"nombre": name, "zona": z, "hora": live_sval(r, "horaRegistro", "HoraRegistro"), "_ts": ts}
+
+                      def fetch_live_detail(pk):
+                          url = PICKING_DETAIL_URL + "?" + urllib.parse.urlencode({"pickingint": pk})
+                          payload, _, _ = request_json(url, jwt=jwt, timeout=60)
+                          return pk, extract_rows(payload) if not isinstance(payload, list) else payload
+
+                      details = {}
+                      # Evitar castigar el WMS: concurrencia baja y sólo pickings del día.
+                      with ThreadPoolExecutor(max_workers=4) as ex:
+                          futs = {ex.submit(fetch_live_detail, pk): pk for pk in candidates}
+                          for fut in as_completed(futs):
+                              pk = futs[fut]
+                              try:
+                                  _, rr = fut.result()
+                                  details[pk] = rr
+                              except Exception as de:
+                                  print("AVISO detalle picking", pk, str(de)[:160])
+
+                      live_orders = []
+                      for pk, rr in details.items():
+                          if not rr:
+                              continue
+                          zones = {z:{"total":0,"ejecutadas":0,"pendientes":0} for z in ("MFCA","MFCB","MFCC","AR")}
+                          relevant = False
+                          executed = 0
+                          pedido = candidates.get(pk, "")
+                          for ln in rr:
+                              pedido = live_sval(ln, "pedido", "Pedido", "NumPedido") or pedido
+                              z = live_zone(live_sval(ln, "zonapiso", "ZonaPiso", "zona", "Zona"))
+                              state = norm_value(live_sval(ln, "descripcionlinea", "DescripcionLinea", "EstadoDeLinea", "EstadoLinea", "origen", "Origen"))
+                              is_exec = ("EJECUT" in state or "CONFIRM" in state or "NEGAD" in state)
+                              if is_exec: executed += 1
+                              if z:
+                                  relevant = True
+                                  zones[z]["total"] += 1
+                                  if is_exec: zones[z]["ejecutadas"] += 1
+                                  else: zones[z]["pendientes"] += 1
+                          if not relevant:
+                              continue
+                          total = len(rr)
+                          pending = max(0, total-executed)
+                          picker = picker_by_picking.get(pk)
+                          if picker:
+                              picker = {k:v for k,v in picker.items() if not k.startswith("_")}
+                          live_orders.append({
+                              "pedido": pedido, "picking": pk, "lineas": total,
+                              "ejecutadas": executed, "pendientes": pending,
+                              "avance": round((executed*100/total),1) if total else 0,
+                              "zonas": zones, "picker_actual": picker
+                          })
+
+                      live_orders.sort(key=lambda x: (x["avance"]>=100, -x["avance"], x["pedido"]))
+                      save_json_file(PICKING_LIVE_FILE, {
+                          "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
+                          "source": "Copernico dwh_picking/picking + ProductividadPIK",
+                          "orders_count": len(live_orders), "orders": live_orders
+                      })
+                      print("picking-en-curso.json generado · pedidos MFC/AR:", len(live_orders))
+                  except Exception as live_error:
+                      print("AVISO: Picking en curso no pudo actualizarse; se conserva el último válido:", str(live_error))
 
                   # Reutilizar Líneas de Picking si Avance ya las obtuvo. Si Avance
                   # falló, se intenta consultarlas nuevamente para este bloque.
@@ -2349,15 +2455,15 @@ jobs:
           git config user.email "actions@github.com"
           SNAP=/tmp/ubicaciones-operational
           rm -rf "$SNAP"; mkdir -p "$SNAP"
-          for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
+          for f in negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
           mkdir -p "$SNAP/datos"
           for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
           for intento in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
-            for f in negaciones.json avance-pedidos.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
+            for f in negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
             for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
-            git add negaciones.json avance-pedidos.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/lineas-negadas datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
+            git add negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/lineas-negadas datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
             if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
             git commit -m "AutoSync Copernico · operational"
             if git push origin HEAD:main; then exit 0; fi
