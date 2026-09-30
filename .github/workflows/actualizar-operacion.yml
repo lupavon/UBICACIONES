@@ -1110,13 +1110,53 @@ jobs:
                           if z == "AR" or z.startswith("AR "): return "AR"
                           return ""
 
-                      # Picking -> Pedido detectados en la consulta diaria.
+                      # La PLANILLA DE PREPARACION es la fuente maestra de orden/pedidos.
+                      # Se lee de la misma base compartida (Cloudflare Worker) que usa el dashboard.
+                      # Copernico solo enriquece cada Picking con lineas/estado/zonas reales.
                       candidates = {}
+                      plan_rows = []
+                      try:
+                          store_payload, _, _ = request_json(
+                              "https://ubicaciones-api.pavonlucas-m.workers.dev/store?v=" + urllib.parse.quote(str(int(time.time()))),
+                              timeout=30
+                          )
+                          day_iso = f"{day[:4]}-{day[4:6]}-{day[6:8]}" if len(str(day)) == 8 else str(day_label or "")
+                          day_obj = (store_payload or {}).get("days", {}).get(day_iso, {}) if isinstance(store_payload, dict) else {}
+                          daily = day_obj.get("dailyPlanilla") or {}
+                          sectors = daily.get("sectors") or []
+                          unit_sector = None
+                          for sec in sectors:
+                              sec_name = norm_value(sec.get("name", ""))
+                              if "UNITARIO" in sec_name and "SECO" in sec_name:
+                                  unit_sector = sec
+                                  break
+                          if unit_sector:
+                              plan_rows = unit_sector.get("rows") or []
+                          elif isinstance(day_obj.get("unitarioPlanilla"), dict):
+                              plan_rows = day_obj["unitarioPlanilla"].get("rows") or []
+
+                          for idx, r in enumerate(plan_rows, 1):
+                              pk = live_sval(r, "Picking", "picking", "TR")
+                              if not pk:
+                                  continue
+                              candidates[pk] = {
+                                  "pedido": live_sval(r, "Pedido", "pedido"),
+                                  "tienda": live_sval(r, "Tienda", "tienda"),
+                                  "orden": idx,
+                                  "lineas_plan": r.get("TotalLineas", 0),
+                                  "unidades_plan": r.get("UnidadesPlanificadas", 0),
+                              }
+                          print("Planilla Unitario Seco leida · pedidos:", len(candidates))
+                      except Exception as pe:
+                          print("AVISO: no se pudo leer la planilla compartida; se usa deteccion Copernico:", str(pe)[:180])
+
+                      # Contingencia: sumar Pickings detectados hoy que no estén en la planilla.
+                      # Quedan al final para no alterar nunca el orden de PREPA.
                       for r in pick_rows:
                           pk = live_sval(r, "NumPicking", "Picking", "picking")
                           pe = live_sval(r, "pedido", "Pedido", "NumPedido")
-                          if pk:
-                              candidates.setdefault(pk, pe)
+                          if pk and pk not in candidates:
+                              candidates[pk] = {"pedido": pe, "tienda": "", "orden": 10000 + len(candidates), "lineas_plan": 0, "unidades_plan": 0}
 
                       # Picker actual = última confirmación de Productividad por Picking.
                       picker_by_picking = {}
@@ -1161,11 +1201,12 @@ jobs:
                           zones = {z:{"total":0,"ejecutadas":0,"pendientes":0} for z in ("MFCA","MFCB","MFCC","AR")}
                           relevant = False
                           executed = 0
-                          pedido = candidates.get(pk, "")
+                          meta = candidates.get(pk, {}) if isinstance(candidates.get(pk, {}), dict) else {"pedido": candidates.get(pk, "")}
+                          pedido = meta.get("pedido", "")
                           for ln in rr:
                               pedido = live_sval(ln, "pedido", "Pedido", "NumPedido") or pedido
                               z = live_zone(live_sval(ln, "zonapiso", "ZonaPiso", "zona", "Zona"))
-                              state = norm_value(live_sval(ln, "descripcionlinea", "DescripcionLinea", "EstadoDeLinea", "EstadoLinea", "origen", "Origen"))
+                              state = norm_value(live_sval(ln, "describeestadolinea", "DescribeEstadoLinea", "descripcionlinea", "DescripcionLinea", "EstadoDeLinea", "EstadoLinea"))
                               is_exec = ("EJECUT" in state or "CONFIRM" in state or "NEGAD" in state)
                               if is_exec: executed += 1
                               if z:
@@ -1181,13 +1222,14 @@ jobs:
                           if picker:
                               picker = {k:v for k,v in picker.items() if not k.startswith("_")}
                           live_orders.append({
-                              "pedido": pedido, "picking": pk, "lineas": total,
+                              "pedido": pedido, "picking": pk, "tienda": meta.get("tienda", ""), "orden_plan": meta.get("orden", 99999),
+                              "lineas_plan": meta.get("lineas_plan", 0), "unidades_plan": meta.get("unidades_plan", 0), "lineas": total,
                               "ejecutadas": executed, "pendientes": pending,
                               "avance": round((executed*100/total),1) if total else 0,
                               "zonas": zones, "picker_actual": picker
                           })
 
-                      live_orders.sort(key=lambda x: (x["avance"]>=100, -x["avance"], x["pedido"]))
+                      live_orders.sort(key=lambda x: (x.get("orden_plan", 99999), x.get("pedido", "")))
                       save_json_file(PICKING_LIVE_FILE, {
                           "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
                           "source": "Copernico dwh_picking/picking + ProductividadPIK",
