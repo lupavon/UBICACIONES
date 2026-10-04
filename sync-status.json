@@ -1,1 +1,1 @@
-{"status":"ok","fail_count":0,"next_retry_at":null,"last_success_at":"2026-10-04T13:34:11.448686+00:00","last_attempt_at":"2026-10-04T13:34:11.448686+00:00","message":"Datos operativos actualizados correctamente","http_code":200,"detail":"","copernico_user_id":11257}
+{"status":"ok","fail_count":0,"next_retry_at":null,"last_success_at":"2026-10-04T13:43:32.700116+00:00","last_attempt_at":"2026-10-04T13:43:32.700116+00:00","message":"Stock actualizado correctamente","http_code":200,"detail":"","copernico_user_id":11257}
