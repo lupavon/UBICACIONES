@@ -2255,7 +2255,8 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 <div class="modebar">
 <button class="btn active" id="dashboardModeBtn">🏠 Operación</button>
 <button class="btn" id="pickerLiveModeBtn">🧭 Picking en curso</button>
-<button class="btn" id="productivityModeBtn">📈 Productividad</button>
+<button class="btn" id="productivityModeBtn">📈 Productividad TM</button>
+<button class="btn" id="productivityTTModeBtn">🌆 Productividad TT</button>
 <button class="btn" id="negationsModeBtn">🚫 Negaciones</button>
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn" id="receiptModeBtn">📥 En recibo</button>
@@ -2883,6 +2884,42 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
     </aside>
   </div>
   <div class="processStatus prodStatus" id="productivityStatus">Cargando productividad del día…</div>
+</div>
+<div id="productivityTTView" class="prodView" style="display:none">
+  <div class="prodHero">
+    <div><div class="prodEyebrow">OPERACIÓN · PICKING · TURNO TARDE</div><h2>Productividad TT</h2><p>Confirmadas + negadas · turno 14:00–22:00 · base operativa 6 h 30 min · lectura multizona por picker</p></div>
+    <div class="prodDateNav">
+      <button class="prodIconBtn" id="productivityTTPrevDay">←</button>
+      <label><span>Fecha analizada</span><input id="productivityTTDateFilter" type="date"></label>
+      <button class="prodIconBtn" id="productivityTTNextDay">→</button>
+      <button class="prodSoftBtn" id="productivityTTYesterdayBtn">Ayer</button>
+      <button class="prodPrimaryBtn" id="productivityTTTodayBtn">Hoy</button>
+    </div>
+  </div>
+  <div class="prodKpiStrip">
+    <div class="prodKpi prodKpiMain"><span>Productividad general TT</span><strong id="productivityTTGeneral">0.0</strong><small>líneas/h</small></div>
+    <div class="prodKpi"><span>Líneas del día</span><strong id="productivityTTTotalLines">0</strong><small>confirmadas + negadas</small></div>
+    <div class="prodKpi"><span>Pickers activos</span><strong id="productivityTTPickerCount">0</strong><small>con actividad 14–22</small></div>
+    <div class="prodKpi"><span>Zonas trabajadas</span><strong id="productivityTTZoneCount">0</strong><small>zonas físicas detectadas</small></div>
+    <div class="prodKpi"><span>Picker más multizona</span><strong id="productivityTTMultiPicker">—</strong><small id="productivityTTMultiPickerSub">sin datos</small></div>
+  </div>
+  <div class="prodMainGrid">
+    <section class="prodCard prodSectorCard"><div class="prodCardHead"><div><span class="prodLabel">HOY</span><h3>Productividad por sector</h3><p>Líneas TT y participación por sector operativo</p></div></div><div class="prodTableWrap"><table class="prodTable"><thead><tr><th>Sector</th><th>Líneas</th><th>% del turno</th></tr></thead><tbody id="productivityTTSectorBody"></tbody></table></div></section>
+    <section class="prodCard"><div class="prodCardHead"><div><span class="prodLabel">DISTRIBUCIÓN</span><h3>Mix de zonas del turno</h3><p>Cuánto trabajo se concentró en cada zona física</p></div></div><div id="productivityTTZoneMix" class="opsZoneGrid"></div></section>
+  </div>
+  <section class="prodCard prodPickerCard">
+    <div class="prodCardHead prodPickerHead"><div><span class="prodLabel">EQUIPO TT</span><h3>Productividad por picker</h3><p>La zona no se fuerza a una sola: se muestra la distribución real de cada picker</p></div><div class="prodPickerTools"><input id="productivityTTSearch" placeholder="Buscar picker…"><button class="prodSoftBtn" id="productivityTTRefreshBtn">↻ Actualizar</button><small id="productivityTTUpdated"></small></div></div>
+    <div class="prodTableWrap"><table class="prodTable" style="min-width:1050px"><thead><tr><th>Picker</th><th>Líneas</th><th>Líneas/h</th><th>Zonas</th><th>Distribución real</th><th>Zona principal</th></tr></thead><tbody id="productivityTTDailyBody"></tbody></table></div>
+  </section>
+  <section class="prodCard">
+    <div class="prodCardHead"><div><span class="prodLabel">PICKER × ZONA</span><h3>Matriz de líneas por zona</h3><p>Permite ver rápidamente quién pasó por varias zonas durante el turno</p></div></div>
+    <div class="prodTableWrap"><table class="prodTable" id="productivityTTMatrixTable"><thead id="productivityTTMatrixHead"></thead><tbody id="productivityTTMatrixBody"></tbody></table></div>
+  </section>
+  <section class="prodCard">
+    <div class="prodCardHead"><div><span class="prodLabel">DETALLE HORARIO</span><h3>Líneas preparadas por hora</h3><p>14–15 · 15–16 · 16–17 · 17–18 · 18–19 · 19–20 · 20–21 · 21–22</p></div></div>
+    <div class="prodTableWrap"><table class="prodTable" style="min-width:1100px"><thead><tr><th>Picker</th><th>14–15</th><th>15–16</th><th>16–17</th><th>17–18</th><th>18–19</th><th>19–20</th><th>20–21</th><th>21–22</th><th>Total</th><th>Lín/h</th></tr></thead><tbody id="productivityTTHourlyBody"></tbody></table></div>
+  </section>
+  <div class="processStatus prodStatus" id="productivityTTStatus">Cargando productividad TT…</div>
 </div>
 <div id="timesView" style="display:none">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -3745,6 +3782,7 @@ function setDisplayMode(mode){
   $('receiptView').style.display=mode==='receipt'?'block':'none';
   $('negationsView').style.display=mode==='negations'?'block':'none';
   $('productivityView').style.display=mode==='productivity'?'block':'none';
+  $('productivityTTView').style.display=mode==='productivityTT'?'block':'none';
   $('timesView').style.display=mode==='times'?'block':'none';
 
   $('dashboardModeBtn').classList.toggle('active',mode==='dashboard');
@@ -3759,6 +3797,7 @@ function setDisplayMode(mode){
   $('receiptModeBtn').classList.toggle('active',mode==='receipt');
   $('negationsModeBtn').classList.toggle('active',mode==='negations');
   $('productivityModeBtn').classList.toggle('active',mode==='productivity');
+  $('productivityTTModeBtn').classList.toggle('active',mode==='productivityTT');
   $('timesModeBtn').classList.toggle('active',mode==='times');
 
   if(mode==='dashboard') buildOperationalDashboard();
@@ -3773,6 +3812,7 @@ function setDisplayMode(mode){
   if(mode==='receipt') buildReceiptPanel(true);
   if(mode==='negations') buildNegationsPanel();
   if(mode==='productivity') buildTimesPanel(false, $('productivityDateFilter')?.value||'');
+  if(mode==='productivityTT') buildProductivityTT(false, $('productivityTTDateFilter')?.value||'');
   if(mode==='times') buildTimesPanel(false, $('timeDateFilter')?.value||'');
 }
 
@@ -8397,4 +8437,31 @@ if($('productivityGeneratePptBtn'))$('productivityGeneratePptBtn').onclick=gener
 })();
 </script>
 
+<script id="productivity-tt-v1">
+// ===== Productividad TT · turno tarde multizona =====
+const TT_START_HOUR=14, TT_END_HOUR=22, TT_PRODUCTIVE_HOURS=6.5;
+let PRODUCTIVITY_TT_ROWS=[],PRODUCTIVITY_TT_DATE='';
+function ttGet(o,...keys){for(const k of keys){if(o&&o[k]!==undefined&&o[k]!==null&&String(o[k]).trim()!=='')return o[k]}return ''}
+function ttNorm(v){return String(v||'').trim().toUpperCase().replace(/\s+/g,'')}
+function ttHour(r){let h=Number(ttGet(r,'Hora','hora'));if(Number.isFinite(h)&&h>=0&&h<=23)return h;const x=String(ttGet(r,'HoraRegistro','horaregistro','horaRegistro','FechaRegistro','fecharegistro'));const m=x.match(/(?:^|[ T])(\d{1,2}):(\d{2})/);return m?Number(m[1]):-1}
+function ttPicker(r){return String(ttGet(r,'Nombres','Picker','NombreEmpleado','nombreEmpleado','Empleado','empleado')||'Sin nombre').trim()}
+function ttId(r){return String(ttGet(r,'IdEmpleado','idEmpleado','Empleado','empleado')).trim()}
+function ttProcess(r){return ttNorm(ttGet(r,'Proceso','proceso','ProcesoEtsscc','ProcesoETSSCC'))}
+function ttState(r){return ttNorm(ttGet(r,'Estado','estado','EstadoLineaEtsscc','EstadoDeLinea','EstadoLinea'))}
+function ttZoneRaw(r){return ttNorm(ttGet(r,'ZonaLineaPicking','ZonaPrincipal','ZonaPiso','zonapiso','Zona','zona'))||'SINZONA'}
+function ttExcluded(r){const n=timeNormName(ttPicker(r)),id=ttId(r);return ['3887','3891'].includes(id)||['noelia juarez','lucas pavon','nestor diaz','leonel gonzalez'].includes(n)}
+function ttSector(z){z=ttNorm(z);if(/^MFC[ABC](?:L|R)?$/.test(z)||['AR','BR'].includes(z))return 'MFCS / MFCVOL';if(/^MFC[DEFG](?:L|R)?$/.test(z))return 'MFCQ';if(['AL','BL','CL','CR','DL','DR','EL','ER','FL','FR','GL','GR','HL','HR'].includes(z))return 'Masterbox';if(['PM','PML','PMR'].includes(z))return 'PM';if(['CIG','CIGL','CIGR','CSGR'].includes(z))return 'Cigarrillos';if(['REF','REFL','REFR','RMFCL','RMFCR'].includes(z))return 'Refrigerados';if(['CON','CONL','CONR','CMFCL','CMCFR','CMFCR'].includes(z))return 'Congelados';return z==='SINZONA'?'Sin zona':z}
+function ttKey(r,kind='full'){const p=String(ttGet(r,'Picking','picking','NumPicking')).trim(),o=String(ttGet(r,'NumPedido','Pedido','pedido')).trim(),sku=String(ttGet(r,'ean','EAN','SKU','sku','ref','Ref','barcode','Barcode')).trim();return kind==='full'?[p,o,sku].join('|'):kind==='order'?[p,o].join('|'):p}
+function ttCrossRows(prod,pick){const full=new Map(),order=new Map(),only=new Map();for(const r of pick){const z=ttNorm(ttGet(r,'zonapiso','ZonaPiso','Zona','zona'));if(!z)continue;const k1=ttKey(r,'full'),k2=ttKey(r,'order'),k3=ttKey(r,'pick');if(k1&&!full.has(k1))full.set(k1,z);if(k2){if(!order.has(k2))order.set(k2,new Set());order.get(k2).add(z)}if(k3){if(!only.has(k3))only.set(k3,new Set());only.get(k3).add(z)}}return prod.map(r=>{let z=ttNorm(ttGet(r,'ZonaPiso','zonapiso','Zona','zona'));if(!z){z=full.get(ttKey(r,'full'))||'';if(!z){const a=order.get(ttKey(r,'order'));if(a&&a.size===1)z=[...a][0]}if(!z){const a=only.get(ttKey(r,'pick'));if(a&&a.size===1)z=[...a][0]}}return {...r,ZonaLineaPicking:z||'SINZONA'}})}
+function ttShiftDate(n){const inp=$('productivityTTDateFilter');if(!inp)return;const base=inp.value||timeTodayISO(),[y,m,d]=base.split('-').map(Number),dt=new Date(y,m-1,d);dt.setDate(dt.getDate()+n);const iso=timeLocalISO(dt);if(iso>timeTodayISO())return;inp.value=iso;buildProductivityTT(true,iso)}
+async function buildProductivityTT(force=false,date=''){
+ const iso=date||$('productivityTTDateFilter')?.value||timeTodayISO(),st=$('productivityTTStatus');if($('productivityTTDateFilter')){$('productivityTTDateFilter').max=timeTodayISO();$('productivityTTDateFilter').value=iso}if(!force&&PRODUCTIVITY_TT_DATE===iso&&PRODUCTIVITY_TT_ROWS.length){renderProductivityTT();return}
+ try{if(st){st.className='processStatus prodStatus';st.textContent='Cargando Productividad TT del '+iso.split('-').reverse().join('/')+'…'}const [a,b]=await Promise.all([fetch(productivityRawFileForDate(iso)+'?tt='+Date.now(),{cache:'no-store'}),fetch(pickingRawFileForDate(iso)+'?tt='+Date.now(),{cache:'no-store'})]);if(!a.ok)throw new Error('No existe Productividad raw para esta fecha');const pa=await a.json(),pb=b.ok?await b.json():{rows:[]};let rows=ttCrossRows(Array.isArray(pa)?pa:(pa.rows||[]),Array.isArray(pb)?pb:(pb.rows||[]));rows=rows.filter(r=>{const h=ttHour(r),p=ttProcess(r);return h>=TT_START_HOUR&&h<TT_END_HOUR&&(!p||p.includes('PICK'))&&!ttExcluded(r)});PRODUCTIVITY_TT_ROWS=rows;PRODUCTIVITY_TT_DATE=iso;renderProductivityTT();if($('productivityTTUpdated'))$('productivityTTUpdated').textContent='Día '+iso.split('-').reverse().join('/');if(st){st.className='processStatus prodStatus ok';st.textContent='Fuente: Copérnico ProductividadPIK + Líneas de Picking · '+rows.length+' líneas TT 14–22 · '+iso.split('-').reverse().join('/')}}catch(e){console.error('Productividad TT',e);PRODUCTIVITY_TT_ROWS=[];PRODUCTIVITY_TT_DATE=iso;renderProductivityTT();if(st){st.className='processStatus prodStatus bad';st.textContent='Sin datos TT para '+iso.split('-').reverse().join('/')+': '+String(e.message||e)}}
+}
+function renderProductivityTT(){const q=String($('productivityTTSearch')?.value||'').trim().toLowerCase(),rows=PRODUCTIVITY_TT_ROWS.filter(r=>!q||ttPicker(r).toLowerCase().includes(q)||ttId(r).toLowerCase().includes(q)),by={};for(const r of rows){const n=ttPicker(r);if(!by[n])by[n]={name:n,rows:[],hours:Array(8).fill(0),zones:{}};const p=by[n],h=ttHour(r),z=ttZoneRaw(r);p.rows.push(r);if(h>=14&&h<22)p.hours[h-14]++;p.zones[z]=(p.zones[z]||0)+1}const pickers=Object.values(by).sort((a,b)=>b.rows.length-a.rows.length||a.name.localeCompare(b.name,'es'));const total=pickers.reduce((s,p)=>s+p.rows.length,0),avg=pickers.length?pickers.reduce((s,p)=>s+p.rows.length/TT_PRODUCTIVE_HOURS,0)/pickers.length:0;const allZones={};for(const p of pickers)for(const [z,n] of Object.entries(p.zones))allZones[z]=(allZones[z]||0)+n;const realZones=Object.keys(allZones).filter(z=>z!=='SINZONA');$('productivityTTGeneral').textContent=avg.toFixed(1);$('productivityTTTotalLines').textContent=total.toLocaleString('es-AR');$('productivityTTPickerCount').textContent=pickers.length;$('productivityTTZoneCount').textContent=realZones.length;const multi=pickers.slice().sort((a,b)=>Object.keys(b.zones).filter(z=>z!=='SINZONA').length-Object.keys(a.zones).filter(z=>z!=='SINZONA').length||b.rows.length-a.rows.length)[0];$('productivityTTMultiPicker').textContent=multi?multi.name:'—';$('productivityTTMultiPickerSub').textContent=multi?(Object.keys(multi.zones).filter(z=>z!=='SINZONA').length+' zonas · '+multi.rows.length+' líneas'):'sin datos';
+ const sec={};for(const [z,n] of Object.entries(allZones)){const k=ttSector(z);sec[k]=(sec[k]||0)+n}$('productivityTTSectorBody').innerHTML=Object.entries(sec).sort((a,b)=>b[1]-a[1]).map(([z,n])=>'<tr><td><b>'+esc(z)+'</b></td><td><b>'+n.toLocaleString('es-AR')+'</b></td><td>'+(total?(n/total*100).toFixed(1):'0.0')+'%</td></tr>').join('');$('productivityTTZoneMix').innerHTML=Object.entries(allZones).sort((a,b)=>b[1]-a[1]).map(([z,n])=>'<div class="opsZoneCard"><div class="ztitle">'+esc(z==='SINZONA'?'Sin zona':z)+'</div><div class="zval">'+n.toLocaleString('es-AR')+'</div><div class="zmeta">'+(total?(n/total*100).toFixed(1):0)+'% de las líneas TT</div></div>').join('');
+ $('productivityTTDailyBody').innerHTML=pickers.map(p=>{const zs=Object.entries(p.zones).sort((a,b)=>b[1]-a[1]),known=zs.filter(([z])=>z!=='SINZONA'),dist=known.map(([z,n])=>z+' '+Math.round(n/p.rows.length*100)+'%').join(' · ')||'—',main=known[0]?.[0]||'—';return '<tr><td><b>'+esc(p.name)+'</b></td><td><b>'+p.rows.length+'</b></td><td><b>'+(p.rows.length/TT_PRODUCTIVE_HOURS).toFixed(1)+'</b></td><td><b>'+known.length+'</b></td><td>'+esc(dist)+'</td><td>'+esc(main)+'</td></tr>'}).join('');
+ const zones=realZones.sort((a,b)=>(allZones[b]||0)-(allZones[a]||0));$('productivityTTMatrixHead').innerHTML='<tr><th>Picker</th>'+zones.map(z=>'<th>'+esc(z)+'</th>').join('')+'<th>Total</th></tr>';$('productivityTTMatrixBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+zones.map(z=>'<td>'+(p.zones[z]||0)+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td></tr>').join('');$('productivityTTHourlyBody').innerHTML=pickers.map(p=>'<tr><td><b>'+esc(p.name)+'</b></td>'+p.hours.map(n=>'<td>'+n+'</td>').join('')+'<td><b>'+p.rows.length+'</b></td><td><b>'+(p.rows.length/TT_PRODUCTIVE_HOURS).toFixed(1)+'</b></td></tr>').join('')}
+(function(){const btn=$('productivityTTModeBtn');if(btn)btn.addEventListener('click',()=>setDisplayMode('productivityTT'));const inp=$('productivityTTDateFilter');if(inp){inp.max=timeTodayISO();inp.value=timeTodayISO();inp.addEventListener('change',()=>buildProductivityTT(true,inp.value))}$('productivityTTPrevDay')?.addEventListener('click',()=>ttShiftDate(-1));$('productivityTTNextDay')?.addEventListener('click',()=>ttShiftDate(1));$('productivityTTYesterdayBtn')?.addEventListener('click',()=>{if(inp){inp.value=timeYesterdayISO();buildProductivityTT(true,inp.value)}});$('productivityTTTodayBtn')?.addEventListener('click',()=>{if(inp){inp.value=timeTodayISO();buildProductivityTT(true,inp.value)}});$('productivityTTRefreshBtn')?.addEventListener('click',()=>buildProductivityTT(true,inp?.value||''));$('productivityTTSearch')?.addEventListener('input',renderProductivityTT)})();
+</script>
 </body></html>
