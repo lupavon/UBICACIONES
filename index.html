@@ -5831,6 +5831,10 @@ function timeIsExcluded(r){
   if(name==='noelia juarez'||name==='lucas pavon'||name==='nestor diaz'||name==='leonel gonzalez')return true;
   return false;
 }
+// Exclusión puntual de productividad: Enzo Luna, únicamente 08/10/2026.
+function productivityExcludedOnDate(r, day){
+  return day==='2026-10-08' && timeNormName(r?.Nombres||r?.Picker||r?.Empleado||'')==='enzo luna';
+}
 function timeRawZone(r){
   return String(r?.ZonaLineaPicking||r?.ZonaPrincipal||r?.Zona||r?.ZonaPiso||r?.zonapiso||r?.zona||'').trim().toUpperCase();
 }
@@ -5879,7 +5883,7 @@ function timePickerZonesDetailed(rows){
 }
 function timeFiltered(){
   const q=String((displayMode==='productivity'?$('productivitySearch')?.value:$('timeSearch')?.value)||'').trim().toLowerCase();
-  return TIME_ROWS.filter(r=>!timeIsExcluded(r)).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
+  return TIME_ROWS.filter(r=>!timeIsExcluded(r)&&!(displayMode==='productivity'&&productivityExcludedOnDate(r,$('productivityDateFilter')?.value||TIME_SELECTED_DATE))).filter(r=>!q||String(r.Nombres||'').toLowerCase().includes(q)||String(r.Empleado||'').toLowerCase().includes(q));
 }
 let TIME_HOURLY_SORT={key:'name',dir:1};
 let TIME_DEAD_SORT={key:'name',dir:1};
@@ -6058,7 +6062,7 @@ async function productivityLoadMonth(iso,force=false){
           let res=await fetch(productivitySummaryFileForDate(day)+'?month='+Date.now(),{cache:'no-store'});
           if(!res.ok)return {day,rows:[]};
           const payload=await res.json();
-          const rows=productivitySummaryRowsToTime(payload).filter(r=>!timeIsExcluded(r));
+          const rows=productivitySummaryRowsToTime(payload).filter(r=>!timeIsExcluded(r)&&!productivityExcludedOnDate(r,day));
           return {day,rows};
         }catch(e){return {day,rows:[]};}
       })());
