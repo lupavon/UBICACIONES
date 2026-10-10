@@ -3804,7 +3804,7 @@ function setDisplayMode(mode){
   if(mode==='occupancy') buildOccupancyMap();
   if(mode==='kpi') buildKpiPanel();
   if(mode==='sanitation') buildSanitationPanel();
-  if(mode==='process') buildPalletsProcessPanel();
+  if(mode==='process') buildPalletsProcessPanel(true);
   if(mode==='receipt') buildReceiptPanel(true);
   if(mode==='negations') buildNegationsPanel();
   if(mode==='productivity') buildTimesPanel(false, $('productivityDateFilter')?.value||'');
@@ -3915,45 +3915,47 @@ function renderPalletsProcess(){
   $('processIdentifiedCount').textContent=identified.toLocaleString('es-AR');
 }
 
+// El inventario actual manda; la trazabilidad solo aporta metadatos.
 async function buildPalletsProcessPanel(force=false){
-  if(PROCESS_LOADED && !force){
-    renderPalletsProcess();
-    return;
-  }
-
   const st=$('processStatus');
-  if(st){
-    st.className='processStatus';
-    st.textContent='Cargando pallets actualmente en EN_PROCESO…';
-  }
-
+  if(st){st.className='processStatus';st.textContent='Consultando ubicaciones actuales de stock…';}
   try{
-    const res=await fetch('./pallets-proceso.json?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache'}
+    const stockRes=await fetch('./stock.json?process='+Date.now(),{cache:'no-store'});
+    if(!stockRes.ok)throw new Error('Stock HTTP '+stockRes.status);
+    const stock=await stockRes.json();
+    const all=Array.isArray(stock)?stock:(Array.isArray(stock?.rows)?stock.rows:null);
+    if(!all)throw new Error('stock.json no contiene filas válidas');
+    const current=all.filter(r=>String(processVal(r,['Ubicacion','ubicacion','Location'])||'').trim().toUpperCase()==='EN_PROCESO');
+    let traces=[];
+    try{
+      const traceRes=await fetch('./pallets-proceso.json?trace='+Date.now(),{cache:'no-store'});
+      if(traceRes.ok){const data=await traceRes.json();traces=Array.isArray(data)?data:(Array.isArray(data?.rows)?data.rows:[]);}
+    }catch(_){/* Sin trazabilidad, mostrar igualmente el stock real */}
+    const key=r=>[String(processVal(r,['Caja','caja','numeroCaja','NroCaja'])||'').trim(),String(processVal(r,['EAN','ean','SKU','sku'])||'').trim(),String(processVal(r,['Referencia','referencia'])||'').trim()].join('|');
+    const byExact=new Map(traces.map(r=>[key(r),r]));
+    // Nunca sumar registros del histórico; solo enriquecer las filas actuales.
+    PROCESS_ROWS=current.map(r=>{
+      const t=byExact.get(key(r));
+      return {...r,
+        Caja:processVal(r,['Caja','caja','numeroCaja','NroCaja']),
+        EAN:processVal(r,['EAN','ean','SKU','sku']),
+        Descripcion:processVal(r,['Descripcion','descripcion']),
+        Saldo:processVal(r,['Saldo','saldo']),
+        FV:processVal(r,['FV','fv']),
+        PosicionOrigen:t?processVal(t,['PosicionOrigen','posicion_origen','UbicacionInicial']):'',
+        Maquinista:t?processVal(t,['Maquinista','maquinista','Nombre_empleado']):'',
+        Id_maquinista:t?processVal(t,['Id_maquinista','id_maquinista','Id_empleado']):'',
+        FechaIngresoProceso:t?processVal(t,['FechaIngresoProceso','fecha_ingreso_proceso','fecha']):''
+      };
     });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-
-    const payload=await res.json();
-    const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-    PROCESS_ROWS=rows;
     PROCESS_LOADED=true;
-
-    if(st){
-      const when=payload?.updated_at?new Date(payload.updated_at):null;
-      const whenTxt=when&&!isNaN(when)?when.toLocaleString('es-AR'):'';
-      st.className='processStatus ok';
-      st.textContent='● Información actualizada'+(whenTxt?' · '+whenTxt:'');
-    }
+    const when=stock?.updated_at?new Date(stock.updated_at):null;
+    const whenTxt=when&&!isNaN(when)?when.toLocaleString('es-AR'):'';
+    if(st){st.className='processStatus ok';st.textContent='● Stock actual'+(whenTxt?' · '+whenTxt:'')+' · '+PROCESS_ROWS.length+' líneas EN_PROCESO';}
     renderPalletsProcess();
   }catch(err){
-    PROCESS_ROWS=[];
-    PROCESS_LOADED=false;
-    renderPalletsProcess();
-    if(st){
-      st.className='processStatus bad';
-      st.textContent='Todavía no está publicado pallets-proceso.json · '+(err.message||String(err));
-    }
+    PROCESS_ROWS=[];PROCESS_LOADED=false;renderPalletsProcess();
+    if(st){st.className='processStatus bad';st.textContent='No se pudo verificar el stock actual: '+(err.message||String(err));}
   }
 }
 
