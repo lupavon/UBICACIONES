@@ -2673,15 +2673,15 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
   <div class="progressPlanPanel">
     <div class="progressPlanControls">
       <label><small>Fecha de planificación</small><input id="progressPlanDate" type="date"></label>
-      <label class="filelabel">📄 Cargar Detalle TRs<input accept=".xlsx,.xls" id="progressPlanFile" type="file"/></label>
+      <label class="filelabel">📄 Opcional: Detalle TRs<input accept=".xlsx,.xls" id="progressPlanFile" type="file"/></label>
       <span style="display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #35404d;border-radius:7px;background:#0d131a;color:#9eabb9;font-size:10px">🚫 Excluye automáticamente Warehouse_Destino_Id 38</span>
       <button class="btn progressDeletePlanBtn" id="progressPlanClearBtn" type="button" title="Borra la base de TRs de la fecha seleccionada para todos los usuarios">🗑 Borrar TRs del día</button>
       <button class="btn" id="progressPlanExportBtn" type="button">⬇ Backup historial</button>
       <label class="filelabel">⬆ Restaurar backup<input accept=".json" id="progressPlanImportFile" type="file"/></label><span id="progressGlobalStatus" class="muted" style="font-size:9px;padding:7px 2px">Base compartida: conectando…</span>
     </div>
-    <div class="progressPlanMeta" id="progressPlanMeta">Sin planificación cargada para esta fecha.</div>
+    <div class="progressPlanMeta" style="padding:7px 10px;margin-top:6px;border:1px solid #b7d9f4;border-radius:7px;background:#eaf5ff;color:#214c71;font-size:11px">① Elegí la fecha → ② Arrastrá la Planilla de Preparación (pestaña DD-MM) → ③ Tocá Actualizar. Se consulta directamente Seguimiento Picking del WMS, sin cargar Detalle TRs. Las líneas se actualizan cuando Copérnico crea nuevas por negaciones.</div><div class="progressPlanMeta" id="progressPlanMeta">Sin planificación cargada para esta fecha.</div>
     <div class="progressDailyDrop" id="progressDailyDrop" title="Arrastrá la Planilla de Preparación o hacé clic para seleccionarla">
-      <div class="progressDailyDropMain"><div class="progressDailyDropIcon">📥</div><div class="progressDailyDropText"><b>Planilla de Preparación del día</b><small>Arrastrá acá el Excel diario. Detecta automáticamente todos los sectores de la planilla (Unitarios secos, Unitarios químicos, Masterbox, PM, etc.) y toma Tienda · Pedido ERP · Picking · Líneas · Unidades.</small></div></div>
+      <div class="progressDailyDropMain"><div class="progressDailyDropIcon">📥</div><div class="progressDailyDropText"><b>1. Planilla de Preparación del día</b><small>Arrastrá acá el Excel diario. Detecta automáticamente todos los sectores de la planilla (Unitarios secos, Unitarios químicos, Masterbox, PM, etc.) y toma Tienda · Pedido ERP · Picking · Líneas · Unidades.</small></div></div>
       <div class="progressDailyDropMeta" id="progressDailyDropMeta">Sin planilla diaria cargada</div>
       <input accept=".xlsx,.xls" id="progressDailyPlanFile" type="file" hidden>
     </div>
@@ -6746,8 +6746,8 @@ function progressFindDailySectorsInSheet(ws,sheetName){
     const tienda=find(['TIENDA']);
     const pedido=find(['PEDIDO ERP','PEDIDO']);
     const picking=find(['PICKING']);
-    const lineas=find(['LINEAS']);
-    const unidades=find(['UNIDADES']);
+    const lineas=find(['LINEAS','CANT LINEAS','CANTIDAD LINEAS']);
+    const unidades=find(['UNIDADES','CANT UNIDADES','CANTIDAD UNIDADES']);
     if(tienda>=0&&pedido>=0&&picking>=0&&lineas>=0&&unidades>=0){
       headers.push({row:i,cols:{tienda,pedido,picking,lineas,unidades},name:progressFindSectorName(matrix,i)});
     }
@@ -6761,7 +6761,7 @@ function progressFindDailySectorsInSheet(ws,sheetName){
       const pedido=String(progressDailyCell(row,h.cols.pedido)||'').trim();
       const tienda=String(progressDailyCell(row,h.cols.tienda)||'').trim();
       const picking=String(progressDailyCell(row,h.cols.picking)||'').trim();
-      const lineas=Number(String(progressDailyCell(row,h.cols.lineas)||'').replace(/\./g,'').replace(',','.'))||0;
+      const lineas=Number(String(progressDailyCell(row,h.cols.lineas)||'').trim().replace(/\./g,'').replace(',','.'))||0;
       const unidades=Number(String(progressDailyCell(row,h.cols.unidades)||'').replace(/\./g,'').replace(',','.'))||0;
       if(!pedido&&!tienda&&!picking&&!lineas&&!unidades){blanks++; if(out.length&&blanks>=3)break; continue}else blanks=0;
       if(joined.includes('TOTAL')&&!pedido)continue;
@@ -6816,8 +6816,10 @@ async function progressImportDailyPlanFile(file,date){
   const sectors=Object.values(merged);
   // Protección extra: en una pestaña diaria cada encabezado de sector debe quedar aislado.
   // Si un sector enorme absorbe otras secciones, abortamos en vez de guardar datos contaminados.
-  const suspicious=sectors.find(sec=>sec.rows.length>80);
-  if(suspicious)throw new Error('El sector '+suspicious.name+' quedó con '+suspicious.rows.length+' pedidos; se abortó la carga porque parece haber mezcla de bloques.');
+  // No rechazar sectores grandes: un día puede tener más de 80 pedidos legítimos.
+  // El corte entre bloques lo determina cada nueva fila de encabezados, no un umbral fijo.
+  const suspicious=sectors.filter(sec=>!sec.name||sec.name==='SECTOR SIN NOMBRE');
+  if(suspicious.length)console.warn('Sectores sin título identificable:',suspicious.map(x=>x.rows.length));
   const st=progressLoadStore();st.days[date]=st.days[date]||{rows:[]};
   st.days[date].dailyPlanilla={fileName:file.name,sheetName:realSheet,loadedAt:new Date().toISOString(),parserVersion:PROGRESS_DAILY_PLAN_PARSER_VERSION,sectors};
   // Compatibilidad con versiones anteriores: si existe Unitario Seco también queda disponible aquí.
@@ -7326,14 +7328,59 @@ function progressPendingPhysicalStreets(row,live){
   if(unresolved)rows.push({zone:'Sin calle',pending:unresolved,physical:true});
   return rows;
 }
+// Integración experimental Seguimiento Picking Copérnico (sin almacenar credenciales).
+const PROGRESS_WMS_URL='https://services.copernicowms.com/backweb25/dwh_picking/picking?pickingint=';
+let PROGRESS_WMS_LINES=new Map(),PROGRESS_WMS_ERRORS=new Map(),PROGRESS_WMS_DATE='',PROGRESS_WMS_LAST=0,PROGRESS_WMS_BUSY=false;
+function progressWmsKey(v){return String(v??'').trim().replace(/\.0$/,'')}
+function progressWmsStatus(r){return String(r.descripcionestadolinea??r.descripcionEstadoLinea??r.EstadoLinea??'').trim().toUpperCase()}
+function progressWmsIsDone(r){return /EJECUTAD|CONFIRMAD|NEGAD/.test(progressWmsStatus(r))}
+function progressWmsZone(r){return progressExactZone(r.zonapiso??r.ZonaPiso??r.zonaPiso??'')}
+function progressWmsView(row){
+  const pedido=progressWmsKey(row.Pedido),picking=progressWmsKey(row.Picking||row.TR);
+  if(!picking||!PROGRESS_WMS_LINES.has(picking))return null;
+  const all=PROGRESS_WMS_LINES.get(picking);
+  // Un picking puede incluir varios pedidos ERP: nunca atribuir todo el picking a uno.
+  const matches=all.filter(r=>progressWmsKey(r.pedido??r.Pedido)===pedido);
+  if(!matches.length)return null;
+  const uniq=new Map();for(const r of matches){const id=progressWmsKey(r.IddetPrePick??r.iddetprepick??r.idPrepack??r.IdPrepack);if(id)uniq.set(id,r)}
+  const lines=uniq.size?[...uniq.values()]:matches;
+  const pendingByZone={};let done=0,denied=0;
+  for(const r of lines){const st=progressWmsStatus(r),origin=String(r.origen??'').toUpperCase();
+    if(progressWmsIsDone(r))done++;else {const z=progressWmsZone(r)||'Sin zona';pendingByZone[z]=(pendingByZone[z]||0)+1;}
+    if(origin.includes('NEGAD')||st.includes('NEGAD'))denied++;
+  }
+  return {Pedido:pedido,Picking:picking,Pickings:[picking],TotalLineas:lines.length,Procesadas:done,Confirmadas:Math.max(0,done-denied),Negadas:denied,Pendientes:lines.length-done,PendientesPorZona:pendingByZone,Zonas:[...new Set(lines.map(progressWmsZone).filter(Boolean))],_wms:true};
+}
+async function progressWmsLoad(date,force=false){
+  const daily=progressDailyPlan(date);
+  if(!daily?.sectors?.length){PROGRESS_WMS_LINES.clear();PROGRESS_WMS_ERRORS.clear();PROGRESS_WMS_DATE='';return}
+  if(date!==progressTodayISO()){PROGRESS_WMS_LINES.clear();PROGRESS_WMS_ERRORS.clear();PROGRESS_WMS_DATE='';return}
+  if(PROGRESS_WMS_BUSY)return;
+  if(!force&&PROGRESS_WMS_DATE===date&&Date.now()-PROGRESS_WMS_LAST<45000)return;
+  const pickings=[...new Set(daily.sectors.flatMap(sec=>sec.rows||[]).map(r=>progressWmsKey(r.Picking||r.TR)).filter(x=>/^\d+$/.test(x)))];
+  PROGRESS_WMS_BUSY=true;PROGRESS_WMS_DATE=date;PROGRESS_WMS_LAST=Date.now();
+  const fresh=new Map(),errors=new Map();let cursor=0;
+  const worker=async()=>{while(cursor<pickings.length){const pk=pickings[cursor++];try{
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+    let resp;try{resp=await fetch(PROGRESS_WMS_URL+encodeURIComponent(pk),{cache:'no-store',signal:ctrl.signal,credentials:'omit'})}finally{clearTimeout(timer)}
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const json=await resp.json();const rows=Array.isArray(json)?json:(Array.isArray(json?.rows)?json.rows:Array.isArray(json?.data)?json.data:null);
+    if(!rows)throw new Error('Respuesta sin array de líneas');fresh.set(pk,rows);
+  }catch(e){errors.set(pk,String(e.message||e))}}};
+  try{await Promise.all(Array.from({length:Math.min(3,pickings.length)},()=>worker()));
+    PROGRESS_WMS_LINES=fresh;PROGRESS_WMS_ERRORS=errors;
+  }finally{PROGRESS_WMS_BUSY=false}
+}
 function progressDailyOrderView(row){
-  const live=progressDailyLiveForPlanRow(row),total=Math.max(0,Number(row?.TotalLineas||0));
+  const wms=PROGRESS_WMS_DATE===progressSelectedDate()?progressWmsView(row):null;
+  const live=wms||progressDailyLiveForPlanRow(row);
+  const total=wms?wms.TotalLineas:Math.max(0,Number(row?.TotalLineas||0));
   const processed=Math.min(total,Math.max(0,Number(live?.Procesadas||0)));
   const pending=Math.max(0,total-processed),pct=total?processed/total*100:0;
 
   // Mostrar la calle física de picking (zonapiso de stock), no el grupo/código de planificación.
   // Se reconstruyen los SKU pendientes del pedido y cada SKU se lleva a su calle de Picking actual.
-  let streets=progressPendingPhysicalStreets(row,live);
+  let streets=wms?Object.entries(wms.PendientesPorZona).map(([zone,pending])=>({zone,pending,physical:false,planned:false})):progressPendingPhysicalStreets(row,live);
 
   // Si todavía no hubo coincidencia con el reporte de Líneas de Picking,
   // Detalle TRs se usa solamente como puente Pedido ERP -> TR/códigos.
@@ -7342,7 +7389,7 @@ function progressDailyOrderView(row){
   // No volver a mostrar códigos/grupos (FMFCUP, FMFCCU, etc.) como si fueran calles.
   // Si no puede resolverse una ubicación física, la UI muestra "Sin detalle de calle pendiente".
 
-  return {live,total,processed,pending,pct,streets};
+  return {live,total,processed,pending,pct,streets,wms};
 }
 function xcmp(a,b){return String(a||'').localeCompare(String(b||''),'es',{numeric:true})}
 function progressRenderUnitarioPanel(){
@@ -7357,7 +7404,8 @@ function progressRenderUnitarioPanel(){
   body.innerHTML=views.length?views.map(({r,v},i)=>{
     const advance='<div class="progressDailyAdvance"><b>'+Number(v.pct||0).toFixed(1)+'%</b><div class="progressBar"><i style="width:'+progressPct(v.pct)+'%"></i></div><small>'+progressFmt(v.processed)+' de '+progressFmt(v.total)+' líneas</small></div>';
     let streets='';
-    if(v.pending===0)streets='<span class="progressDailyStreet done">✓ Completo</span>';
+    if(!v.wms&&PROGRESS_WMS_DATE===date&&PROGRESS_WMS_ERRORS.has(String(r.Picking||r.TR||'')))streets='<span class="progressDailyNoDetail">⚠ No se pudo consultar Copérnico</span>';
+    else if(v.pending===0)streets='<span class="progressDailyStreet done">✓ Completo</span>';
     else if(v.streets.length)streets='<div class="progressDailyStreets">'+v.streets.map(z=>'<span class="progressDailyStreet" title="'+(z.physical?'Calle física de picking según stock / SKU pendiente':(z.planned?'Calle/código planificado según Detalle TRs':'Líneas pendientes informadas por Copérnico'))+'">'+esc(z.zone)+' <em>'+progressFmt(z.pending)+'</em></span>').join('')+'</div>';
     else streets='<span class="progressDailyNoDetail">Sin detalle de calle pendiente</span>';
     return '<tr><td>'+(i+1)+'</td><td><b>'+esc(r.Tienda||'—')+'</b></td><td>'+esc(r.Pedido||'—')+'</td><td>'+esc(r.Picking||r.TR||'—')+'</td><td class="num">'+progressFmt(v.total)+'</td><td>'+advance+'</td><td>'+streets+'</td></tr>';
@@ -7369,7 +7417,7 @@ function progressRenderUnitarioPanel(){
   const dm=$('progressDailyDropMeta');if(dm){
     const raw=progressLoadStore().days?.[date]?.dailyPlanilla||null;
     if(daily) dm.textContent=daily.fileName+' · pestaña '+daily.sheetName+' · '+(daily.sectors?.length||0)+' sectores · '+daily.sectors.reduce((a,s)=>a+s.rows.length,0)+' pedidos';
-    else if(raw) dm.textContent='⚠ Planilla anterior invalidada. Volvé a arrastrar el Excel para leer únicamente la pestaña '+progressCurrentPlanSheetName()+'.';
+    else if(raw) dm.textContent='⚠ Planilla anterior invalidada. Volvé a arrastrar el Excel para leer únicamente la pestaña '+progressCurrentPlanSheetName(date)+'.';
     else dm.textContent='Sin planilla diaria cargada · arrastrá el Excel del día';
   }
   // El panel lateral anterior queda oculto. Conservamos sus nodos para no romper listeners existentes.
@@ -7542,6 +7590,7 @@ async function buildOrderProgressPanel(force=false){
   const date=progressSelectedDate();
   await progressRemoteLoad(force);
   await progressHydrateSnapshotsFromHistory(progressLoadStore(),date);
+  await progressWmsLoad(date,force);
   try{
     const res=await fetch(progressHistoryUrl(date)+'?v='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const payload=await res.json();
     ORDER_PROGRESS_LIVE_ROWS=Array.isArray(payload.rows)?payload.rows:[];
@@ -7549,7 +7598,7 @@ async function buildOrderProgressPanel(force=false){
     const dailyOverview=progressBuildDailyOverviewRows(date);ORDER_PROGRESS_ROWS=dailyOverview|| (hasAnyPlan?progressBuildPlannedRows(date):progressBuildFallbackRows());ORDER_PROGRESS_AREAS=progressMakeAreas(ORDER_PROGRESS_ROWS);
     const sel=$('progressAreaFilter'),cur=sel.value||'__ALL__',areas=ORDER_PROGRESS_AREAS.map(x=>x.Area);sel.innerHTML='<option value="__ALL__">Todas las zonas</option>'+areas.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');sel.value=areas.includes(cur)?cur:'__ALL__';
     const upd=payload.updated_at?new Date(payload.updated_at):null;$('progressUpdated').textContent=upd&&!isNaN(upd)?'Actualizado '+upd.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Actualizado';
-    const missingLive=hasAnyPlan?ORDER_PROGRESS_ROWS.filter(x=>!x.LiveMatched&&x.Estado!=='No preparar').length:0;$('progressStatus').className='processStatus';$('progressStatus').textContent=(hasAnyPlan?'Planificación cargada + ':'')+'Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos vigentes'+(missingLive?' · '+missingLive+' sin cruce Copérnico':'')+' · fecha '+date.split('-').reverse().join('/')+(date===progressTodayISO()?' · actualización automática cada minuto':' · histórico');renderOrderProgress();
+    const missingLive=hasAnyPlan?ORDER_PROGRESS_ROWS.filter(x=>!x.LiveMatched&&x.Estado!=='No preparar').length:0;$('progressStatus').className='processStatus';$('progressStatus').textContent=(hasAnyPlan?'Planificación cargada + ':'')+'Copérnico Líneas de Picking · '+ORDER_PROGRESS_ROWS.length+' segmentos vigentes'+(missingLive?' · '+missingLive+' sin cruce Copérnico':'')+' · WMS directo: '+PROGRESS_WMS_LINES.size+' pickings consultados'+(PROGRESS_WMS_ERRORS.size?' · '+PROGRESS_WMS_ERRORS.size+' errores':'')+' · fecha '+date.split('-').reverse().join('/')+(date===progressTodayISO()?' · actualización automática cada minuto':' · histórico');renderOrderProgress();
     await progressLoadMicroPickers(date,force);await progressLoadZonePickers(date,force);progressRenderUnitarioPanel();
     if(ORDER_PROGRESS_TIMER)clearInterval(ORDER_PROGRESS_TIMER);ORDER_PROGRESS_TIMER=null;if(date===progressTodayISO())ORDER_PROGRESS_TIMER=setInterval(()=>{if(displayMode==='progress'&&progressSelectedDate()===progressTodayISO())buildOrderProgressPanel(true)},60000);
   }catch(e){
