@@ -8344,15 +8344,105 @@ setInterval(()=>{if(!document.hidden)loadSyncHealth()},15000);
 // === UBICACIONES AUTH ===
 const AUTH_API = 'https://ubicaciones-auth.pavonlucas-m.workers.dev';
 const AUTH_TOKEN_KEY = 'ubicaciones_auth_token';
+const AUTH_TIMEOUT_MS = 12000;
 let AUTH_USER=null;
-const getAuthToken=()=>sessionStorage.getItem(AUTH_TOKEN_KEY)||'';
-const setAuthToken=(t)=>{if(t)sessionStorage.setItem(AUTH_TOKEN_KEY,t);else sessionStorage.removeItem(AUTH_TOKEN_KEY)};
-const authFetch=async(path,opts={})=>{const token=getAuthToken();const headers={'Content-Type':'application/json',...(opts.headers||{})};if(token)headers['Authorization']='Bearer '+token;return fetch(AUTH_API+path,{...opts,headers})};
+let authMemoryToken;
+let authEpoch=0;
+let authLoginPending=false;
+const getAuthToken=()=>{if(authMemoryToken!==undefined)return authMemoryToken;try{authMemoryToken=sessionStorage.getItem(AUTH_TOKEN_KEY)||''}catch{authMemoryToken=''}return authMemoryToken};
+const setAuthToken=(token)=>{authMemoryToken=token||'';try{if(token)sessionStorage.setItem(AUTH_TOKEN_KEY,token);else sessionStorage.removeItem(AUTH_TOKEN_KEY)}catch{/* El acceso sigue funcionando si el navegador bloquea el almacenamiento. */}};
+
+async function authFetch(path,opts={}){
+  const method=(opts.method||'GET').toUpperCase();
+  const isLogin=path==='/login';
+  const headers=new Headers(opts.headers||{});
+  // /login lee JSON independientemente del MIME. text/plain es CORS-safelisted:
+  // evita un OPTIONS por cada login sin poner credenciales en la URL.
+  if(opts.body!=null&&!headers.has('Content-Type'))headers.set('Content-Type',isLogin?'text/plain;charset=UTF-8':'application/json');
+  const token=isLogin?'':getAuthToken();
+  if(token)headers.set('Authorization','Bearer '+token);
+  const attempts=method==='GET'?2:1; // Nunca repetir escrituras ni crear sesiones duplicadas.
+  for(let attempt=0;attempt<attempts;attempt++){
+    if(attempt)await new Promise(resolve=>setTimeout(resolve,500));
+    const controller=new AbortController();
+    const externalAbort=()=>controller.abort();
+    if(opts.signal?.aborted)controller.abort();
+    else opts.signal?.addEventListener('abort',externalAbort,{once:true});
+    let timedOut=false;
+    const timer=setTimeout(()=>{timedOut=true;controller.abort()},AUTH_TIMEOUT_MS);
+    try{
+      const response=await fetch(AUTH_API+path,{...opts,method,headers,credentials:'omit',cache:'no-store',signal:controller.signal});
+      // Mantener el límite también durante la descarga del cuerpo.
+      await response.clone().text();
+      if(method==='GET'&&[408,502,503,504].includes(response.status)&&attempt+1<attempts)continue;
+      return response;
+    }catch(error){
+      if(opts.signal?.aborted)throw error;
+      if(attempt+1<attempts)continue;
+      throw new Error(timedOut?'El servicio de acceso tardó demasiado en responder. Intentá ingresar nuevamente.':
+        (navigator.onLine===false?'No hay conexión a Internet. Reconectate e intentá ingresar nuevamente.':
+        'No se pudo conectar con el servicio de acceso. Intentá nuevamente; si continúa, hay que revisar el servidor de autenticación.'));
+    }finally{
+      clearTimeout(timer);
+      opts.signal?.removeEventListener('abort',externalAbort);
+    }
+  }
+}
+async function authReadJSON(response){
+  let data;
+  try{data=await response.json()}catch{throw new Error('El servicio de acceso devolvió una respuesta inválida (HTTP '+response.status+').')}
+  if(!response.ok){
+    const message=response.status>=500?'El servicio de acceso tiene un problema temporal (HTTP '+response.status+'). Intentá nuevamente.':
+      (typeof data?.error==='string'?data.error:'No se pudo completar el acceso (HTTP '+response.status+').');
+    const requestId=response.headers.get('X-Auth-Request-Id');
+    const error=new Error(message+(requestId?' Referencia: '+requestId:''));error.status=response.status;throw error;
+  }
+  return data;
+}
+function authValidUser(user){return user&&typeof user.username==='string'&&user.username.length>0}
 function showLogin(msg=''){document.getElementById('authGate').classList.remove('hidden');document.getElementById('loginError').textContent=msg;document.getElementById('userChip').style.display='none'}
 function applyAuthUser(u){AUTH_USER=u;document.getElementById('authGate').classList.add('hidden');document.getElementById('userChip').style.display='flex';document.getElementById('currentUserName').textContent=u.name||u.username;document.getElementById('currentUserRole').textContent=u.role==='administrador'?'Administrador':'Operativo';document.querySelectorAll('.adminOnly').forEach(el=>el.style.display=u.username==='lpavon'?'inline-block':'none')}
-async function authBoot(){try{const r=await authFetch('/session');if(!r.ok){setAuthToken('');return showLogin();}const d=await r.json();if(d?.user){applyAuthUser(d.user);setDisplayMode('dashboard');}else{setAuthToken('');showLogin();}}catch(e){showLogin('No se pudo conectar con el servicio de autenticación.')}}
-document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const er=document.getElementById('loginError');er.textContent='Validando…';try{const r=await authFetch('/login',{method:'POST',body:JSON.stringify({username:document.getElementById('loginUser').value.trim().toLowerCase(),password:document.getElementById('loginPass').value})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Usuario o contraseña incorrectos');if(d.token)setAuthToken(d.token);applyAuthUser(d.user);setDisplayMode('dashboard');document.getElementById('loginPass').value='';er.textContent=''}catch(x){setAuthToken('');er.textContent=x.message}});
-document.getElementById('logoutBtn').onclick=async()=>{try{await authFetch('/logout',{method:'POST'})}catch(e){} setAuthToken('');AUTH_USER=null;showLogin();};
+async function authBoot(){
+  const epoch=authEpoch;
+  if(!getAuthToken())return showLogin();
+  try{
+    const response=await authFetch('/session');
+    if(epoch!==authEpoch)return;
+    if(response.status===401){setAuthToken('');return showLogin()}
+    const data=await authReadJSON(response);
+    if(epoch!==authEpoch)return;
+    if(!authValidUser(data?.user))throw new Error('El servicio de acceso devolvió una sesión inválida.');
+    applyAuthUser(data.user);setDisplayMode('dashboard');
+  }catch(error){if(epoch===authEpoch)showLogin(error.message)}
+}
+document.getElementById('loginForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(authLoginPending)return;
+  const epoch=++authEpoch; // Una validación inicial atrasada no puede borrar este login.
+  authLoginPending=true;
+  const errorBox=document.getElementById('loginError');
+  const button=document.querySelector('#loginForm button[type="submit"]');
+  const previousText=button.textContent;
+  button.disabled=true;button.textContent='Ingresando…';errorBox.textContent='Validando…';
+  try{
+    const response=await authFetch('/login',{method:'POST',body:JSON.stringify({username:document.getElementById('loginUser').value.trim().toLowerCase(),password:document.getElementById('loginPass').value})});
+    const data=await authReadJSON(response);
+    if(epoch!==authEpoch)return;
+    if(!authValidUser(data?.user)||typeof data.token!=='string'||!data.token)throw new Error('El servicio de acceso devolvió una sesión incompleta.');
+    setAuthToken(data.token);applyAuthUser(data.user);setDisplayMode('dashboard');
+    document.getElementById('loginPass').value='';errorBox.textContent='';
+  }catch(error){
+    if(epoch!==authEpoch)return;
+    if(error.status===401){setAuthToken('');AUTH_USER=null}
+    errorBox.textContent=error.message;
+  }finally{authLoginPending=false;button.disabled=false;button.textContent=previousText}
+});
+document.getElementById('logoutBtn').onclick=async()=>{
+  ++authEpoch;
+  const request=authFetch('/logout',{method:'POST'});
+  setAuthToken('');AUTH_USER=null;showLogin();
+  try{await request}catch{/* La sesión local ya quedó cerrada. */}
+};
 function closeUsersView(){const v=document.getElementById('usersView');if(v)v.classList.remove('active');const b=document.getElementById('usersModeBtn');if(b)b.classList.remove('active')}
 function openUsersView(){if(AUTH_USER?.username!=='lpavon')return;displayMode='users';placeDetailForMode('users');['dashboardView','progressView','rackView','heatmapView','occupancyView','kpiView','sanitationView','palletsProcessView','receiptView','negationsView','timesView'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});document.querySelectorAll('.modebar .btn').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('usersModeBtn');if(btn)btn.classList.add('active');const view=document.getElementById('usersView');if(view)view.classList.add('active');loadUsers();loadSessions();}
 document.getElementById('usersModeBtn').onclick=openUsersView;
