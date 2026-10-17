@@ -8151,85 +8151,95 @@ function saveStockCache(payload){
     : setTimeout(doSave,250);
 }
 
-async function loadPublishedStock({silent=false}={}){
-  if(stockLoadInFlight) return;
+// Preferir fecha real antes que cantidad de Doc_Oc: una muestra vieja no debe
+// desplazar una más reciente sólo porque contiene más campos de recepción.
+function stockPayloadInfo(payload){
+  const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+  if(!rows.length)throw new Error('Stock sin filas');
+  const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
+  const parsed=Date.parse(updatedAt);
+  const docOcCoverage=rows.reduce((n,row)=>n+(String(processVal(row,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc'])??'').trim()?1:0),0);
+  return {updatedAt,ts:Number.isFinite(parsed)?parsed:0,docOcCoverage};
+}
+let stockVisibleInfo=null;
+let lastStockPayloadCheckAt=0;
+let stockLoadPromise=null;
+const STOCK_FULL_CHECK_MS=60000;
+function stockCandidateIsNewer(candidate,current){
+  return !current||candidate.ts>current.ts||(candidate.ts===current.ts&&candidate.docOcCoverage>current.docOcCoverage);
+}
+async function loadPublishedStock({silent=false,force=false}={}){
+  if(stockLoadPromise)return stockLoadPromise;
   stockLoadInFlight=true;
-
-  const status=$('sourceText');
-  if(status && !DATA.length && !silent) status.textContent='Buscando stock…';
-
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),15000);
-
-  try{
-    const sources=[
-      {name:'Worker',url:'https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now()},
-      {name:'GitHub',url:'./stock.json?v='+Date.now()}
-    ];
-
-    const results=await Promise.allSettled(sources.map(async src=>{
-      const res=await fetch(src.url,{
-        cache:'no-store',
-        signal:controller.signal,
-        headers:{'Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache'}
-      });
-      if(!res.ok) throw new Error(src.name+' HTTP '+res.status);
-      const candidate=await res.json();
-      const rows=Array.isArray(candidate)?candidate:(Array.isArray(candidate?.rows)?candidate.rows:[]);
-      if(!rows.length) throw new Error(src.name+' sin filas');
-      const rawTs=candidate?.updated_at||candidate?.updatedAt||candidate?.generated_at||'';
-      const ts=rawTs ? new Date(rawTs).getTime() : 0;
-      const docOcCoverage=rows.reduce((n,row)=>{
-        const v=processVal(row,['Doc_Oc','DOC_OC','doc_oc','DocOC','docOc']);
-        return n + (String(v??'').trim()?1:0);
-      },0);
-      return {payload:candidate,ts:isNaN(ts)?0:ts,source:src.name,docOcCoverage};
-    }));
-
-    const valid=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
-    if(!valid.length){
-      const errors=results.map(r=>r.status==='rejected'?String(r.reason?.message||r.reason):'').filter(Boolean);
-      throw new Error(errors.join(' · ')||'No se pudo obtener stock remoto');
-    }
-
-    // Para En Recibo necesitamos conservar Doc_Oc de Inventario Referencia.
-    // Priorizamos una fuente que realmente lo incluya; entre fuentes completas, la más fresca.
-    valid.sort((a,b)=>{
-      const aHas=a.docOcCoverage>0?1:0, bHas=b.docOcCoverage>0?1:0;
-      if(aHas!==bHas) return bHas-aHas;
-      if(a.docOcCoverage!==b.docOcCoverage) return b.docOcCoverage-a.docOcCoverage;
-      return b.ts-a.ts;
-    });
-    const chosen=valid[0];
-    const payload=chosen.payload;
-    const updatedAt=payload?.updated_at||payload?.updatedAt||payload?.generated_at||'';
-    const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
-
-    if(DATA.length && updatedAt && cachedMeta===updatedAt){
-      if(status) status.textContent=formatStockStatus(updatedAt);
-      lastGoodStockAt=Date.now();
-      return;
-    }
-
-    applyStockPayload(payload,{fromCache:false});
-    saveStockCache(payload);
-    lastGoodStockAt=Date.now();
-    if(status) status.textContent=formatStockStatus(updatedAt);
-
-  }catch(err){
-    console.error('loadPublishedStock',err);
-    if(status){
-      if(DATA.length){
-        const cachedMeta=localStorage.getItem(STOCK_CACHE_META_KEY)||'';
-        status.textContent=formatStockStatus(cachedMeta,{fromCache:true,error:true});
-      }else{
-        status.textContent='🔴 No se pudo cargar stock.json · '+(err?.message||err);
+  stockLoadPromise=(async()=>{
+    const status=$('sourceText');
+    if(status&&!DATA.length&&!silent)status.textContent='Buscando stock…';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),15000);
+    let applied=false;
+    try{
+      if(!stockVisibleInfo&&DATA.length){
+        stockVisibleInfo=stockPayloadInfo({rows:DATA,updated_at:localStorage.getItem(STOCK_VISIBLE_META_KEY)||localStorage.getItem(STOCK_CACHE_META_KEY)||''});
       }
+      // Archivo pequeño: las consultas de 8 s no deben bajar 19 MB cada vez.
+      // Revalidar además el payload cada 60 s por si el manifiesto se retrasa.
+      if(!force&&DATA.length&&Date.now()-lastStockPayloadCheckAt<STOCK_FULL_CHECK_MS){
+        const metaController=new AbortController();
+        const metaTimeout=setTimeout(()=>metaController.abort(),2000);
+        try{
+          const response=await fetch('https://raw.githubusercontent.com/lupavon/UBICACIONES/main/stock-sync-status.json?v='+Date.now(),{cache:'no-store',signal:metaController.signal});
+          if(response.ok){
+            const manifest=await response.json();
+            const next=Date.parse(manifest.stock_updated_at||'');
+            if(Number.isFinite(next)&&next<=(stockVisibleInfo?.ts||0)){
+              if(status)status.textContent=formatStockStatus(stockVisibleInfo.updatedAt);
+              return;
+            }
+          }else if(response.status===404){
+            // Compatibilidad mientras todavía no se publicó el primer manifiesto.
+            return;
+          }
+        }catch{/* El chequeo completo periódico conserva el fallback sin manifiesto. */
+          return;
+        }finally{clearTimeout(metaTimeout)}
+      }
+      lastStockPayloadCheckAt=Date.now();
+      const sources=[
+        {name:'GitHub directo',url:'https://raw.githubusercontent.com/lupavon/UBICACIONES/main/stock.json?v='+Date.now()},
+        {name:'Worker',url:'https://ubicaciones-stock.pavonlucas-m.workers.dev/stock?v='+Date.now()},
+        {name:'GitHub Pages',url:'./stock.json?v='+Date.now()}
+      ];
+      const results=await Promise.allSettled(sources.map(async source=>{
+        // Sin cabeceras personalizadas: no forzar OPTIONS hacia el Worker.
+        const response=await fetch(source.url,{cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw new Error(source.name+' HTTP '+response.status);
+        const payload=await response.json();
+        const candidate=stockPayloadInfo(payload);
+        if(stockCandidateIsNewer(candidate,stockVisibleInfo)||!DATA.length){
+          applyStockPayload(payload,{fromCache:false});
+          stockVisibleInfo=candidate;
+          saveStockCache(payload);
+          lastGoodStockAt=Date.now();
+          applied=true;
+          if(status)status.textContent=formatStockStatus(candidate.updatedAt);
+        }
+        // Mostrar cada respuesta válida al llegar. La otra fuente puede mejorarla,
+        // pero un Worker bloqueado no demora la aplicación de los datos de GitHub.
+        return candidate;
+      }));
+      const valid=results.filter(result=>result.status==='fulfilled');
+      if(!valid.length)throw new Error('No se pudo obtener stock remoto');
+      if(!applied&&status)status.textContent=formatStockStatus(stockVisibleInfo?.updatedAt||'');
+    }catch(error){
+      console.warn('Stock: no se pudo completar la actualización',error?.name||'Error');
+      if(status)status.textContent=DATA.length
+        ?formatStockStatus(stockVisibleInfo?.updatedAt||localStorage.getItem(STOCK_VISIBLE_META_KEY)||'',{fromCache:true,error:true})
+        :'🔴 No se pudo cargar stock.json · '+(error?.message||error);
+    }finally{
+      clearTimeout(timeout);stockLoadInFlight=false;
     }
-  }finally{
-    clearTimeout(timeout);
-    stockLoadInFlight=false;
-  }
+  })();
+  try{return await stockLoadPromise}finally{stockLoadPromise=null}
 }
 
 rebuild();
@@ -8257,7 +8267,7 @@ if(refreshBtn){
     refreshBtn.disabled=true;
     const prev=refreshBtn.textContent;
     refreshBtn.textContent='Actualizando…';
-    try{ await loadPublishedStock(); }
+    try{ await loadPublishedStock({force:true}); }
     finally{
       refreshBtn.disabled=false;
       refreshBtn.textContent=prev;
@@ -8268,7 +8278,8 @@ if(refreshBtn){
 // Arranque único del dashboard:
 // 1) mostrar cache inmediatamente;
 // 2) buscar stock nuevo en segundo plano;
-// 3) refrescar cada 8 segundos y elegir la fuente más fresca entre Worker y GitHub.
+// 3) consultar metadatos cada 8 segundos y descargar stock al detectar novedades.
+//    Cada 60 segundos revalidar también las fuentes completas como respaldo.
 placeDetailForMode(displayMode);
 loadCachedStock();
 refreshVisibleStockStatus();
@@ -8300,10 +8311,10 @@ async function loadSyncHealth(){
   if(!el)return;
 
   try{
-    const res=await fetch('./sync-status.json?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache'}
-    });
+    let res;
+    try{res=await fetch('https://raw.githubusercontent.com/lupavon/UBICACIONES/main/stock-sync-status.json?v='+Date.now(),{cache:'no-store'})}catch{}
+    if(!res||!res.ok)res=await fetch('./stock-sync-status.json?v='+Date.now(),{cache:'no-store'});
+    if(res.status===404)res=await fetch('./sync-status.json?v='+Date.now(),{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
 
     const st=await res.json();
