@@ -40,6 +40,7 @@ jobs:
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
           from collections import defaultdict, Counter
+          from scripts.stock_refresh import StockPulse
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
@@ -808,6 +809,7 @@ jobs:
           user_id = None
           login_ok = False
           stock_updated = False
+          stock_pulse = None
           main_error = None
           logout_error = None
 
@@ -982,6 +984,13 @@ jobs:
 
               save_json_file(STOCK_FILE, stock_payload)
               stock_updated = True
+
+              # Publicar ahora, sin esperar productividad, negaciones o trazabilidad.
+              # Un solo login; el pulso comparte su token y no libera licencias.
+              stock_pulse = StockPulse(jwt, STOCK_URL, extract_rows)
+              stock_pulse.seed(now_iso, publish_now=SYNC_MODE != "fast")
+              if SYNC_MODE != "fast":
+                  stock_pulse.start()
 
               print("STOCK HTTP:", stock_http)
               print("Registros:", len(rows))
@@ -2224,6 +2233,8 @@ jobs:
               )
 
           finally:
+              if stock_pulse:
+                  stock_pulse.close()
               if jwt and user_id is not None:
                   print("=== 5. LOGOUT ===")
 
@@ -2257,20 +2268,7 @@ jobs:
 
       - name: Publicar datos fast
         run: |
-          set -e
-          git config user.name "UBICACIONES AutoSync"
-          git config user.email "actions@github.com"
-          SNAP=/tmp/ubicaciones-fast
-          rm -rf "$SNAP"; mkdir -p "$SNAP"
-          for f in stock.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
-          for intento in 1 2 3 4 5; do
-            git fetch origin main
-            git reset --hard origin/main
-            for f in stock.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
-            git add stock.json sync-status.json 2>/dev/null || true
-            if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
-            git commit -m "AutoSync Copernico · fast"
-            if git push origin HEAD:main; then exit 0; fi
-            sleep $((intento * 2))
-          done
-          exit 1
+          python3 - <<'PY'
+          from scripts.stock_refresh import StockPublisher
+          StockPublisher().publish(extra_files=("sync-status.json",))
+          PY

@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: copernico-heavy
+  group: copernico-session
   cancel-in-progress: false
 
 jobs:
@@ -39,6 +39,7 @@ jobs:
           from datetime import datetime, timezone, timedelta
           from pathlib import Path
           from collections import defaultdict, Counter
+          from scripts.stock_refresh import StockPulse
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
@@ -805,6 +806,7 @@ jobs:
           user_id = None
           login_ok = False
           stock_updated = False
+          stock_pulse = None
           main_error = None
           logout_error = None
 
@@ -979,6 +981,13 @@ jobs:
 
               save_json_file(STOCK_FILE, stock_payload)
               stock_updated = True
+
+              # Publicar ahora, sin esperar productividad, negaciones o trazabilidad.
+              # Un solo login; el pulso comparte su token y no libera licencias.
+              stock_pulse = StockPulse(jwt, STOCK_URL, extract_rows)
+              stock_pulse.seed(now_iso, publish_now=SYNC_MODE != "fast")
+              if SYNC_MODE != "fast":
+                  stock_pulse.start()
 
               print("STOCK HTTP:", stock_http)
               print("Registros:", len(rows))
@@ -1574,6 +1583,8 @@ jobs:
               )
 
           finally:
+              if stock_pulse:
+                  stock_pulse.close()
               if jwt and user_id is not None:
                   print("=== 5. LOGOUT ===")
 
@@ -1608,6 +1619,7 @@ jobs:
       - name: Publicar datos heavy
         run: |
           set -e
+          python3 -c "from scripts.stock_refresh import StockPublisher; StockPublisher().publish()"
           git config user.name "UBICACIONES AutoSync"
           git config user.email "actions@github.com"
           SNAP=/tmp/ubicaciones-heavy
