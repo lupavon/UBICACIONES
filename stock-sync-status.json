@@ -1,1 +1,1 @@
-{"status":"error","updated_at":"2026-10-20T22:17:01.913185+00:00","stock_updated_at":"2026-10-20T22:04:35.143553+00:00","last_success_at":"2026-10-20T22:04:35.143553+00:00","message":"No se pudo renovar el stock; se conserva el último válido","target_interval_seconds":60}
+{"status":"error","updated_at":"2026-10-20T22:18:03.456164+00:00","stock_updated_at":"2026-10-20T22:04:35.143553+00:00","last_success_at":"2026-10-20T22:04:35.143553+00:00","message":"No se pudo renovar el stock; se conserva el último válido","target_interval_seconds":60}
