@@ -1,0 +1,81 @@
+name: Publicar interfaz UBICACIONES
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'mudanzas.html'
+      - 'service-worker.js'
+      - 'operational-data.js'
+      - 'manifest.webmanifest'
+      - 'icon-*.png'
+      - '.github/workflows/pages-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ubicaciones-pages-ui
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Obtener solo los archivos de interfaz
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+            /mudanzas.html
+            /service-worker.js
+            /operational-data.js
+            /manifest.webmanifest
+            /icon-192.png
+            /icon-512.png
+      - name: Verificar y empaquetar interfaz
+        env:
+          UI_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os, re, shutil, subprocess
+          html = Path('index.html').read_text()
+          if not html.lstrip().lower().startswith('<!doctype html'):
+              raise SystemExit('index.html no es un documento completo')
+          if 'mudanzasIntegratedButton' not in html:
+              raise SystemExit('Falta el acceso integrado a Mudanzas')
+          if 'raw.githubusercontent.com/lupavon/UBICACIONES/main/' not in html:
+              raise SystemExit('Falta la conexión independiente a datos operativos')
+          for attrs, code in re.findall(r'<script\b([^>]*)>(.*?)</script>', html, re.S | re.I):
+              if code.strip() and 'application/json' not in attrs:
+                  subprocess.run(['node', '--check'], input=code, text=True, check=True)
+          out = Path('_site')
+          out.mkdir()
+          for name in ['index.html','service-worker.js','operational-data.js','manifest.webmanifest','icon-192.png','icon-512.png']:
+              if Path(name).is_file():
+                  shutil.copy2(name, out / name)
+          # Publicar también el módulo incluido en index, nunca el prototipo anterior.
+          embedded = re.search(r'frame\.srcdoc=("(?:[^"\\]|\\.)*");loaded=true', html)
+          if not embedded:
+              raise SystemExit('No se pudo extraer el módulo de Mudanzas')
+          (out / 'mudanzas.html').write_text(json.loads(embedded.group(1)))
+          (out / '.nojekyll').touch()
+          (out / 'version.json').write_text(json.dumps({'commit':os.environ['UI_COMMIT'],'module':'mudanzas-integrado'}))
+          print('Interfaz lista:', sum(p.stat().st_size for p in out.iterdir()), 'bytes')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment
