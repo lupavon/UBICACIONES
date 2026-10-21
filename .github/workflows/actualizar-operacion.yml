@@ -1506,6 +1506,18 @@ jobs:
                   neg_history_file = NEGATIONS_HISTORY_DIR / f"{day}.json"
                   save_json_file(neg_history_file, neg_payload)
                   print("Histórico Negaciones guardado:", neg_history_file)
+                  # Publicar el día actual antes de históricos y tareas secundarias.
+                  # Reutiliza la sesión y el publicador que conserva cambios remotos.
+                  try:
+                      published_neg = stock_pulse.publisher.publish(
+                          extra_files=(str(NEGATIONS_FILE), str(neg_history_file))
+                      )
+                      print("Negaciones del día publicadas" if published_neg else
+                            "Negaciones: publicación diferida al cierre del ciclo")
+                  except Exception as publish_error:
+                      print("Negaciones: publicación temprana pendiente (" +
+                            type(publish_error).__name__ + ")")
+
 
                   def make_neg_payload_for_day(source_prod, source_pick, query_day, label_day, updated_at, prod_status=200, pick_status=200, source_reasons=None, reasons_status=None):
                       # Índices propios del día histórico.
