@@ -101,7 +101,7 @@ class StockPulse:
     def fetch(self):
         # Opener propio: no compartir CookieJar/opener con los hilos operativos.
         request = urllib.request.Request(self.url, headers={
-            "Accept": "application/json", "Authorization": "Bearer " + self.jwt,
+            "Accept": "application/json", "Authorization": self.jwt,
             "Origin": "https://copernicowms.com", "Referer": "https://copernicowms.com/",
             "User-Agent": "Mozilla/5.0",
         })
