@@ -3600,6 +3600,26 @@ function mixTraceHtml(state){
   h+='<div class="mixTraceNote">Criterio: para cada SKU actualmente presente se busca, incluso cuando comparte la misma caja con otros SKU, el comienzo de su saldo positivo actual. El SKU cuya presencia activa comenzó último es el que generó la convivencia actual. El responsable mostrado es <strong>Nombre_empleado</strong> de ese movimiento.</div></div>';
   return h;
 }
+// Archivos publicados: URL absoluta para funcionar también desde una copia local.
+async function receiptPublishedJson(file){
+  const urls=[
+    'https://raw.githubusercontent.com/lupavon/UBICACIONES/main/'+file,
+    new URL('./'+file,location.href).href
+  ];
+  const errors=[];
+  for(const url of [...new Set(urls)]){
+    if(!/^https?:/.test(url))continue;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    try{
+      const res=await fetch(url+'?v='+Date.now(),{cache:'no-store',signal:controller.signal});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      return await res.json();
+    }catch(e){errors.push(e.message||String(e))}
+    finally{clearTimeout(timer)}
+  }
+  throw new Error(file+': '+(errors.join(' / ')||'sin conexión HTTP disponible'));
+}
 let TRACE_DATASET=null;
 let TRACE_DATASET_PROMISE=null;
 
@@ -3608,12 +3628,7 @@ async function loadTraceDataset(force=false){
   if(TRACE_DATASET_PROMISE && !force)return TRACE_DATASET_PROMISE;
 
   TRACE_DATASET_PROMISE=(async()=>{
-    const res=await fetch('./trazabilidad-cajas.json?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache'}
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const payload=await res.json();
+    const payload=await receiptPublishedJson('trazabilidad-cajas.json');
     TRACE_DATASET=payload||{};
     return TRACE_DATASET;
   })();
@@ -4412,11 +4427,8 @@ async function loadCopernicoReferenceRows(force=false){
   // Inventario Referencia). El Worker puede publicar una versión reducida sin Doc_Oc.
   let fullRows=[];
   try{
-    const res=await fetch('./stock.json?v='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}});
-    if(res.ok){
-      const payload=await res.json();
-      fullRows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
-    }
+    const payload=await receiptPublishedJson('stock.json');
+    fullRows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
   }catch(err){
     console.warn('No se pudo leer stock.json completo para Doc_Oc',err);
   }
@@ -4467,9 +4479,10 @@ async function loadCopernicoReferenceRows(force=false){
 }
 async function loadCopernicoReceiptPlan(rows,force=false){
   if(COPERNICO_RECEIPT_PLAN_CACHE&&!force)return COPERNICO_RECEIPT_PLAN_CACHE;
+  if(!(rows||[]).some(r=>{const oc=receiptInventoryOC(r);return oc&&oc!=='MULTIPRODUCTO'}))return [];
   const range=receiptPlanRange(rows);
   const qs=new URLSearchParams({documentooc:'',tipodoc:'PO',bodega:'47',fecha_inicial:range.from,fecha_final:range.to});
-  const res=await fetch(COPERNICO_RECEIPT_URL+'?'+qs.toString()+'&_='+Date.now(),{cache:'no-store'});
+  const res=await fetch(COPERNICO_RECEIPT_URL+'?'+qs.toString()+'&_='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(12000)});
   if(!res.ok)throw new Error('Consulta Recibo HTTP '+res.status);
   const payload=await res.json();
   const data=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
@@ -4540,12 +4553,11 @@ let RECEIPT_MASTER_PROMISE=null;
 async function loadReceiptMaster(force=false){
   if(force)RECEIPT_MASTER_PROMISE=null;
   if(!RECEIPT_MASTER_PROMISE){
-    RECEIPT_MASTER_PROMISE=fetch('./maestro-recibo.json?v='+Date.now(),{
-      cache:'no-store',headers:{'Cache-Control':'no-cache'}
-    }).then(r=>{
-      if(!r.ok)throw new Error('maestro-recibo.json HTTP '+r.status);
-      return r.json();
-    }).then(payload=>(payload&&payload.items&&typeof payload.items==='object')?payload.items:{});
+    RECEIPT_MASTER_PROMISE=receiptPublishedJson('maestro-recibo.json')
+      .then(payload=>{
+        if(!payload?.items||typeof payload.items!=='object')throw new Error('Formato de maestro inválido');
+        return payload.items;
+      }).catch(err=>{RECEIPT_MASTER_PROMISE=null;throw err});
   }
   return RECEIPT_MASTER_PROMISE;
 }
@@ -4599,6 +4611,13 @@ async function buildReceiptPanelCore(force=false){
   try{
     const baseRows=await loadCopernicoReferenceRows(force);
     const sourceSnapshot=DATA;
+    RECEIPT_ROWS=baseRows;
+    fillReceiptTeams();
+    if(!RECEIPT_DEFAULTS_APPLIED)applyReceiptDefaults();
+    renderReceipt();
+    // Lanzar las fuentes independientes juntas y capturar errores inmediatamente.
+    const masterTask=loadReceiptMaster(refreshAux).then(value=>({value}),error=>({error}));
+    const traceTask=loadTraceDataset(refreshAux).then(value=>({value}),error=>({error}));
 
     let planRows=[];
     try{
@@ -4611,7 +4630,9 @@ async function buildReceiptPanelCore(force=false){
 
     // Agregar Macrozona y Proveedor desde el maestro VL sin tocar la lógica de trazabilidad.
     try{
-      const receiptMaster=await loadReceiptMaster(refreshAux);
+      const masterResult=await masterTask;
+      if(masterResult.error)throw masterResult.error;
+      const receiptMaster=masterResult.value;
       enriched=enrichReceiptRowsWithMaster(enriched,receiptMaster);
     }catch(masterErr){
       console.warn('No se pudo cargar maestro-recibo.json; se conserva el proveedor de Copérnico',masterErr);
@@ -4622,13 +4643,17 @@ async function buildReceiptPanelCore(force=false){
 
     let trace=null;
     try{
-      trace=await loadTraceDataset(refreshAux);
+      const traceResult=await traceTask;
+      if(traceResult.error)throw traceResult.error;
+      trace=traceResult.value;
     }catch(traceErr){
       warnings.push('Trazabilidad: '+(traceErr.message||traceErr));
       console.warn('No se pudo cargar trazabilidad-cajas.json para En recibo',traceErr);
     }
 
     RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(enriched,trace) : enriched.map(r=>({...r,_receiptTraceFound:false}));
+    const pendingTrace=trace?enriched.filter(r=>trace.boxes?.[String(receiptField(r,'caja')||'').trim()]?.ok===false).length:0;
+    if(pendingTrace)warnings.push('Trazabilidad pendiente en origen para '+pendingTrace+' registros');
     RECEIPT_LOADED=true;
     RECEIPT_STOCK_SOURCE=sourceSnapshot;
     RECEIPT_CHECKED_AT=Date.now();
