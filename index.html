@@ -2646,8 +2646,9 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 <input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, macrozona, proveedor, descripción, responsable o equipo..."/>
 <select id="receiptTeamFilter" autocomplete="off"><option value="">Todos los equipos</option></select>
 <select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
-<option value="all">Todo actual</option>
-<option value="exclude_today" selected>Hasta ayer (excluye hoy)</option>
+<option value="all" selected>Todo actual (incluye sin fecha)</option>
+<option value="unknown">Sin fecha identificada</option>
+<option value="exclude_today">Hasta ayer (excluye hoy)</option>
 <option value="yesterday">Solo ayer</option>
 <option value="old">Viejos (anteriores a ayer)</option>
 <option value="today">Solo hoy</option>
@@ -4158,31 +4159,30 @@ function fillReceiptTeams(){
 function applyReceiptDefaults(){
   const teamSel=$('receiptTeamFilter');
   const ageSel=$('receiptAgeFilter');
-  if(ageSel)ageSel.value='exclude_today';
+  if(ageSel)ageSel.value='all';
   if(teamSel){
-    const hasReception=[...teamSel.options].some(o=>o.value==='Recepción');
-    teamSel.value=hasReception?'Recepción':'';
+    teamSel.value='';
   }
   RECEIPT_DEFAULTS_APPLIED=true;
 }
 function receiptDateOnly(v){
   const raw=String(v||'').trim();
   if(!raw)return null;
-  let d=null;
-  // ISO / fecha nativa
-  d=new Date(raw);
-  if(!isNaN(d))return new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  // dd/mm/yyyy [hh:mm:ss]
-  const m=raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  // Interpretar primero el formato argentino: 10/11 es 10 de noviembre.
+  const m=raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s|$)/);
   if(m){
-    d=new Date(+m[3],+m[2]-1,+m[1]);
-    if(!isNaN(d))return d;
+    const d=new Date(+m[3],+m[2]-1,+m[1]);
+    return d.getFullYear()===+m[3] && d.getMonth()===+m[2]-1 && d.getDate()===+m[1]?d:null;
   }
-  return null;
+  const iso=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(iso)return receiptDateOnly(iso[3]+'/'+iso[2]+'/'+iso[1]);
+  const d=new Date(raw);
+  return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
 }
 function receiptAgeMatches(r,mode){
   if(!mode||mode==='all')return true;
   const d=receiptDateOnly(receiptField(r,'fecha'));
+  if(mode==='unknown')return !d;
   if(!d)return false;
   const now=new Date();
   const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
@@ -4298,7 +4298,7 @@ function updateReceiptSupplierSummary(rows,ageMode,team){
   foot.innerHTML=arr.length?'<tr><td>TOTAL</td><td>'+fmt(totalBoxes)+'</td><td>'+fmt(totalUnits)+'</td><td>'+fmt(totalSkus)+'</td></tr>':'';
   const scope=$('receiptSupplierScope');
   if(scope){
-    const labels={all:'Todo actual',exclude_today:'Hasta ayer (excluye hoy)',yesterday:'Solo ayer',old:'Viejos (anteriores a ayer)',today:'Solo hoy'};
+    const labels={unknown:'Sin fecha identificada',all:'Todo actual (incluye sin fecha)',exclude_today:'Hasta ayer (excluye hoy)',yesterday:'Solo ayer',old:'Viejos (anteriores a ayer)',today:'Solo hoy'};
     scope.textContent=(labels[ageMode]||'')+(team?' · Equipo: '+team:' · Todos los equipos');
   }
 }
@@ -4320,6 +4320,7 @@ function renderReceipt(){
   if(filterField&&filterValue)rows=rows.filter(r=>(String(receiptField(r,filterField)||'—').trim()||'—')===filterValue);
   rows.sort((a,b)=>groupKey?(String(receiptField(a,groupKey)||'').localeCompare(String(receiptField(b,groupKey)||''),'es',{numeric:true,sensitivity:'base'})||receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir):receiptCmp(a,b,RECEIPT_SORT.key)*RECEIPT_SORT.dir);
   empty.style.display=rows.length?'none':'block';
+  empty.textContent=RECEIPT_ROWS.length?'No hay coincidencias con los filtros seleccionados. Hay '+RECEIPT_ROWS.length+' registros actuales en RECIBO.':'No hay unidades actualmente en RECIBO.';
   const receiptRowHtml=r=>{
     const equipo=receiptField(r,'equipo')||'Sin clasificar';
     return '<tr>'+
@@ -4354,7 +4355,7 @@ function renderReceipt(){
   updateReceiptQuickSummary(receiptAgeRows);
 
   // El resumen por proveedor responde al filtro de antigüedad + Equipo.
-  // Como el default de Equipo es Recepción, el resumen abre filtrado por Recepción.
+  // El inicio muestra todos los equipos; conservar la selección del usuario.
   const receiptSupplierRows=receiptAgeRows.filter(r=>
     !team || String(receiptField(r,'equipo')||'Sin clasificar')===team
   );
@@ -4399,7 +4400,7 @@ function receiptPlanRange(rows){
 async function loadCopernicoReferenceRows(force=false){
   // La lista de líneas actuales sigue saliendo del stock publicado.
   if(force || !Array.isArray(DATA) || !DATA.length){
-    try{ await loadPublishedStock({silent:true}); }catch(_e){}
+    try{ await loadPublishedStock({silent:true,force}); }catch(_e){}
   }
   for(let i=0;i<20 && (!Array.isArray(DATA)||!DATA.length);i++){
     await new Promise(r=>setTimeout(r,150));
@@ -4579,39 +4580,58 @@ function enrichReceiptRowsWithMaster(rows,master){
   });
 }
 
+let RECEIPT_BUILD_PROMISE=null;
+let RECEIPT_STOCK_SOURCE=null;
+let RECEIPT_CHECKED_AT=0;
 async function buildReceiptPanel(force=false){
-  if(RECEIPT_LOADED&&!force){renderReceipt();return}
+  if(RECEIPT_BUILD_PROMISE)return RECEIPT_BUILD_PROMISE;
+  RECEIPT_BUILD_PROMISE=buildReceiptPanelCore(force);
+  try{return await RECEIPT_BUILD_PROMISE}finally{RECEIPT_BUILD_PROMISE=null}
+}
+async function buildReceiptPanelCore(force=false){
+  if(RECEIPT_LOADED&&!force&&RECEIPT_STOCK_SOURCE===DATA&&Date.now()-RECEIPT_CHECKED_AT<60000){renderReceipt();return}
+  const refreshAux=force||Date.now()-RECEIPT_CHECKED_AT>=60000;
+  const warnings=[];
+  const refreshButton=$('receiptRefreshBtn');
+  if(refreshButton)refreshButton.disabled=true;
   const st=$('receiptStatus');
   if(st){st.className='processStatus';st.textContent='Cargando stock publicado de Inventario Referencia → RECIBO → Plan Recibo → trazabilidad…'}
   try{
     const baseRows=await loadCopernicoReferenceRows(force);
+    const sourceSnapshot=DATA;
 
     let planRows=[];
     try{
-      planRows=await loadCopernicoReceiptPlan(baseRows,force);
+      planRows=await loadCopernicoReceiptPlan(baseRows,refreshAux);
     }catch(planErr){
+      warnings.push('Plan Recibo: '+(planErr.message||planErr));
       console.warn('No se pudo cargar Consulta Recibo para asociar proveedor',planErr);
     }
     let enriched=enrichReceiptRowsWithReferenceAndProvider(baseRows,planRows);
 
     // Agregar Macrozona y Proveedor desde el maestro VL sin tocar la lógica de trazabilidad.
     try{
-      const receiptMaster=await loadReceiptMaster(force);
+      const receiptMaster=await loadReceiptMaster(refreshAux);
       enriched=enrichReceiptRowsWithMaster(enriched,receiptMaster);
     }catch(masterErr){
       console.warn('No se pudo cargar maestro-recibo.json; se conserva el proveedor de Copérnico',masterErr);
+      warnings.push('Maestro de proveedores: '+(masterErr.message||masterErr));
+      RECEIPT_MASTER_PROMISE=null;
       enriched=enrichReceiptRowsWithMaster(enriched,{});
     }
 
     let trace=null;
     try{
-      trace=await loadTraceDataset(force);
+      trace=await loadTraceDataset(refreshAux);
     }catch(traceErr){
+      warnings.push('Trazabilidad: '+(traceErr.message||traceErr));
       console.warn('No se pudo cargar trazabilidad-cajas.json para En recibo',traceErr);
     }
 
     RECEIPT_ROWS=trace ? enrichReceiptRowsWithTrace(enriched,trace) : enriched.map(r=>({...r,_receiptTraceFound:false}));
     RECEIPT_LOADED=true;
+    RECEIPT_STOCK_SOURCE=sourceSnapshot;
+    RECEIPT_CHECKED_AT=Date.now();
     fillReceiptTeams();
     if(!RECEIPT_DEFAULTS_APPLIED)applyReceiptDefaults();
     if(st){
@@ -4622,12 +4642,18 @@ async function buildReceiptPanel(force=false){
       st.textContent='● Fuente: Copérnico Inventario Referencia · '+RECEIPT_ROWS.length.toLocaleString('es-AR')+' registros en RECIBO'+
         ' · proveedor resuelto: '+linked.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
         ' · ingreso identificado: '+identified.toLocaleString('es-AR')+'/'+RECEIPT_ROWS.length.toLocaleString('es-AR')+
-        (missingProvider?' · '+missingProvider.toLocaleString('es-AR')+' sin proveedor':'');
+        (missingProvider?' · '+missingProvider.toLocaleString('es-AR')+' sin proveedor':'')+
+        ' · Consulta: '+new Date().toLocaleTimeString('es-AR')+
+        ' · Stock: '+(stockVisibleInfo?.updatedAt||'fecha no informada')+
+        (warnings.length?' · Datos incompletos: '+warnings.join(' | '):'')+
+        (identified<RECEIPT_ROWS.length?' · Las filas sin fecha se ven en Todo actual / Sin fecha identificada.':'');
     }
     renderReceipt();
   }catch(err){
-    RECEIPT_ROWS=[];RECEIPT_LOADED=false;fillReceiptTeams();renderReceipt();
-    if(st){st.className='processStatus bad';st.textContent='No se pudo construir En recibo desde el stock publicado · '+(err.message||String(err))}
+    renderReceipt();
+    if(st){st.className='processStatus bad';st.textContent='No se pudo actualizar En recibo; se conserva la última vista disponible · '+(err.message||String(err))}
+  }finally{
+    if(refreshButton)refreshButton.disabled=false;
   }
 }
 
@@ -8280,7 +8306,11 @@ rebuild();
 let autoRefreshTimer=null;
 function startAutoStockRefresh(){
   if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer=setInterval(()=>{ if(!document.hidden) loadPublishedStock({silent:true}); },8000);
+  autoRefreshTimer=setInterval(async()=>{
+    if(document.hidden)return;
+    await loadPublishedStock({silent:true});
+    if(displayMode==='receipt')await buildReceiptPanel(false);
+  },8000);
 }
 
 const refreshBtn=document.getElementById('refreshStockBtn');
