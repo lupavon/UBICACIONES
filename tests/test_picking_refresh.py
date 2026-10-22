@@ -87,6 +87,24 @@ class PickingTests(unittest.TestCase):
         self.assertEqual(status["status"], "error")
         self.assertTrue(status["last_success_at"])
 
+    def test_failed_details_rotate_across_workflow_restarts(self):
+        self.failure = "detail"
+        self.pulse.tick()
+        first = set(self.details)
+        restarted = PickingPulse("token", self.pulse.build_summary, lambda _: 0,
+                                 repo=self.temp.name, publisher=self.pub, fetcher=self.fetch)
+        restarted.tick()
+        self.assertTrue(first.isdisjoint(self.details[8:]))
+
+    def test_restart_preserves_last_success_on_failure(self):
+        self.pulse.tick()
+        stamp = self.read("picking-sync-status.json")["sources"]["lineas"]["last_success_at"]
+        self.failure = "lines"
+        restarted = PickingPulse("token", self.pulse.build_summary, lambda _: 0,
+                                 repo=self.temp.name, publisher=self.pub, fetcher=self.fetch)
+        restarted.tick()
+        self.assertEqual(self.read("picking-sync-status.json")["sources"]["lineas"]["last_success_at"], stamp)
+
     def test_productivity_failure_does_not_block_progress(self):
         self.pulse.tick()
         prod_file = Path(self.temp.name) / f"datos/productividad/{self.pulse.day}.json"
