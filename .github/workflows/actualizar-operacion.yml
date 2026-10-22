@@ -46,6 +46,7 @@ jobs:
           from pathlib import Path
           from collections import defaultdict, Counter
           from scripts.stock_refresh import StockPulse
+          from scripts.picking_refresh import PickingPulse
 
           LOGIN_URL = "https://services.copernicowms.com/users/api/login"
           STOCK_URL = "https://services.copernicowms.com/backweb25/inventario/obtenerrefsxcaja?bodega=47"
@@ -818,6 +819,7 @@ jobs:
           login_ok = False
           stock_updated = False
           stock_pulse = None
+          picking_pulse = None
           main_error = None
           logout_error = None
 
@@ -996,9 +998,14 @@ jobs:
               # Publicar ahora, sin esperar productividad, negaciones o trazabilidad.
               # Un solo login; el pulso comparte su token y no libera licencias.
               stock_pulse = StockPulse(jwt, STOCK_URL, extract_rows)
-              stock_pulse.seed(now_iso, publish_now=SYNC_MODE != "fast")
+              stock_pulse.seed(now_iso)
+              stock_pulse.start()
+
+              # Picking comparte la sesión y publica cada fuente inmediatamente.
+              picking_pulse = PickingPulse(jwt, build_summary, parse_date)
+              picking_pulse.tick()
               if SYNC_MODE != "fast":
-                  stock_pulse.start()
+                  picking_pulse.start()
 
               print("STOCK HTTP:", stock_http)
               print("Registros:", len(rows))
@@ -1014,256 +1021,20 @@ jobs:
                   print("MODO FAST: stock publicado sin ejecutar procesos secundarios")
                   raise SystemExit(0)
 
-              # A partir de acá, si algo secundario falla, stock igual queda válido.
-              #
-              # IMPORTANTE: Avance de pedidos se actualiza primero y de forma
-              # independiente usando únicamente Líneas de Picking. De esta manera,
-              # un 401/fallo posterior de Productividad/Negaciones no congela
-              # avance-pedidos.json.
+              # Las fuentes de hoy ya fueron publicadas por PickingPulse.
+              # Históricos/negaciones/tiempos pueden demorar sin congelar Picking.
               ar_tz = timezone(timedelta(hours=-3))
-              day = datetime.now(ar_tz).strftime("%Y%m%d")
-              day_label = datetime.now(ar_tz).strftime("%d/%m/%Y")
+              day = picking_pulse.day
+              day_label = datetime.strptime(day, "%Y%m%d").strftime("%d/%m/%Y")
               pick_url = PICKING_LINES_URL + "?" + urllib.parse.urlencode({"fecha": day})
-
-              pick_rows = []
-              pick_http = None
-
-              print("=== 2B. AVANCE DE PEDIDOS ===")
+              prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({"fecha": day, "tipo_productividad": "ProductividadPIK"})
+              pick_rows = picking_pulse.pick_rows
+              prod_rows = picking_pulse.prod_rows
+              pick_http = 200 if picking_pulse.pick_ok else None
+              prod_http = 200 if picking_pulse.prod_ok else None
               try:
-                  pick_response, pick_http, _ = request_json(
-                      pick_url, jwt=jwt, timeout=180
-                  )
-                  pick_rows = extract_rows(pick_response)
-
-                  def progress_sval_ind(row, *names):
-                      v = field(row, *names)
-                      return str(v if v is not None else "").strip()
-
-                  progress_rows_ind = []
-                  for ln_prog in pick_rows:
-                      progress_rows_ind.append({
-                          "Pedido": progress_sval_ind(ln_prog, "pedido", "Pedido", "NumPedido"),
-                          "Picking": progress_sval_ind(ln_prog, "NumPicking", "Picking", "picking"),
-                          "Zona": progress_sval_ind(ln_prog, "zonapiso", "ZonaPiso", "zona", "Zona").upper(),
-                          "Estado": progress_sval_ind(ln_prog, "EstadoDeLinea", "estadoDeLinea", "EstadoLinea", "estadolinea", "Estado"),
-                          "SKU": progress_sval_ind(ln_prog, "ean", "EAN", "product", "Product"),
-                          "Descripcion": progress_sval_ind(ln_prog, "descripcion", "Descripcion", "Descripción"),
-                          "Ubicacion": progress_sval_ind(ln_prog, "ubicacion_asig", "Ubicacion_asig", "ubicacion", "Ubicacion"),
-                          "Cantidad": field(ln_prog, "Cant", "cant", "Cantidad", "cantidad", "unidad", "Unidad") or 0
-                      })
-
-                  processed_units_ind = {}
-                  processed_lines_ind = {}
-                  for ln_prog in pick_rows:
-                      estado_prog = progress_sval_ind(
-                          ln_prog, "EstadoDeLinea", "estadoDeLinea",
-                          "EstadoLinea", "estadolinea", "Estado"
-                      ).upper()
-                      if "CONFIRM" not in estado_prog and "NEGAD" not in estado_prog:
-                          continue
-                      sku_prog = progress_sval_ind(
-                          ln_prog, "ean", "EAN", "product", "Product",
-                          "producto", "Producto"
-                      ).upper()
-                      if not sku_prog:
-                          continue
-                      qty_prog = field(ln_prog, "Cant", "cant", "Cantidad", "cantidad")
-                      try:
-                          qty_prog = float(qty_prog or 0)
-                      except Exception:
-                          qty_prog = 0.0
-                      processed_units_ind[sku_prog] = processed_units_ind.get(sku_prog, 0) + max(0, qty_prog)
-                      processed_lines_ind[sku_prog] = processed_lines_ind.get(sku_prog, 0) + 1
-
-                  progress_payload = {
-                      "updated_at": now_iso,
-                      "fecha": day_label,
-                      "fecha_query": day,
-                      "source": "Copernico Líneas de Picking",
-                      "lineas_count": len(progress_rows_ind),
-                      "processed_units_by_sku": processed_units_ind,
-                      "processed_lines_by_sku": processed_lines_ind,
-                      "processed_sku_source": "Líneas de Picking · Cant de Confirmadas + Negadas · global por SKU",
-                      "rows": progress_rows_ind
-                  }
-                  save_json_file(ORDER_PROGRESS_FILE, progress_payload)
-                  save_json_file(ORDER_PROGRESS_HISTORY_DIR / f"{day}.json", progress_payload)
-                  print("avance-pedidos.json + histórico diario generados · líneas:", len(progress_rows_ind))
-              except Exception as e:
-                  print("AVISO: Avance pedidos no pudo actualizarse; se conserva el último válido:", str(e))
-
-              print("=== 2C. PRODUCTIVIDAD / NEGACIONES / TIEMPOS ===")
-              try:
-                  prod_url = PRODUCTIVITY_URL + "?" + urllib.parse.urlencode({
-                      "fecha": day,
-                      "tipo_productividad": "ProductividadPIK"
-                  })
-
-                  prod_response, prod_http, _ = request_json(prod_url, jwt=jwt, timeout=180)
-                  prod_rows = extract_rows(prod_response)
-
-                  # Picking en curso: detalle REAL por Picking desde dwh_picking.
-                  # El listado maestro sale de las Líneas de Picking del día; no
-                  # publicamos JWT ni credenciales, sólo el consolidado sanitizado.
-                  print("=== 2C.1 PICKING EN CURSO · DETALLE REAL ===")
-                  try:
-                      def live_sval(row, *names):
-                          v = field(row, *names)
-                          return str(v if v is not None else "").strip()
-
-                      def live_zone(value):
-                          z = norm_value(value)
-                          if z.startswith("MFCA"): return "MFCA"
-                          if z.startswith("MFCB"): return "MFCB"
-                          if z.startswith("MFCC"): return "MFCC"
-                          if z == "AR" or z.startswith("AR "): return "AR"
-                          return ""
-
-                      # La PLANILLA DE PREPARACION es la fuente maestra de orden/pedidos.
-                      # Se lee de la misma base compartida (Cloudflare Worker) que usa el dashboard.
-                      # Copernico solo enriquece cada Picking con lineas/estado/zonas reales.
-                      candidates = {}
-                      plan_rows = []
-                      try:
-                          store_payload, _, _ = request_json(
-                              "https://ubicaciones-api.pavonlucas-m.workers.dev/store?v=" + urllib.parse.quote(str(int(time.time()))),
-                              timeout=30
-                          )
-                          day_iso = f"{day[:4]}-{day[4:6]}-{day[6:8]}" if len(str(day)) == 8 else str(day_label or "")
-                          day_obj = (store_payload or {}).get("days", {}).get(day_iso, {}) if isinstance(store_payload, dict) else {}
-                          daily = day_obj.get("dailyPlanilla") or {}
-                          sectors = daily.get("sectors") or []
-                          unit_sector = None
-                          for sec in sectors:
-                              sec_name = norm_value(sec.get("name", ""))
-                              if "UNITARIO" in sec_name and "SECO" in sec_name:
-                                  unit_sector = sec
-                                  break
-                          if unit_sector:
-                              plan_rows = unit_sector.get("rows") or []
-                          elif isinstance(day_obj.get("unitarioPlanilla"), dict):
-                              plan_rows = day_obj["unitarioPlanilla"].get("rows") or []
-
-                          for idx, r in enumerate(plan_rows, 1):
-                              pk = live_sval(r, "Picking", "picking", "TR")
-                              if not pk:
-                                  continue
-                              candidates[pk] = {
-                                  "pedido": live_sval(r, "Pedido", "pedido"),
-                                  "tienda": live_sval(r, "Tienda", "tienda"),
-                                  "orden": idx,
-                                  "lineas_plan": r.get("TotalLineas", 0),
-                                  "unidades_plan": r.get("UnidadesPlanificadas", 0),
-                              }
-                          print("Planilla Unitario Seco leida · pedidos:", len(candidates))
-                      except Exception as pe:
-                          print("AVISO: no se pudo leer la planilla compartida; se usa deteccion Copernico:", str(pe)[:180])
-
-                      # Contingencia: sumar Pickings detectados hoy que no estén en la planilla.
-                      # Quedan al final para no alterar nunca el orden de PREPA.
-                      for r in pick_rows:
-                          pk = live_sval(r, "NumPicking", "Picking", "picking")
-                          pe = live_sval(r, "pedido", "Pedido", "NumPedido")
-                          if pk and pk not in candidates:
-                              candidates[pk] = {"pedido": pe, "tienda": "", "orden": 10000 + len(candidates), "lineas_plan": 0, "unidades_plan": 0}
-
-                      # Picker actual = última confirmación de Productividad por Picking.
-                      picker_by_picking = {}
-                      for r in prod_rows:
-                          proc = norm_value(live_sval(r, "Proceso", "proceso"))
-                          if proc and "PICK" not in proc:
-                              continue
-                          pk = live_sval(r, "Picking", "picking", "NumPicking")
-                          if not pk:
-                              continue
-                          z = live_zone(live_sval(r, "ZonaPiso", "zonapiso", "Zona", "zona"))
-                          if not z:
-                              continue
-                          stamp = live_sval(r, "fecharegistro", "FechaRegistro") + " " + live_sval(r, "horaRegistro", "HoraRegistro")
-                          ts = parse_date(stamp)
-                          name = live_sval(r, "Nombres", "nombres", "NombreEmpleado", "nombreEmpleado") or live_sval(r, "Empleado", "empleado")
-                          prev = picker_by_picking.get(pk)
-                          if prev is None or ts >= prev["_ts"]:
-                              picker_by_picking[pk] = {"nombre": name, "zona": z, "hora": live_sval(r, "horaRegistro", "HoraRegistro"), "_ts": ts}
-
-                      def fetch_live_detail(pk):
-                          url = PICKING_DETAIL_URL + "?" + urllib.parse.urlencode({"pickingint": pk})
-                          payload, _, _ = request_json(url, jwt=jwt, timeout=60)
-                          return pk, extract_rows(payload) if not isinstance(payload, list) else payload
-
-                      details = {}
-                      # Evitar castigar el WMS: concurrencia baja y sólo pickings del día.
-                      with ThreadPoolExecutor(max_workers=4) as ex:
-                          futs = {ex.submit(fetch_live_detail, pk): pk for pk in candidates}
-                          for fut in as_completed(futs):
-                              pk = futs[fut]
-                              try:
-                                  _, rr = fut.result()
-                                  details[pk] = rr
-                              except Exception as de:
-                                  print("AVISO detalle picking", pk, str(de)[:160])
-
-                      live_orders = []
-                      for pk, rr in details.items():
-                          if not rr:
-                              continue
-                          zones = {z:{"total":0,"ejecutadas":0,"pendientes":0} for z in ("MFCA","MFCB","MFCC","AR")}
-                          relevant = False
-                          executed = 0
-                          meta = candidates.get(pk, {}) if isinstance(candidates.get(pk, {}), dict) else {"pedido": candidates.get(pk, "")}
-                          pedido = meta.get("pedido", "")
-                          for ln in rr:
-                              pedido = live_sval(ln, "pedido", "Pedido", "NumPedido") or pedido
-                              z = live_zone(live_sval(ln, "zonapiso", "ZonaPiso", "zona", "Zona"))
-                              state = norm_value(live_sval(ln, "describeestadolinea", "DescribeEstadoLinea", "descripcionlinea", "DescripcionLinea", "EstadoDeLinea", "EstadoLinea"))
-                              is_exec = ("EJECUT" in state or "CONFIRM" in state or "NEGAD" in state)
-                              if is_exec: executed += 1
-                              if z:
-                                  relevant = True
-                                  zones[z]["total"] += 1
-                                  if is_exec: zones[z]["ejecutadas"] += 1
-                                  else: zones[z]["pendientes"] += 1
-                          if not relevant:
-                              continue
-                          total = len(rr)
-                          pending = max(0, total-executed)
-                          picker = picker_by_picking.get(pk)
-                          if picker:
-                              picker = {k:v for k,v in picker.items() if not k.startswith("_")}
-                          live_orders.append({
-                              "pedido": pedido, "picking": pk, "tienda": meta.get("tienda", ""), "orden_plan": meta.get("orden", 99999),
-                              "lineas_plan": meta.get("lineas_plan", 0), "unidades_plan": meta.get("unidades_plan", 0), "lineas": total,
-                              "ejecutadas": executed, "pendientes": pending,
-                              "avance": round((executed*100/total),1) if total else 0,
-                              "zonas": zones, "picker_actual": picker
-                          })
-
-                      live_orders.sort(key=lambda x: (x.get("orden_plan", 99999), x.get("pedido", "")))
-                      save_json_file(PICKING_LIVE_FILE, {
-                          "updated_at": now_iso, "fecha": day_label, "fecha_query": day,
-                          "source": "Copernico dwh_picking/picking + ProductividadPIK",
-                          "orders_count": len(live_orders), "orders": live_orders
-                      })
-                      print("picking-en-curso.json generado · pedidos MFC/AR:", len(live_orders))
-                  except Exception as live_error:
-                      print("AVISO: Picking en curso no pudo actualizarse; se conserva el último válido:", str(live_error))
-
-                  # Reutilizar Líneas de Picking si Avance ya las obtuvo. Si Avance
-                  # falló, se intenta consultarlas nuevamente para este bloque.
-                  if not pick_rows:
-                      pick_response, pick_http, _ = request_json(
-                          pick_url, jwt=jwt, timeout=180
-                      )
-                      pick_rows = extract_rows(pick_response)
-
-                  # Persistir las tres bases que consume Productividad.
-                  prod_payload = {"updated_at": now_iso, "fecha": day_label, "fecha_query": day, "source": "Copernico ProductividadPIK", "row_count": len(prod_rows), "rows": prod_rows}
-                  pick_payload = {"updated_at": now_iso, "fecha": day_label, "fecha_query": day, "source": "Copernico Líneas de Picking", "row_count": len(pick_rows), "rows": pick_rows}
-                  summary_payload = build_summary(prod_rows, pick_rows, day, day_label, now_iso)
-                  save_json_file(PRODUCTIVITY_HISTORY_DIR / f"{day}.json", prod_payload)
-                  save_json_file(PICKING_HISTORY_DIR / f"{day}.json", pick_payload)
-                  save_json_file(PRODUCTIVITY_SUMMARY_DIR / f"{day}.json", summary_payload)
-                  print("Productividad persistida:", day, "· raw:", len(prod_rows), "· picking:", len(pick_rows), "· resumen 06-14:", summary_payload["lineas_productividad_06_14"], "· pickers:", summary_payload["pickers_count"])
+                  if not (picking_pulse.pick_ok and picking_pulse.prod_ok):
+                      raise RuntimeError("Fuentes incompletas; se conservan negaciones y tiempos anteriores")
 
                   # Histórico de Picking/Productividad. En ejecución manual se puede
                   # reconstruir N días anteriores; en el cron se completa 1 fecha
@@ -2480,6 +2251,8 @@ jobs:
               )
 
           finally:
+              if picking_pulse:
+                  picking_pulse.close()
               if stock_pulse:
                   stock_pulse.close()
               if jwt and user_id is not None:
@@ -2515,24 +2288,15 @@ jobs:
 
       - name: Publicar datos operational
         run: |
-          set -e
-          python3 -c "from scripts.stock_refresh import StockPublisher; StockPublisher().publish()"
-          git config user.name "UBICACIONES AutoSync"
-          git config user.email "actions@github.com"
-          SNAP=/tmp/ubicaciones-operational
-          rm -rf "$SNAP"; mkdir -p "$SNAP"
-          for f in negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json; do [ ! -f "$f" ] || cp "$f" "$SNAP/$f"; done
-          mkdir -p "$SNAP/datos"
-          for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "datos/$d" ] || { mkdir -p "$SNAP/datos/$d"; cp -a "datos/$d/." "$SNAP/datos/$d/"; }; done
-          for intento in 1 2 3 4 5; do
-            git fetch origin main
-            git reset --hard origin/main
-            for f in negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json; do [ ! -f "$SNAP/$f" ] || cp "$SNAP/$f" "$f"; done
-            for d in tiempos negaciones productividad lineas-picking productividad-resumen avance; do [ ! -d "$SNAP/datos/$d" ] || { mkdir -p "datos/$d"; cp -a "$SNAP/datos/$d/." "datos/$d/"; }; done
-            git add negaciones.json avance-pedidos.json picking-en-curso.json tiempos.json sync-status.json datos/tiempos datos/negaciones datos/lineas-negadas datos/productividad datos/lineas-picking datos/productividad-resumen datos/avance 2>/dev/null || true
-            if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
-            git commit -m "AutoSync Copernico · operational"
-            if git push origin HEAD:main; then exit 0; fi
-            sleep $((intento * 2))
-          done
-          exit 1
+          python3 - <<'PYCODE'
+          import subprocess
+          from scripts.stock_refresh import DatasetPublisher
+          tracked = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          new = subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines()
+          roots = ('datos/tiempos/', 'datos/negaciones/', 'datos/lineas-negadas/',
+                   'datos/productividad/', 'datos/lineas-picking/', 'datos/productividad-resumen/', 'datos/avance/')
+          files = {'negaciones.json', 'avance-pedidos.json', 'picking-en-curso.json',
+                   'tiempos.json', 'sync-status.json', 'picking-sync-status.json'}
+          names = [p for p in sorted(set(tracked + new)) if p in files or p.startswith(roots)]
+          DatasetPublisher().publish_files(names)
+          PYCODE

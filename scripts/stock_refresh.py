@@ -34,8 +34,10 @@ def timestamp(payload):
         return 0.0
 
 
-class StockPublisher:
-    """Commit de dos archivos sin resetear el checkout que usa el cálculo activo."""
+class DatasetPublisher:
+    """Publica sólo archivos explícitos, sin revertir muestras más recientes."""
+    _lock = threading.Lock()
+
     def __init__(self, repo=".", remote="origin", branch="main"):
         self.repo = Path(repo).resolve()
         self.remote, self.branch = remote, branch
@@ -45,43 +47,49 @@ class StockPublisher:
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               check=True, timeout=25).stdout.decode().strip()
 
-    def publish(self, extra_files=()):
-        names = [name for name in ("stock.json", "stock-sync-status.json", *extra_files) if (self.repo / name).exists()]
-        if not names:
+    def publish_files(self, names):
+        with self._lock:
+            return self._publish_files(names)
+
+    def _publish_files(self, names):
+        captured = {name: (self.repo / name).read_bytes() for name in names if (self.repo / name).is_file()}
+        if not captured:
             return False
-        # Capturar bytes del mismo ciclo antes de reintentar contra cambios remotos.
-        captured = {name: (self.repo / name).read_bytes() for name in names}
-        env = os.environ.copy()
-        env.update(GIT_AUTHOR_NAME="UBICACIONES AutoSync", GIT_AUTHOR_EMAIL="actions@github.com",
+        env = dict(os.environ, GIT_AUTHOR_NAME="UBICACIONES AutoSync", GIT_AUTHOR_EMAIL="actions@github.com",
                    GIT_COMMITTER_NAME="UBICACIONES AutoSync", GIT_COMMITTER_EMAIL="actions@github.com")
-        for attempt in range(2):
+        for attempt in range(3):
             self.git("fetch", "--no-tags", self.remote, self.branch)
             parent = self.git("rev-parse", "FETCH_HEAD")
-            try:
-                remote_stock = json.loads(self.git("show", parent + ":stock.json"))
-            except (subprocess.CalledProcessError, ValueError):
-                remote_stock = {}
-            local_stock = json.loads(captured.get("stock.json", b"{}"))
-            if timestamp(remote_stock) > timestamp(local_stock):
-                # Otro productor ya publicó datos posteriores. Nunca retroceder.
-                return False
-            with tempfile.TemporaryDirectory(prefix="ubicaciones-stock-index-") as temp:
+            with tempfile.TemporaryDirectory(prefix="ubicaciones-data-index-") as temp:
                 index_env = dict(env, GIT_INDEX_FILE=str(Path(temp) / "index"))
                 self.git("read-tree", parent, env=index_env)
                 for name, content in captured.items():
+                    local = json.loads(content)
+                    try:
+                        remote = json.loads(self.git("show", parent + ":" + name))
+                    except (subprocess.CalledProcessError, ValueError):
+                        remote = {}
+                    if timestamp(remote) > timestamp(local):
+                        continue
                     blob = self.git("hash-object", "-w", "--stdin", data=content)
                     self.git("update-index", "--add", "--cacheinfo", "100644," + blob + "," + name, env=index_env)
                 tree = self.git("write-tree", env=index_env)
                 if tree == self.git("rev-parse", parent + "^{tree}"):
                     return False
-                commit = self.git("commit-tree", tree, "-p", parent, "-m", "AutoSync Copernico · stock disponible", env=env)
+                commit = self.git("commit-tree", tree, "-p", parent, "-m", "AutoSync Copernico · datos disponibles", env=env)
                 try:
                     self.git("push", self.remote, commit + ":refs/heads/" + self.branch)
                     return True
                 except subprocess.CalledProcessError:
-                    if attempt:
+                    if attempt == 2:
                         raise
         return False
+
+
+class StockPublisher(DatasetPublisher):
+    """Compatibilidad con los productores de stock existentes."""
+    def publish(self, extra_files=()):
+        return self.publish_files(("stock.json", "stock-sync-status.json", *extra_files))
 
 
 class StockPulse:
@@ -173,3 +181,4 @@ class StockPulse:
         if self.thread:
             # Esperar la consulta en vuelo antes del logout; nunca iniciar otra.
             self.thread.join()
+
