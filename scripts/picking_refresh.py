@@ -207,9 +207,10 @@ class PickingPulse:
             previous = old.get(pk, {})
             last = previous.get("detail_updated_at")
             order["detail_updated_at"] = last
+            order["detail_attempted_at"] = previous.get("detail_attempted_at")
             last_ts = timestamp({"updated_at": last})
             ttl = 30 if order.get("pendientes", 0) or order.get("data_pending") else 300
-            attempt = self.detail_attempts.get(pk, last_ts)
+            attempt = max(self.detail_attempts.get(pk, 0), timestamp({"updated_at": previous.get("detail_attempted_at")}), last_ts)
             if now - max(last_ts, attempt) >= ttl:
                 due.append((attempt, pk))
         selected = [pk for _, pk in sorted(due)[:self.detail_limit]]
@@ -221,6 +222,7 @@ class PickingPulse:
             futures = {}
             for pk in selected:
                 self.detail_attempts[pk] = now
+                orders[pk]["detail_attempted_at"] = iso_now()
                 futures[pool.submit(detail, pk)] = pk
             for future in as_completed(futures):
                 pk = futures[future]
@@ -230,6 +232,7 @@ class PickingPulse:
                         raise ValueError("Detalle vacío")
                     order = self.live_order(pk, rr, candidates[pk], detail_stamp, "Copernico dwh_picking/picking")
                     order["detail_updated_at"] = detail_stamp
+                    order["detail_attempted_at"] = detail_stamp
                     orders[pk] = order
                 except Exception:
                     failures += 1
@@ -262,7 +265,8 @@ class PickingPulse:
         day, label = current.strftime("%Y%m%d"), current.strftime("%d/%m/%Y")
         if self.day != day:
             self.pick_rows, self.prod_rows, self.detail_attempts = [], [], {}
-            self.status = {}
+            saved = self.read("picking-sync-status.json")
+            self.status = saved.get("sources", {}) if saved.get("fecha_query") == day else {}
         self.day = day
         self.pick_ok = self.prod_ok = False
         stamp = None
