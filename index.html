@@ -2264,6 +2264,48 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 <style id="picker-live-real-v3">
 .pickerOrderTableWrap{overflow:auto;background:#fff;border:1px solid #dfe7ef;border-radius:12px;box-shadow:0 4px 14px rgba(24,54,86,.04)}.pickerOrderTable{width:100%;border-collapse:collapse;min-width:1240px;font-size:11px}.pickerOrderTable th{background:#eef2f6;color:#52677c;text-transform:uppercase;font-size:9px;font-weight:900;padding:9px 10px;border-bottom:1px solid #d7e0e9;white-space:nowrap}.pickerOrderTable td{padding:9px 10px;border-bottom:1px solid #e8edf2;color:#1d3044;text-align:center;vertical-align:middle}.pickerOrderTable .left{text-align:left}.pickerOrderTable .pedido{font-weight:900}.pickerOrderTable .num{font-weight:900}.pickerChip{--pc:#2563eb;display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:color-mix(in srgb,var(--pc) 8%,white);border:1px solid color-mix(in srgb,var(--pc) 30%,#dfe7ef);font-weight:800;white-space:nowrap}.pickerChip i{width:9px;height:9px;border-radius:50%;background:var(--pc)}.pickerChip small{font-size:8px;color:#6e8194}.zoneReal b{display:block;font-size:12px}.zoneReal small{font-size:8px;color:#7b8b9c}.zoneReal.active{background:#f4f9fd}.livePct{font-weight:900}.liveBar{width:70px;height:5px;background:#e7edf3;border-radius:5px;overflow:hidden;margin:4px auto}.liveBar i{display:block;height:100%;background:#4b91cc}.statePill{display:inline-block;padding:4px 7px;border-radius:999px;font-size:9px;font-weight:900}.statePill.done{background:#dff4e7;color:#17663a}.statePill.run{background:#fff1d6;color:#8a5700}.statePill.wait{background:#edf1f5;color:#607286}body:not(.light-mode) .pickerOrderTableWrap{background:#151b23;border-color:#29333e}body:not(.light-mode) .pickerOrderTable th{background:#1a222c;color:#9eacba;border-color:#303b47}body:not(.light-mode) .pickerOrderTable td{color:#e7edf4;border-color:#242e39}body:not(.light-mode) .pickerChip{background:color-mix(in srgb,var(--pc) 14%,#151b23);color:#e7edf4}body:not(.light-mode) .zoneReal small,body:not(.light-mode) .pickerChip small{color:#8f9cab}body:not(.light-mode) .liveBar{background:#26313d}
 </style>
+<style id="boxTraceStyles">
+.boxTraceKpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.boxTraceSearch input{font-size:18px;padding:12px 14px;min-width:0}
+.boxTraceFilters{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+.boxTraceBlock{margin:4px 0 8px}
+.boxTraceBlock>b{display:block;font-size:13px;margin-bottom:6px}
+.boxTraceChips{display:flex;flex-wrap:wrap;gap:8px}
+.boxTraceChip{min-height:44px;border:1px solid #355b70;background:#121a23;color:#eef1f5;border-radius:12px;padding:8px 12px;font-weight:800;font-size:14px;cursor:pointer;text-align:left}
+.boxTraceChip small{display:block;font-weight:600;color:#8d98a5;font-size:10px;margin-top:2px}
+.boxTraceNote{font-size:12px;color:#8d98a5;line-height:1.45;margin:8px 0 12px}
+.boxTraceTable{min-width:980px}
+.boxTraceLink{background:transparent;border:0;padding:2px 0;color:#79dcff;font-weight:900;cursor:pointer;font-size:inherit}
+.boxTraceLink:hover{text-decoration:underline}
+.boxTraceBadge{display:inline-block;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;border:1px solid #3a4655;white-space:nowrap}
+.boxTraceBadge.out{color:#f5c96c;border-color:#6b5830}
+.boxTraceBadge.in{color:#78dfaa;border-color:#315c48}
+.boxTraceBadge.other{color:#9fb0c3;border-color:#3a4655}
+.boxTraceMuted{display:block;color:#8d98a5;font-size:10px;font-weight:600;margin-top:2px}
+body.light-mode .boxTraceChip{background:#f4f8fc;color:#17324a;border-color:#b7d0e4}
+body.light-mode .boxTraceChip small,body.light-mode .boxTraceMuted,body.light-mode .boxTraceNote{color:#5d7286}
+body.light-mode .boxTraceLink{color:#1d6fa5}
+body.light-mode .boxTraceBadge.out{color:#8a5700;background:#fff6e6;border-color:#efd7a4}
+body.light-mode .boxTraceBadge.in{color:#17663a;background:#e8f7ee;border-color:#b7e4c7}
+body.light-mode .boxTraceBadge.other{color:#52677c;background:#f3f6f9;border-color:#d5dee8}
+@media(max-width:900px){
+  .boxTraceKpis{grid-template-columns:1fr 1fr}
+}
+@media(max-width:700px){
+  .boxTraceSearch{flex-direction:column;align-items:stretch}
+  .boxTraceSearch input,.boxTraceSearch .btn{width:100%;font-size:18px;padding:14px}
+  .boxTraceFilters .btn{flex:1 1 calc(50% - 6px);padding:12px 8px}
+  .boxTraceTableWrap{max-height:none}
+  .boxTraceTable{min-width:0}
+  .boxTraceTable thead{display:none}
+  .boxTraceTable,.boxTraceTable tbody,.boxTraceTable tr,.boxTraceTable td{display:block;width:100%}
+  .boxTraceTable tr{padding:10px 12px 8px;border-bottom:1px solid #2a3440}
+  .boxTraceTable td{border:0;padding:4px 0}
+  .boxTraceTable td::before{content:attr(data-label);display:block;margin-bottom:1px;color:#8d98a5;font-size:9px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}
+  body.light-mode .boxTraceTable tr{border-bottom-color:#e3ebf3}
+  body.light-mode .boxTraceTable td::before{color:#6d7f92}
+}
+</style>
 </head>
 <body>
 <div id="authGate"><form class="loginCard" id="loginForm"><h2>UBICACIONES</h2><p>Control de almacenamiento · Acceso al sistema</p><label class="authField"><span>Usuario</span><input id="loginUser" autocomplete="username" required></label><label class="authField"><span>Contraseña</span><input id="loginPass" type="password" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:8px" type="submit">Ingresar</button><div class="authError" id="loginError"></div></form></div>
@@ -2282,6 +2324,7 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
 <button class="btn" id="timesModeBtn">⏱ Tiempos</button>
 <button class="btn" id="nonProductiveModeBtn">⏸ Tiempos no productivos</button>
 <button class="btn" id="receiptModeBtn">📥 En recibo</button>
+<button class="btn" id="boxTraceModeBtn">🔎 Trazabilidades</button>
 <button class="btn" id="mudanzasIntegratedButton" type="button">🚚 Mudanzas</button>
 <button class="btn" id="palletsProcessModeBtn">🚧 Pallets en proceso</button>
 <button class="btn" id="progressModeBtn">📦 Avance pedidos</button>
@@ -2961,6 +3004,52 @@ body:not(.light-mode) .modebar>.btn.active::after{background:#58a6ff}
   <div class="prodTableWrap"><table class="prodTable npTable"><thead><tr><th>Picker</th><th>Motivo</th><th>Inicio</th><th>Fin</th><th>Tiempo del día</th><th>Estado</th><th>Observaciones / trazabilidad</th><th>Acciones</th></tr></thead><tbody id="npHistory"></tbody></table></div><div id="npEmpty" class="receiptSupplierEmpty">Sin registros para este día.</div></section>
   <section class="prodCard"><div class="prodCardHead"><div><span class="prodLabel">RESUMEN DEL DÍA</span><h3>Tiempo por picker</h3></div></div><div class="prodTableWrap"><table class="prodTable"><thead><tr><th>Picker</th><th>Momentos</th><th>Tiempo no productivo</th></tr></thead><tbody id="npSummary"></tbody></table></div></section>
   <dialog id="npEditDialog" class="npDialog"><form id="npEditForm"><h3>Corregir registro</h3><p id="npEditPicker"></p><label>Motivo<input id="npEditReason" required maxlength="120"></label><label>Inicio<input id="npEditStart" type="datetime-local" step="1" required></label><label>Fin (vacío = en curso)<input id="npEditEnd" type="datetime-local" step="1"></label><label>Observaciones<textarea id="npEditNotes" maxlength="500" rows="2"></textarea></label><label>Motivo de la corrección<input id="npEditWhy" maxlength="200" required></label><div class="npActions"><button type="button" id="npEditClose" class="prodSoftBtn">Volver</button><button type="submit" id="npEditSave" class="prodPrimaryBtn">Guardar corrección</button></div><p id="npEditError" role="alert"></p></form></dialog>
+</div>
+
+<div id="boxTraceView" style="display:none">
+  <div class="layoutHeatTitle">Trazabilidades</div>
+  <div class="layoutHeatSubtitle">Escribí un número de caja para ver sus movimientos y, sobre todo, hacia qué caja se descontó el stock.</div>
+  <div class="processToolbar boxTraceSearch">
+    <input id="boxTraceQuery" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="Número de caja" aria-label="Número de caja">
+    <button class="btn" id="boxTraceSearchBtn" type="button">Buscar</button>
+    <button class="btn" id="boxTraceRefreshBtn" type="button">↻ Actualizar</button>
+  </div>
+  <div class="boxTraceFilters" id="boxTraceFilters">
+    <button class="btn active" type="button" data-box-trace-filter="hacia">Hacia otras cajas</button>
+    <button class="btn" type="button" data-box-trace-filter="recibido">Recibidos en esta caja</button>
+    <button class="btn" type="button" data-box-trace-filter="otros">Otros movimientos</button>
+    <button class="btn" type="button" data-box-trace-filter="todos">Todos</button>
+  </div>
+  <div class="processStatus" id="boxTraceStatus" aria-live="polite">Ingresá el número de caja.</div>
+  <div class="processKpis boxTraceKpis">
+    <div class="processKpi"><small>CAJAS DESTINO</small><b id="boxTraceDestCount">0</b><span>hacia dónde se descontó</span></div>
+    <div class="processKpi"><small>LÍNEAS DESCONTADAS</small><b id="boxTraceOutCount">0</b><span>SKU enviados a otra caja</span></div>
+    <div class="processKpi"><small>UNIDADES</small><b id="boxTraceOutUnits">0</b><span>descontadas hacia otras cajas</span></div>
+    <div class="processKpi"><small>RECIBIDAS</small><b id="boxTraceInCount">0</b><span>líneas que entraron a esta caja</span></div>
+  </div>
+  <div class="boxTraceBlock">
+    <b>Hacia qué caja se descontó</b>
+    <div class="boxTraceChips" id="boxTraceChips"></div>
+  </div>
+  <p class="boxTraceNote" id="boxTraceNote">La trazabilidad vigente publica, por cada SKU que sigue en la caja destino, el movimiento que inició ese saldo. Si dice RECIBE DESDE Nw, esa Nw es la caja origen de la que se descontó el stock. El historial completo de cada salida (SALE HACIA) no se publica, salvo en el relevamiento de cajas fantasma.</p>
+  <div class="processTableWrap boxTraceTableWrap">
+    <table class="processTable boxTraceTable">
+      <thead>
+        <tr>
+          <th>Fecha y hora</th>
+          <th>SKU</th>
+          <th>Cantidad</th>
+          <th>Caja origen</th>
+          <th>Caja destino</th>
+          <th>Usuario</th>
+          <th>Operación</th>
+          <th>Fuente</th>
+        </tr>
+      </thead>
+      <tbody id="boxTraceBody"></tbody>
+    </table>
+    <div class="processEmpty" id="boxTraceEmpty" style="display:none">Sin movimientos para este filtro.</div>
+  </div>
 </div>
 
 <div id="timesView" style="display:none">
@@ -3842,6 +3931,8 @@ function setDisplayMode(mode){
   $('productivityTTView').style.display=mode==='productivityTT'?'block':'none';
   $('timesView').style.display=mode==='times'?'block':'none';
   $('nonProductiveView').style.display=mode==='nonProductive'?'block':'none';
+  const boxTraceView=document.getElementById('boxTraceView');
+  if(boxTraceView) boxTraceView.style.display=mode==='boxTrace'?'block':'none';
 
   $('dashboardModeBtn').classList.toggle('active',mode==='dashboard');
   $('pickerLiveModeBtn').classList.toggle('active',mode==='pickerLive');
@@ -3858,6 +3949,8 @@ function setDisplayMode(mode){
   $('productivityTTModeBtn').classList.toggle('active',mode==='productivityTT');
   $('timesModeBtn').classList.toggle('active',mode==='times');
   $('nonProductiveModeBtn').classList.toggle('active',mode==='nonProductive');
+  const boxTraceModeBtn=document.getElementById('boxTraceModeBtn');
+  if(boxTraceModeBtn) boxTraceModeBtn.classList.toggle('active',mode==='boxTrace');
 
   if(mode==='dashboard') buildOperationalDashboard();
   if(mode==='pickerLive') buildPickerLivePanel();
@@ -3874,6 +3967,7 @@ function setDisplayMode(mode){
   if(mode==='productivityTT') buildProductivityTT(false, $('productivityTTDateFilter')?.value||'');
   if(mode==='times') buildTimesPanel(false, $('timeDateFilter')?.value||'');
   if(mode==='nonProductive') window.openNonProductivePanel?.();
+  if(mode==='boxTrace') window.openBoxTracePanel?.();
 }
 
 
@@ -8074,6 +8168,7 @@ $('pickerLiveModeBtn').onclick=()=>setDisplayMode('pickerLive');
 $('pickerLiveRefreshBtn').onclick=()=>buildPickerLivePanel(true);
 $('pickerLiveDate').onchange=()=>buildPickerLivePanel(true);
 $('receiptModeBtn').onclick=()=>setDisplayMode('receipt');
+$('boxTraceModeBtn').onclick=()=>setDisplayMode('boxTrace');
 $('negationsModeBtn').onclick=()=>setDisplayMode('negations');
 $('productivityModeBtn').onclick=()=>setDisplayMode('productivity');
 $('timesModeBtn').onclick=()=>setDisplayMode('times');
@@ -8562,7 +8657,7 @@ document.getElementById('logoutBtn').onclick=async()=>{
   try{await request}catch{/* La sesión local ya quedó cerrada. */}
 };
 function closeUsersView(){const v=document.getElementById('usersView');if(v)v.classList.remove('active');const b=document.getElementById('usersModeBtn');if(b)b.classList.remove('active')}
-function openUsersView(){if(AUTH_USER?.username!=='lpavon')return;displayMode='users';placeDetailForMode('users');['dashboardView','progressView','rackView','heatmapView','occupancyView','kpiView','sanitationView','palletsProcessView','receiptView','negationsView','timesView','nonProductiveView'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});document.querySelectorAll('.modebar .btn').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('usersModeBtn');if(btn)btn.classList.add('active');const view=document.getElementById('usersView');if(view)view.classList.add('active');loadUsers();loadSessions();}
+function openUsersView(){if(AUTH_USER?.username!=='lpavon')return;displayMode='users';placeDetailForMode('users');['dashboardView','progressView','rackView','heatmapView','occupancyView','kpiView','sanitationView','palletsProcessView','receiptView','negationsView','timesView','nonProductiveView','boxTraceView'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});document.querySelectorAll('.modebar .btn').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('usersModeBtn');if(btn)btn.classList.add('active');const view=document.getElementById('usersView');if(view)view.classList.add('active');loadUsers();loadSessions();}
 document.getElementById('usersModeBtn').onclick=openUsersView;
 async function loadUsers(){const tb=document.getElementById('usersTbody');tb.innerHTML='<tr><td colspan="6">Cargando…</td></tr>';try{const r=await authFetch('/admin/users');if(r.status===401||r.status===403)throw new Error('Sin permisos');const d=await r.json();const users=d.users||[];document.getElementById('usersCount').textContent=users.length;tb.innerHTML=users.map(u=>`<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.name||'')}</td><td><span class="pill">${u.role==='administrador'?'Administrador':'Operativo'}</span></td><td>${Number(u.active)===0?'Inactivo':'Activo'}</td><td>${u.sessions>0?'<span class="sessionDot"></span>':''}${u.sessions||0}</td><td><button class="btn" onclick="editAuthUser('${esc(u.username)}')">Editar</button> <button class="btn dangerBtn" onclick="disconnectAuthUser('${esc(u.username)}')">Desconectar</button></td></tr>`).join('')||'<tr><td colspan="6">Sin usuarios</td></tr>';window.__AUTH_USERS=users}catch(e){tb.innerHTML='<tr><td colspan="6">'+esc(e.message)+'</td></tr>'}}
 function fmtSessionDate(v){if(!v)return '-';try{return new Date(v.replace(' ','T')+'Z').toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}catch(e){return v}}
@@ -8674,6 +8769,333 @@ async function generateProductivityPpt(){
 }
 if($('productivityGeneratePptBtn'))$('productivityGeneratePptBtn').onclick=generateProductivityPpt;
 
+</script>
+
+<script id="boxTraceScript">
+/* BOX_TRACE_LOGIC_START */
+function boxTraceQueryKey(raw){
+  const text=String(raw??'').trim();
+  if(!text)return '';
+  const labeled=text.match(/Nw:\s*(\d+)/i);
+  if(labeled)return labeled[1].replace(/^0+(?=\d)/,'');
+  const compact=text.replace(/\s+/g,'');
+  if(/^\d+$/.test(compact))return compact.replace(/^0+(?=\d)/,'');
+  const chunks=compact.match(/\d+/g)||[];
+  if(chunks.length===1&&chunks[0].length>=3)return chunks[0].replace(/^0+(?=\d)/,'');
+  return compact;
+}
+function boxTraceQty(value){
+  if(value==null||value==='')return null;
+  const n=Number(String(value).replace(',','.'));
+  return Number.isFinite(n)?n:null;
+}
+function boxTraceFmtFecha(value){
+  const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(!m)return value?String(value):'—';
+  return m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+':'+(m[6]||'00');
+}
+function boxTraceEvent(holder,raw,source){
+  const tx=String(raw?.Transaccion??'').trim();
+  const match=tx.match(/(ELIMINA LINEA POR SALE HACIA|RECIBE DESDE|SALE HACIA)\s+Nw:\s*(\d+)/i);
+  const qty=boxTraceQty(raw?.Movimiento);
+  let origin='';
+  let dest='';
+  let sentido='otro';
+  if(match){
+    const kind=match[1].toUpperCase();
+    const other=match[2].replace(/^0+(?=\d)/,'');
+    if(kind.indexOf('RECIBE DESDE')!==-1){
+      origin=other;
+      dest=holder;
+    }else{
+      origin=holder;
+      dest=other;
+    }
+    sentido='hacia';
+  }
+  return {
+    fecha:String(raw?.Fecha??'').trim(),
+    sku:String(raw?.EAN??'').trim(),
+    qty,
+    estado:String(raw?.Estado??'').trim(),
+    tx,
+    user:String(raw?.Nombre_empleado??'').trim(),
+    userId:raw?.Id_empleado??'',
+    noControl:String(raw?.NoControl??'').trim(),
+    origin,
+    dest,
+    sentido,
+    holder,
+    source
+  };
+}
+function boxTraceDedupeKey(event){
+  return [
+    boxTraceQueryKey(event.origin),
+    boxTraceQueryKey(event.dest),
+    event.sku,
+    event.fecha,
+    event.estado,
+    event.qty,
+    event.tx
+  ].join('|');
+}
+function boxTracePushBox(events,seen,caja,box,source){
+  const holder=boxTraceQueryKey(box?.caja||caja);
+  const rows=Array.isArray(box?.movimientos)?box.movimientos:[];
+  for(const raw of rows){
+    if(!raw||typeof raw!=='object')continue;
+    const event=boxTraceEvent(holder,raw,source);
+    const key=boxTraceDedupeKey(event);
+    if(seen.has(key))continue;
+    seen.add(key);
+    events.push(event);
+  }
+}
+function boxTraceBuildIndex(trace,ghost){
+  const events=[];
+  const seen=new Set();
+  const boxes=trace&&trace.boxes&&typeof trace.boxes==='object'?trace.boxes:{};
+  for(const [caja,box] of Object.entries(boxes)){
+    if(!box||box.ok===false)continue;
+    boxTracePushBox(events,seen,caja,box,'vigente');
+  }
+  let ghostUsed=0;
+  const ghostBoxes=ghost&&ghost.boxes&&typeof ghost.boxes==='object'?ghost.boxes:{};
+  for(const [caja,box] of Object.entries(ghostBoxes)){
+    if(!box||box.ok===false||!Array.isArray(box.movimientos)||!box.movimientos.length)continue;
+    const before=events.length;
+    boxTracePushBox(events,seen,caja,box,'fantasma');
+    if(events.length>before)ghostUsed++;
+  }
+  return {
+    events,
+    updatedAt:trace?.updated_at||'',
+    ghostUpdatedAt:ghost?.updated_at||'',
+    boxCount:trace?.box_count||Object.keys(boxes).length,
+    ghostBoxCount:ghostUsed
+  };
+}
+function boxTraceClassify(event,query){
+  const q=boxTraceQueryKey(query);
+  if(!q)return '';
+  const origin=boxTraceQueryKey(event.origin);
+  const dest=boxTraceQueryKey(event.dest);
+  const holder=boxTraceQueryKey(event.holder);
+  if(event.sentido==='hacia'&&origin===q&&dest&&dest!==q)return 'hacia';
+  if(event.sentido==='hacia'&&dest===q&&origin&&origin!==q)return 'recibido';
+  if(holder===q||origin===q||dest===q)return 'otros';
+  return '';
+}
+function boxTraceSelect(events,query,filter){
+  const q=boxTraceQueryKey(query);
+  const all=[];
+  if(!q)return {query:q,all,visible:[]};
+  for(const event of events||[]){
+    const kind=boxTraceClassify(event,q);
+    if(!kind)continue;
+    all.push(Object.assign({},event,{kind}));
+  }
+  all.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||String(a.sku).localeCompare(String(b.sku),'es',{numeric:true}));
+  const visible=filter==='todos'?all:all.filter(event=>event.kind===filter);
+  return {query:q,all,visible};
+}
+function boxTraceSummary(rows){
+  const hacia=(rows||[]).filter(row=>row.kind==='hacia');
+  const dests=new Map();
+  let unidades=0;
+  for(const row of hacia){
+    const id=boxTraceQueryKey(row.dest);
+    unidades+=Math.abs(Number(row.qty)||0);
+    if(!dests.has(id))dests.set(id,{caja:row.dest||id,lineas:0,unidades:0});
+    const dest=dests.get(id);
+    dest.lineas++;
+    dest.unidades+=Math.abs(Number(row.qty)||0);
+  }
+  return {
+    hacia:hacia.length,
+    recibido:(rows||[]).filter(row=>row.kind==='recibido').length,
+    otros:(rows||[]).filter(row=>row.kind==='otros').length,
+    unidades,
+    destinos:[...dests.values()].sort((a,b)=>b.lineas-a.lineas||String(a.caja).localeCompare(String(b.caja),'es',{numeric:true}))
+  };
+}
+/* BOX_TRACE_LOGIC_END */
+
+let BOX_TRACE_INDEX=null;
+let BOX_TRACE_INDEX_PROMISE=null;
+let boxTraceFilter='hacia';
+let boxTraceSeq=0;
+
+function boxTraceFmtUnits(value){
+  if(value==null||value==='')return '—';
+  const n=Number(value);
+  if(!Number.isFinite(n))return '—';
+  return Math.abs(n).toLocaleString('es-AR',{maximumFractionDigits:2});
+}
+function boxTraceStamp(iso){
+  const d=new Date(iso);
+  if(!iso||Number.isNaN(d.getTime()))return iso?String(iso):'';
+  return d.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+}
+function boxTraceStockMaps(){
+  const locs=new Map();
+  const desc=new Map();
+  const rows=typeof DATA!=='undefined'&&Array.isArray(DATA)?DATA:[];
+  for(const row of rows){
+    const caja=boxTraceQueryKey(row?.Caja??row?.caja??'');
+    const ean=String(row?.EAN??row?.ean??'').trim();
+    const loc=String(row?.Ubicacion??row?.ubicacion??'').trim();
+    const name=String(row?.Descripcion??row?.descripcion??'').trim();
+    const saldo=Number(String(row?.Saldo??row?.saldo??'0').replace(',','.'))||0;
+    if(ean&&name&&!desc.has(ean))desc.set(ean,name);
+    if(!caja||!loc||saldo<=0)continue;
+    if(!locs.has(caja))locs.set(caja,new Set());
+    locs.get(caja).add(loc);
+  }
+  return {locs,desc};
+}
+function boxTraceWhere(map,caja){
+  const set=map.get(boxTraceQueryKey(caja));
+  if(!set||!set.size)return '';
+  const all=[...set];
+  const shown=all.slice(0,4).join(' · ');
+  return all.length>4?shown+' · +'+(all.length-4):shown;
+}
+async function loadBoxTraceIndex(force){
+  if(BOX_TRACE_INDEX&&!force)return BOX_TRACE_INDEX;
+  if(BOX_TRACE_INDEX_PROMISE&&!force)return BOX_TRACE_INDEX_PROMISE;
+  const run=(async()=>{
+    const trace=await loadTraceDataset(!!force);
+    let ghost=null;
+    try{ghost=await receiptPublishedJson('cajas-fantasma-movimientos.json')}catch(_){ghost=null}
+    BOX_TRACE_INDEX=boxTraceBuildIndex(trace,ghost);
+    return BOX_TRACE_INDEX;
+  })();
+  if(!force)BOX_TRACE_INDEX_PROMISE=run;
+  try{return await run}
+  finally{if(BOX_TRACE_INDEX_PROMISE===run)BOX_TRACE_INDEX_PROMISE=null}
+}
+function boxTraceSyncFilters(){
+  document.querySelectorAll('[data-box-trace-filter]').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.boxTraceFilter===boxTraceFilter);
+  });
+}
+function boxTraceBoxButton(caja,filter,where){
+  const key=boxTraceQueryKey(caja);
+  if(!key)return '—';
+  const loc=where?('<span class="boxTraceMuted">'+esc(where)+'</span>'):'';
+  return '<button type="button" class="boxTraceLink" data-box-trace-open="'+esc(key)+'" data-box-trace-open-filter="'+esc(filter)+'">'+esc(key)+'</button>'+loc;
+}
+function boxTraceRender(index,query){
+  const selected=boxTraceSelect(index.events,query,boxTraceFilter);
+  const summary=boxTraceSummary(selected.all);
+  const stock=boxTraceStockMaps();
+  const status=$('boxTraceStatus');
+  const empty=$('boxTraceEmpty');
+  const body=$('boxTraceBody');
+  $('boxTraceDestCount').textContent=summary.destinos.length.toLocaleString('es-AR');
+  $('boxTraceOutCount').textContent=summary.hacia.toLocaleString('es-AR');
+  $('boxTraceOutUnits').textContent=boxTraceFmtUnits(summary.unidades);
+  $('boxTraceInCount').textContent=summary.recibido.toLocaleString('es-AR');
+  const here=boxTraceWhere(stock.locs,selected.query);
+  const updated=boxTraceStamp(index.updatedAt);
+  let head='Caja '+selected.query;
+  if(here)head+=' · ubicación actual '+here;
+  head+=' · '+summary.hacia.toLocaleString('es-AR')+' descuento'+(summary.hacia===1?'':'s')+' hacia otras cajas';
+  if(summary.recibido)head+=' · '+summary.recibido.toLocaleString('es-AR')+' recibido'+(summary.recibido===1?'':'s');
+  if(updated)head+=' · trazabilidad '+updated;
+  if(!selected.all.length){
+    head='La caja '+selected.query+' no aparece en la trazabilidad publicada'+(index.ghostUpdatedAt?' ni en el relevamiento de cajas fantasma':'')+'.';
+  }else if(boxTraceFilter==='hacia'&&!selected.visible.length&&summary.recibido){
+    head+='. No figura como origen de un descuento: mirá «Recibidos en esta caja».';
+  }
+  status.textContent=head;
+  status.className='processStatus'+(selected.all.length?' ok':'');
+  const chips=$('boxTraceChips');
+  chips.innerHTML=summary.destinos.length?summary.destinos.map(dest=>{
+    const where=boxTraceWhere(stock.locs,dest.caja);
+    return '<button type="button" class="boxTraceChip" data-box-trace-open="'+esc(dest.caja)+'" data-box-trace-open-filter="recibido"><b>'+esc(dest.caja)+'</b><small>'+
+      dest.lineas.toLocaleString('es-AR')+' línea'+(dest.lineas===1?'':'s')+' · '+boxTraceFmtUnits(dest.unidades)+' u.'+
+      (where?' · '+esc(where):'')+'</small></button>';
+  }).join(''):'<span class="boxTraceMuted">Sin cajas destino publicadas para este número.</span>';
+  body.innerHTML=selected.visible.map(row=>{
+    const desc=stock.desc.get(row.sku)||'';
+    const badge=row.kind==='hacia'?'out':row.kind==='recibido'?'in':'other';
+    const badgeText=row.kind==='hacia'?'Descontó hacia':row.kind==='recibido'?'Recibió desde':'Otro';
+    const user=row.user||'—';
+    const userMeta=[row.userId?('ID '+row.userId):'',row.noControl?('Ctrl '+row.noControl):''].filter(Boolean).join(' · ');
+    const source=row.source==='fantasma'?'Cajas fantasma':'Trazabilidad vigente';
+    const cell=(label,html)=>'<td data-label="'+esc(label)+'">'+html+'</td>';
+    return '<tr>'+
+      cell('Fecha y hora',esc(boxTraceFmtFecha(row.fecha)))+
+      cell('SKU','<b>'+esc(row.sku||'—')+'</b>'+(desc?'<span class="boxTraceMuted">'+esc(desc)+'</span>':''))+
+      cell('Cantidad','<b>'+esc(boxTraceFmtUnits(row.qty))+'</b>')+
+      cell('Caja origen',boxTraceBoxButton(row.origin,'hacia',boxTraceWhere(stock.locs,row.origin)))+
+      cell('Caja destino',boxTraceBoxButton(row.dest,'recibido',boxTraceWhere(stock.locs,row.dest)))+
+      cell('Usuario','<span class="who">'+esc(user)+'</span>'+(userMeta?'<span class="boxTraceMuted">'+esc(userMeta)+'</span>':''))+
+      cell('Operación','<span class="boxTraceBadge '+badge+'">'+badgeText+'</span><span class="boxTraceMuted">'+esc(row.estado||'—')+(row.tx?' · '+row.tx:'')+'</span>')+
+      cell('Fuente',esc(source))+
+    '</tr>';
+  }).join('');
+  empty.style.display=selected.visible.length?'none':'block';
+  if(!selected.visible.length){
+    empty.textContent=selected.all.length
+      ?'No hay movimientos en «'+(boxTraceFilter==='hacia'?'Hacia otras cajas':boxTraceFilter==='recibido'?'Recibidos en esta caja':boxTraceFilter==='otros'?'Otros movimientos':'Todos')+'».'
+      :'Sin movimientos publicados para esta caja.';
+  }
+}
+async function boxTraceRun(force){
+  const seq=++boxTraceSeq;
+  const query=boxTraceQueryKey($('boxTraceQuery')?.value||'');
+  const status=$('boxTraceStatus');
+  if(!query){
+    if(status){status.textContent='Ingresá el número de caja.';status.className='processStatus'}
+    return;
+  }
+  if(status){status.textContent='Buscando movimientos de la caja '+query+'…';status.className='processStatus'}
+  try{
+    const index=await loadBoxTraceIndex(!!force);
+    if(seq!==boxTraceSeq)return;
+    boxTraceRender(index,query);
+  }catch(err){
+    if(seq!==boxTraceSeq)return;
+    if(status){
+      status.textContent='No se pudo leer la trazabilidad: '+(err?.message||String(err));
+      status.className='processStatus bad';
+    }
+  }
+}
+function openBoxTracePanel(){
+  boxTraceSyncFilters();
+  const input=$('boxTraceQuery');
+  if(input&&!String(input.value||'').trim())input.focus();
+}
+window.openBoxTracePanel=openBoxTracePanel;
+$('boxTraceSearchBtn')?.addEventListener('click',()=>boxTraceRun(false));
+$('boxTraceRefreshBtn')?.addEventListener('click',()=>boxTraceRun(true));
+$('boxTraceQuery')?.addEventListener('keydown',event=>{
+  if(event.key==='Enter'){event.preventDefault();boxTraceRun(false)}
+});
+$('boxTraceFilters')?.addEventListener('click',event=>{
+  const btn=event.target.closest('[data-box-trace-filter]');
+  if(!btn)return;
+  boxTraceFilter=btn.dataset.boxTraceFilter||'hacia';
+  boxTraceSyncFilters();
+  if(boxTraceQueryKey($('boxTraceQuery')?.value||'')&&BOX_TRACE_INDEX)boxTraceRender(BOX_TRACE_INDEX,$('boxTraceQuery').value);
+});
+$('boxTraceView')?.addEventListener('click',event=>{
+  const btn=event.target.closest('[data-box-trace-open]');
+  if(!btn)return;
+  const caja=btn.dataset.boxTraceOpen||'';
+  const filter=btn.dataset.boxTraceOpenFilter||'hacia';
+  if(!caja)return;
+  $('boxTraceQuery').value=caja;
+  boxTraceFilter=filter;
+  boxTraceSyncFilters();
+  if(BOX_TRACE_INDEX)boxTraceRender(BOX_TRACE_INDEX,caja);
+  else boxTraceRun(false);
+});
 </script>
 
 <script id="themeV3Script">
