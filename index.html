@@ -15,8 +15,8 @@
     if(method==='GET'&&url.origin===base.origin&&(roots.has(path)||/^datos\/[a-z-]+\/\d{8}\.json$/.test(path))){
       const remote=new URL('https://raw.githubusercontent.com/lupavon/UBICACIONES/main/'+path);
       remote.search=url.search;
-      if(input instanceof Request)return original(new Request(remote,input),{...options,cache:'no-store'});
-      return original(remote,{...options,cache:'no-store'});
+      if(input instanceof Request)return original(remote,{cache:'no-store'});
+      return original(remote,{cache:'no-store'});
     }
     return original(input,options);
   };
@@ -5830,15 +5830,13 @@ async function buildNegationsPanel(force=false){
 
   try{
     let res=await fetch(negFileForDate(selected)+'?v='+Date.now(),{
-      cache:'no-store',
-      headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}
+      cache:'no-store'
     });
 
     // Respaldo: archivo raíz solo para el día actual; no mezclar fechas históricas.
     if(!res.ok && selected===negTodayISO()){
       res=await fetch('./negaciones.json?v='+Date.now(),{
-        cache:'no-store',
-        headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}
+        cache:'no-store'
       });
     }
     if(!res.ok){
