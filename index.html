@@ -5834,7 +5834,7 @@ async function buildNegationsPanel(force=false){
       headers:{'Cache-Control':'no-cache, no-store, must-revalidate'}
     });
 
-    // Compatibilidad con el archivo actual mientras se publica el histórico del día.
+    // Respaldo: archivo raíz solo para el día actual; no mezclar fechas históricas.
     if(!res.ok && selected===negTodayISO()){
       res=await fetch('./negaciones.json?v='+Date.now(),{
         cache:'no-store',
@@ -5842,12 +5842,12 @@ async function buildNegationsPanel(force=false){
       });
     }
     if(!res.ok){
-      if(res.status===404)throw new Error('Todavía no hay histórico guardado para esta fecha');
+      if(res.status===404)throw new Error('No existe el archivo datos/negaciones/'+selected.replaceAll('-','')+'.json. Revisar la publicación del workflow de Copérnico.');
       throw new Error('HTTP '+res.status);
     }
 
     const payload=await res.json();
-    NEG_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+    NEG_ROWS=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:(Array.isArray(payload?.negaciones)?payload.negaciones:[]));
     NEG_LOADED=true;
     NEG_SELECTED_DATE=selected;
 
@@ -5862,7 +5862,12 @@ async function buildNegationsPanel(force=false){
       else zoneSel.value=current;
     }
 
-    await negBuildPendingSkuMap(selected);
+    // Mostrar primero las negaciones; el cálculo secundario nunca bloquea el panel.
+    NEG_TR_PENDING_READY=false;
+    renderNegations();
+    negBuildPendingSkuMap(selected).then(()=>{
+      if(NEG_SELECTED_DATE===selected && NEG_LOADED)renderNegations();
+    }).catch(e=>console.warn('Pendientes SKU no disponibles',e));
 
     if($('negUpdated'))$('negUpdated').textContent=payload?.fecha
       ?('Día '+payload.fecha)
@@ -5873,7 +5878,7 @@ async function buildNegationsPanel(force=false){
       st.className='processStatus';
       st.textContent='Fuente: Copérnico · '+NEG_ROWS.length+' negaciones · '+zoneCount+' zonas'+
         (payload?.matched_count!==undefined?' · '+payload.matched_count+' enriquecidas con Líneas Picking':'')+
-        (NEG_TR_PENDING_READY?' · pendiente SKU GLOBAL = Q_Ordered TR vigente − Confirmadas/Negadas de Líneas Picking':' · falta TR o procesadas por SKU para calcular pendiente')+
+        ' · pendiente SKU calculándose en segundo plano'+
         ' · histórico '+selected.split('-').reverse().join('/');
     }
     renderNegations();
@@ -5884,7 +5889,7 @@ async function buildNegationsPanel(force=false){
     if($('negUpdated'))$('negUpdated').textContent='Día '+selected.split('-').reverse().join('/');
     if(st){
       st.className='processStatus bad';
-      st.textContent='Sin datos para '+selected.split('-').reverse().join('/')+': '+String(err.message||err);
+      st.textContent='ERROR DE FUENTE (no significa cero negaciones) · '+selected.split('-').reverse().join('/')+': '+String(err.message||err);
     }
   }
 }
