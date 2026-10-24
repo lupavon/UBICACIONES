@@ -9062,7 +9062,7 @@ function boxTraceStatusText(view,selected,summary,stock){
   }
   if(live.state==='pending')head+=' · consultando Copérnico…';
   if(live.state==='error'&&live.message)head+=' · '+live.message;
-  if(live.state==='miss')head+=' · '+boxTraceLiveMissText(q);
+  if(live.state==='miss')head+=' · La consulta en vivo no está publicada todavía (la ruta /caja no existe). Lo que se ve es la trazabilidad vigente.';
   if(boxTraceFilter==='hacia'&&!selected.visible.length&&summary.recibido){
     head+='. No figura como origen de un descuento: mirá «Recibidos en esta caja».';
   }
