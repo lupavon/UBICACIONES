@@ -8,7 +8,7 @@ const block = html.match(/\/\* BOX_TRACE_LOGIC_START \*\/([\s\S]*?)\/\* BOX_TRAC
 assert.ok(block, 'Falta el bloque de lógica de Trazabilidades');
 const api = new Function(
   block[1] +
-  '\nreturn {boxTraceBuildIndex, boxTraceQueryKey, boxTraceSelect, boxTraceSummary, boxTraceFmtFecha, boxTraceClassify};'
+  '\nreturn {boxTraceBuildIndex, boxTraceQueryKey, boxTraceSelect, boxTraceSummary, boxTraceFmtFecha, boxTraceClassify, boxTraceEvent, boxTraceMergeLive};'
 )();
 
 assert.strictEqual(api.boxTraceQueryKey('221210'), '221210');
@@ -43,6 +43,24 @@ assert.strictEqual(missing.all.length, 0);
 const elimina = index.events.find(row => row.holder === '410928' && row.dest === '260871');
 assert.ok(elimina, 'ELIMINA LINEA POR SALE HACIA debe contar como descuento hacia la caja destino');
 assert.strictEqual(api.boxTraceClassify(elimina, '410928'), 'hacia');
+
+const published = [
+  api.boxTraceEvent('591435', { Fecha: '2026-01-01T00:00:00', EAN: '9', Estado: 'Entrada', Movimiento: 1, Transaccion: 'CREACION CAJA', Nombre_empleado: 'A' }, 'vigente'),
+  api.boxTraceEvent('204400', { Fecha: '2026-02-01T00:00:00', EAN: '111', Estado: 'Entrada', Movimiento: 5, Transaccion: 'RECIBE DESDE Nw: 591435', Nombre_empleado: 'B' }, 'vigente'),
+  api.boxTraceEvent('320631', { Fecha: '2026-02-02T00:00:00', EAN: '222', Estado: 'Entrada', Movimiento: 3, Transaccion: 'RECIBE DESDE Nw: 591435', Nombre_empleado: 'C' }, 'vigente')
+];
+const merged = api.boxTraceMergeLive(published, '591435', [
+  { Fecha: '2026-02-01T00:00:01', EAN: '111', Estado: 'Salida', Movimiento: -5, Transaccion: 'SALE HACIA Nw: 204400', Nombre_empleado: 'B' },
+  { Fecha: '2026-03-01T00:00:00', EAN: '333', Estado: 'Entrada', Movimiento: 1, Transaccion: 'UBICA MUELLE', Nombre_empleado: 'D' }
+]);
+assert.ok(!merged.some(row => row.holder === '591435' && row.source === 'vigente'));
+assert.ok(merged.some(row => row.source === 'vivo' && row.dest === '204400' && row.sku === '111' && row.kind === undefined && row.sentido === 'hacia'));
+assert.ok(!merged.some(row => row.source === 'vigente' && row.dest === '204400' && row.sku === '111'));
+assert.ok(merged.some(row => row.source === 'vigente' && row.dest === '320631' && row.sku === '222'));
+assert.ok(merged.some(row => row.source === 'vivo' && row.sku === '333' && row.tx === 'UBICA MUELLE'));
+const mergedView = api.boxTraceSelect(merged, '591435', 'hacia');
+assert.ok(mergedView.visible.some(row => row.dest === '204400' && row.source === 'vivo'));
+assert.ok(mergedView.visible.some(row => row.dest === '320631' && row.source === 'vigente'));
 
 console.log('test_box_trace ok', {
   events: index.events.length,

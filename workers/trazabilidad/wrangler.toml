@@ -1,0 +1,11 @@
+name = "ubicaciones-trazabilidad"
+main = "src/index.js"
+compatibility_date = "2026-10-24"
+workers_dev = true
+
+# No declares el nombre del worker de picking (ubicaciones-operacion):
+# un deploy con ese nombre reemplazaría Picking en curso.
+# Secrets, los mismos del workflow y sin commitearlos:
+#   wrangler secret put COPERNICO_EMAIL
+#   wrangler secret put COPERNICO_PASSWORD
+# Opcional: wrangler secret put COPERNICO_USER_ID   (default 11257)

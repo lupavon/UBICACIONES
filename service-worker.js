@@ -1,4 +1,4 @@
-const CACHE='ubicaciones-v14';
+const CACHE='ubicaciones-v15';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.registration.scope).href));
 self.addEventListener('install',event=>{
