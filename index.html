@@ -2688,11 +2688,11 @@ body.light-mode .boxTraceBadge.other{color:#52677c;background:#f3f6f9;border-col
 
 <div class="receiptToolbar">
 <input id="receiptSearch" placeholder="Buscar caja, SKU, factura, OC, macrozona, proveedor, descripción, responsable o equipo..."/>
-<select id="receiptTeamFilter" autocomplete="off"><option value="">Todos los equipos</option></select>
+<select id="receiptTeamFilter" autocomplete="off"><option value="">Todos los equipos</option><option value="Recepción" selected>Recepción</option></select>
 <select id="receiptAgeFilter" title="Filtrar por antigüedad del ingreso a recibo">
-<option value="all" selected>Todo actual (incluye sin fecha)</option>
+<option value="all">Todo actual (incluye sin fecha)</option>
 <option value="unknown">Sin fecha identificada</option>
-<option value="exclude_today">Hasta ayer (excluye hoy)</option>
+<option value="exclude_today" selected>Hasta ayer (excluye hoy)</option>
 <option value="yesterday">Solo ayer</option>
 <option value="old">Viejos (anteriores a ayer)</option>
 <option value="today">Solo hoy</option>
@@ -4281,22 +4281,33 @@ function receiptCmp(a,b,key){
   return String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});
 }
 let RECEIPT_DEFAULTS_APPLIED=false;
+let RECEIPT_FILTERS_TOUCHED=false;
+const RECEIPT_DEFAULT_TEAM='Recepción';
+const RECEIPT_DEFAULT_AGE='exclude_today';
 function fillReceiptTeams(){
   const sel=$('receiptTeamFilter');if(!sel)return;
   const current=sel.value;
-  const teams=[...new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'equipo')||'Sin clasificar').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const teams=[...new Set(RECEIPT_ROWS.map(r=>String(receiptField(r,'equipo')||'Sin clasificar').trim()).filter(Boolean))];
+  // Recepción tiene que existir desde el primer pintado, antes de que la trazabilidad clasifique las filas.
+  if(!teams.includes(RECEIPT_DEFAULT_TEAM))teams.push(RECEIPT_DEFAULT_TEAM);
+  teams.sort((a,b)=>a.localeCompare(b,'es'));
   sel.innerHTML='<option value="">Todos los equipos</option>'+teams.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
-  // Después de la inicialización, conservar lo que el usuario haya elegido.
-  if(RECEIPT_DEFAULTS_APPLIED && (current===''||teams.includes(current))){
+  // Reconstruir el select borra la elección. Conservar la vigente si sigue siendo válida;
+  // applyReceiptDefaults pisa esto con Recepción solo mientras nadie haya tocado los filtros.
+  if(current===''||teams.includes(current)){
     sel.value=current;
   }
 }
 function applyReceiptDefaults(){
   const teamSel=$('receiptTeamFilter');
   const ageSel=$('receiptAgeFilter');
-  if(ageSel)ageSel.value='all';
-  if(teamSel){
-    teamSel.value='';
+  // Si la persona ya cambió equipo o período mientras cargaban los datos, no pisar esa elección.
+  if(!RECEIPT_FILTERS_TOUCHED){
+    if(ageSel)ageSel.value=RECEIPT_DEFAULT_AGE;
+    if(teamSel){
+      const hasReception=[...teamSel.options].some(o=>o.value===RECEIPT_DEFAULT_TEAM);
+      teamSel.value=hasReception?RECEIPT_DEFAULT_TEAM:'';
+    }
   }
   RECEIPT_DEFAULTS_APPLIED=true;
 }
@@ -4490,7 +4501,7 @@ function renderReceipt(){
   updateReceiptQuickSummary(receiptAgeRows);
 
   // El resumen por proveedor responde al filtro de antigüedad + Equipo.
-  // El inicio muestra todos los equipos; conservar la selección del usuario.
+  // El default de Equipo es Recepción, así que el resumen abre filtrado por Recepción.
   const receiptSupplierRows=receiptAgeRows.filter(r=>
     !team || String(receiptField(r,'equipo')||'Sin clasificar')===team
   );
@@ -5657,8 +5668,9 @@ $('processFilterField').onchange=()=>{fillToolValues('process',PROCESS_ROWS,$('p
 $('processFilterValue').onchange=()=>renderPalletsProcess();
 $('processGroupBy').onchange=()=>renderPalletsProcess();
 $('processClearTools').onclick=()=>{$('processSearch').value='';$('processFilterField').value='';fillToolValues('process',PROCESS_ROWS,'',(r,k)=>processField(r,k));$('processGroupBy').value='';renderPalletsProcess();};
-// Forzar el default visual desde el arranque; luego applyReceiptDefaults fija también Recepción cuando cargan los equipos.
-if($('receiptAgeFilter'))$('receiptAgeFilter').value='exclude_today';
+// Forzar el default visual desde el arranque; luego applyReceiptDefaults lo vuelve a aplicar cuando cargan los equipos.
+if($('receiptAgeFilter'))$('receiptAgeFilter').value=RECEIPT_DEFAULT_AGE;
+if($('receiptTeamFilter')&&[...$('receiptTeamFilter').options].some(o=>o.value===RECEIPT_DEFAULT_TEAM))$('receiptTeamFilter').value=RECEIPT_DEFAULT_TEAM;
 
 // ===== NEGACIONES · Productividad + Líneas de Picking =====
 let NEG_ROWS=[];
@@ -8211,12 +8223,12 @@ $('negExportBtn').onclick=()=>exportNegationsXls();
 $('negRefreshBtn').onclick=()=>buildNegationsPanel(true);
 document.querySelectorAll('[data-neg-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.negSort;if(NEG_SORT.key===k)NEG_SORT.dir*=-1;else{NEG_SORT.key=k;NEG_SORT.dir=1}renderNegations();});
 $('receiptSearch').oninput=()=>renderReceipt();
-$('receiptTeamFilter').onchange=()=>renderReceipt();
-$('receiptAgeFilter').onchange=()=>renderReceipt();
+$('receiptTeamFilter').onchange=()=>{RECEIPT_FILTERS_TOUCHED=true;renderReceipt();};
+$('receiptAgeFilter').onchange=()=>{RECEIPT_FILTERS_TOUCHED=true;renderReceipt();};
 $('receiptFilterField').onchange=()=>{fillToolValues('receipt',RECEIPT_ROWS,$('receiptFilterField').value,receiptField);renderReceipt();};
 $('receiptFilterValue').onchange=()=>renderReceipt();
 $('receiptGroupBy').onchange=()=>renderReceipt();
-$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';applyReceiptDefaults();$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
+$('receiptClearTools').onclick=()=>{$('receiptSearch').value='';RECEIPT_FILTERS_TOUCHED=false;applyReceiptDefaults();$('receiptFilterField').value='';fillToolValues('receipt',RECEIPT_ROWS,'',receiptField);$('receiptGroupBy').value='';renderReceipt();};
 $('receiptRefreshBtn').onclick=()=>buildReceiptPanel(true);
 document.querySelectorAll('[data-receipt-sort]').forEach(th=>th.onclick=()=>{const k=th.dataset.receiptSort;if(RECEIPT_SORT.key===k)RECEIPT_SORT.dir*=-1;else{RECEIPT_SORT.key=k;RECEIPT_SORT.dir=1}renderReceipt();});
 $('sanGroupSelect').onchange=()=>{
