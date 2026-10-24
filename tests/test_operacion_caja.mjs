@@ -15,6 +15,7 @@ globalThis.fetch = async (url, options = {}) => {
   const body = options.body ? String(options.body) : "";
   calls.push({ href, body, authorization: options.headers?.authorization || "" });
   if (href.endsWith("/session")) {
+    if (globalThis.__session1042) return new Response("error code: 1042", { status: 500 });
     if ((options.headers?.authorization || "") !== dashboard) return json({ error: "No autenticado" }, 401);
     return json({ user: { username: "operador" } });
   }
@@ -117,5 +118,38 @@ assert.equal(preflight.body, null);
 assert.equal(await preflight.text(), "");
 assert.equal(preflight.headers.get("access-control-allow-origin"), "https://lupavon.github.io");
 assert.match(preflight.headers.get("access-control-allow-headers") || "", /authorization/i);
+
+resetCajaSession();
+globalThis.__session1042 = true;
+calls.length = 0;
+const blocked = await handleCaja(cajaRequest("591435"), env);
+const blockedBody = await blocked.json();
+assert.equal(blocked.status, 503);
+assert.equal(blockedBody.error.includes("AUTH"), true);
+assert.equal(blockedBody.error.includes("ingresar"), false);
+assert.equal(calls.some(call => call.href.endsWith("/login")), false);
+globalThis.__session1042 = false;
+
+resetCajaSession();
+let globalSessionHits = 0;
+const previousFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+  if (String(url).endsWith("/session")) globalSessionHits += 1;
+  return previousFetch(url, options);
+};
+const authBinding = {
+  async fetch(url, options) {
+    assert.equal(String(url).endsWith("/session"), true);
+    assert.equal(options.headers.authorization, dashboard);
+    assert.equal(options.headers.origin, "https://lupavon.github.io");
+    return json({ user: { username: "lpavon", name: "Lucas Pavón", role: "administrador" } });
+  }
+};
+calls.length = 0;
+const viaBinding = await handleCaja(cajaRequest("591435"), { ...env, AUTH: authBinding });
+assert.equal(viaBinding.status, 200);
+assert.equal(globalSessionHits, 0);
+assert.equal(calls.some(call => call.href.includes("getmovimientos")), true);
+globalThis.fetch = previousFetch;
 
 console.log("test_operacion_caja ok");

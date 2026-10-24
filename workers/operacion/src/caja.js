@@ -12,6 +12,10 @@
  *   3. npx wrangler deploy
  * No desplegar este archivo como script completo: /picking dejaría de existir.
  * No hace falta un secret nuevo; el worker ya tiene COPERNICO_EMAIL y COPERNICO_PASSWORD.
+ * Para validar la sesión del dashboard hace falta un service binding:
+ *   variable AUTH, servicio ubicaciones-auth.
+ * Un fetch() a https://ubicaciones-auth...workers.dev desde este worker
+ * cae en el error 1042 de Cloudflare (misma zona) y no llega a /session.
  *
  * La sesión técnica es una sola. Esta ruta lee el JWT que ya esté en memoria
  * o en KV y no llama a logout. Si Copérnico responde 403/418, no se fuerza
@@ -186,14 +190,37 @@ async function readKvJwt(env) {
   return "";
 }
 
-async function dashboardUser(request) {
+function sessionUnreachable() {
+  const error = new Error("No se pudo verificar la sesión del dashboard. Volvé a publicar ubicaciones-operacion con el service binding AUTH hacia ubicaciones-auth.");
+  error.status = 503;
+  return error;
+}
+
+async function fetchDashboardSession(request, env, auth) {
+  const headers = { authorization: auth, accept: "application/json" };
+  const origin = request.headers.get("origin");
+  if (origin) headers.origin = origin;
+  const userAgent = request.headers.get("user-agent");
+  if (userAgent) headers["user-agent"] = userAgent;
+  const init = { method: "GET", headers };
+  // El fetch público a otro workers.dev de la misma cuenta responde 1042.
+  if (env?.AUTH && typeof env.AUTH.fetch === "function") return env.AUTH.fetch(DASHBOARD_SESSION_URL, init);
+  return fetch(DASHBOARD_SESSION_URL, init);
+}
+
+async function dashboardUser(request, env) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ") || auth.length < 16) return null;
-  const response = await fetch(DASHBOARD_SESSION_URL, {
-    headers: { authorization: auth, accept: "application/json" }
-  });
-  if (!response.ok) return null;
-  const data = await readJson(response);
+  const response = await fetchDashboardSession(request, env, auth);
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+  if (response.status === 401 || data?.error === "No autenticado") return null;
+  if (!response.ok || text.includes("1042")) throw sessionUnreachable();
   const username = data?.user?.username;
   return typeof username === "string" && username ? data.user : null;
 }
@@ -279,7 +306,7 @@ export async function handleCaja(request, env) {
   const caja = normalizeCaja(url.searchParams.get("numero") || url.searchParams.get("caja") || "");
   if (!caja) return jsonResponse({ ok: false, error: "Número de caja inválido" }, 400, origin);
   try {
-    const user = await dashboardUser(request);
+    const user = await dashboardUser(request, env);
     if (!user) return jsonResponse({ ok: false, error: "Tenés que ingresar al dashboard para consultar Copérnico" }, 401, origin);
     if (!withinRate(clientKey(request, user.username))) {
       return jsonResponse({ ok: false, error: "Demasiadas consultas. Esperá un minuto." }, 429, origin);
