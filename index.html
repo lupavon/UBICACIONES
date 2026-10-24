@@ -3031,7 +3031,7 @@ body.light-mode .boxTraceBadge.other{color:#52677c;background:#f3f6f9;border-col
     <b>Hacia qué caja se descontó</b>
     <div class="boxTraceChips" id="boxTraceChips"></div>
   </div>
-  <p class="boxTraceNote" id="boxTraceNote">La trazabilidad vigente publica, por cada SKU que sigue en la caja destino, el movimiento que inició ese saldo. Si dice RECIBE DESDE Nw, esa Nw es la caja origen de la que se descontó el stock. El historial completo de cada salida (SALE HACIA) no se publica, salvo en el relevamiento de cajas fantasma.</p>
+  <p class="boxTraceNote" id="boxTraceNote">Al buscar, el dashboard pide el historial completo de esa caja a Copérnico (getmovimientos) en /caja del worker de operación, el mismo de Picking en curso. La clave queda en ese worker y el navegador solo manda la sesión del dashboard. Hasta que esa ruta esté publicada ahí, se ve la trazabilidad vigente (un movimiento por SKU que sigue en la caja destino; RECIBE DESDE Nw es la caja origen) y el relevamiento de cajas fantasma. Una consulta corrida a mano con el workflow queda en datos/trazabilidad/&lt;caja&gt;.json.</p>
   <div class="processTableWrap boxTraceTableWrap">
     <table class="processTable boxTraceTable">
       <thead>
@@ -8563,6 +8563,7 @@ let authMemoryToken;
 let authEpoch=0;
 let authLoginPending=false;
 const getAuthToken=()=>{if(authMemoryToken!==undefined)return authMemoryToken;try{authMemoryToken=sessionStorage.getItem(AUTH_TOKEN_KEY)||''}catch{authMemoryToken=''}return authMemoryToken};
+window.getAuthToken=getAuthToken;
 const setAuthToken=(token)=>{authMemoryToken=token||'';try{if(token)sessionStorage.setItem(AUTH_TOKEN_KEY,token);else sessionStorage.removeItem(AUTH_TOKEN_KEY)}catch{/* El acceso sigue funcionando si el navegador bloquea el almacenamiento. */}};
 
 async function authFetch(path,opts={}){
@@ -8920,12 +8921,53 @@ function boxTraceSummary(rows){
     destinos:[...dests.values()].sort((a,b)=>b.lineas-a.lineas||String(a.caja).localeCompare(String(b.caja),'es',{numeric:true}))
   };
 }
+function boxTraceEventsFromMovimientos(caja,movimientos,source){
+  const events=[];
+  const seen=new Set();
+  boxTracePushBox(events,seen,caja,{caja,movimientos:Array.isArray(movimientos)?movimientos:[]},source||'vivo');
+  return events;
+}
+function boxTraceMergeLive(baseEvents,caja,liveMovimientos,source){
+  const q=boxTraceQueryKey(caja);
+  const live=boxTraceEventsFromMovimientos(q,liveMovimientos,source||'vivo');
+  if(!q)return (baseEvents||[]).slice();
+  const liveHacia=new Set();
+  for(const event of live){
+    if(event.sentido==='hacia'&&boxTraceQueryKey(event.origin)===q&&event.dest){
+      liveHacia.add(boxTraceQueryKey(event.dest)+'|'+event.sku);
+    }
+  }
+  const kept=[];
+  for(const event of baseEvents||[]){
+    if(boxTraceQueryKey(event.holder)===q)continue;
+    if(event.sentido==='hacia'&&boxTraceQueryKey(event.origin)===q){
+      const key=boxTraceQueryKey(event.dest)+'|'+event.sku;
+      if(liveHacia.has(key))continue;
+    }
+    kept.push(event);
+  }
+  const seen=new Set(kept.map(boxTraceDedupeKey));
+  const merged=kept.slice();
+  for(const event of live){
+    const key=boxTraceDedupeKey(event);
+    if(seen.has(key))continue;
+    seen.add(key);
+    merged.push(event);
+  }
+  return merged;
+}
 /* BOX_TRACE_LOGIC_END */
 
 let BOX_TRACE_INDEX=null;
 let BOX_TRACE_INDEX_PROMISE=null;
+let BOX_TRACE_VIEW=null;
 let boxTraceFilter='hacia';
 let boxTraceSeq=0;
+const BOX_TRACE_LIVE_ENDPOINTS=[
+  // Primero el worker que ya tiene la sesión de Picking. El segundo solo si esa ruta no existe.
+  'https://ubicaciones-operacion.pavonlucas-m.workers.dev/caja?numero=',
+  'https://ubicaciones-trazabilidad.pavonlucas-m.workers.dev/caja?numero='
+];
 
 function boxTraceFmtUnits(value){
   if(value==null||value==='')return '—';
@@ -8987,8 +9029,48 @@ function boxTraceBoxButton(caja,filter,where){
   const loc=where?('<span class="boxTraceMuted">'+esc(where)+'</span>'):'';
   return '<button type="button" class="boxTraceLink" data-box-trace-open="'+esc(key)+'" data-box-trace-open-filter="'+esc(filter)+'">'+esc(key)+'</button>'+loc;
 }
-function boxTraceRender(index,query){
-  const selected=boxTraceSelect(index.events,query,boxTraceFilter);
+function boxTraceSourceLabel(source){
+  if(source==='vivo')return 'Copérnico en vivo';
+  if(source==='cache')return 'Consulta guardada';
+  if(source==='fantasma')return 'Cajas fantasma';
+  return 'Trazabilidad vigente';
+}
+function boxTraceLiveMissText(caja){
+  return 'La consulta en vivo todavía no está publicada: el worker responde que esa ruta no existe, y esta página no llama a Copérnico con la clave. Cuando se despliegue, la misma búsqueda tarda unos segundos. Mientras tanto, el workflow «Consultar trazabilidad de una caja» puede guardar el historial en datos/trazabilidad/'+caja+'.json; ese camino espera el turno de la sesión técnica y suele tardar más de un minuto.';
+}
+function boxTraceStatusText(view,selected,summary,stock){
+  const live=view.live||{};
+  const q=selected.query;
+  if(live.state==='auth')return live.message||'Tenés que ingresar al dashboard para consultar Copérnico en vivo.';
+  if(!selected.all.length){
+    if(live.state==='pending')return 'La caja '+q+' no está en la trazabilidad publicada. Consultando Copérnico…';
+    if(live.state==='ok')return live.warning||('Copérnico no tiene movimientos para la caja '+q+'.');
+    if(live.state==='error'&&live.message)return live.message;
+    return 'La caja '+q+' no aparece en la trazabilidad publicada'+(view.ghostUpdatedAt?' ni en el relevamiento de cajas fantasma':'')+'. '+boxTraceLiveMissText(q);
+  }
+  const here=boxTraceWhere(stock.locs,q);
+  let head='Caja '+q;
+  if(here)head+=' · ubicación actual '+here;
+  head+=' · '+summary.hacia.toLocaleString('es-AR')+' descuento'+(summary.hacia===1?'':'s')+' hacia otras cajas';
+  if(summary.recibido)head+=' · '+summary.recibido.toLocaleString('es-AR')+' recibido'+(summary.recibido===1?'':'s');
+  if(live.state==='ok'&&live.channel==='vivo'){
+    const secs=(Number(live.elapsedMs)||0)/1000;
+    head+=' · historial Copérnico en vivo ('+Number(live.count||0).toLocaleString('es-AR')+' movimientos, '+secs.toLocaleString('es-AR',{maximumFractionDigits:1})+' s)';
+  }else if(live.state==='ok'&&live.channel==='cache'){
+    head+=' · consulta guardada'+(live.fetchedAt?' del '+boxTraceStamp(live.fetchedAt):'')+' ('+Number(live.count||0).toLocaleString('es-AR')+' movimientos)';
+  }else if(view.updatedAt){
+    head+=' · trazabilidad '+boxTraceStamp(view.updatedAt);
+  }
+  if(live.state==='pending')head+=' · consultando Copérnico…';
+  if(live.state==='error'&&live.message)head+=' · '+live.message;
+  if(live.state==='miss')head+=' · La consulta en vivo no está publicada todavía (la ruta /caja no existe). Lo que se ve es la trazabilidad vigente.';
+  if(boxTraceFilter==='hacia'&&!selected.visible.length&&summary.recibido){
+    head+='. No figura como origen de un descuento: mirá «Recibidos en esta caja».';
+  }
+  return head;
+}
+function boxTraceRender(view){
+  const selected=boxTraceSelect(view.events,view.query,boxTraceFilter);
   const summary=boxTraceSummary(selected.all);
   const stock=boxTraceStockMaps();
   const status=$('boxTraceStatus');
@@ -8998,34 +9080,22 @@ function boxTraceRender(index,query){
   $('boxTraceOutCount').textContent=summary.hacia.toLocaleString('es-AR');
   $('boxTraceOutUnits').textContent=boxTraceFmtUnits(summary.unidades);
   $('boxTraceInCount').textContent=summary.recibido.toLocaleString('es-AR');
-  const here=boxTraceWhere(stock.locs,selected.query);
-  const updated=boxTraceStamp(index.updatedAt);
-  let head='Caja '+selected.query;
-  if(here)head+=' · ubicación actual '+here;
-  head+=' · '+summary.hacia.toLocaleString('es-AR')+' descuento'+(summary.hacia===1?'':'s')+' hacia otras cajas';
-  if(summary.recibido)head+=' · '+summary.recibido.toLocaleString('es-AR')+' recibido'+(summary.recibido===1?'':'s');
-  if(updated)head+=' · trazabilidad '+updated;
-  if(!selected.all.length){
-    head='La caja '+selected.query+' no aparece en la trazabilidad publicada'+(index.ghostUpdatedAt?' ni en el relevamiento de cajas fantasma':'')+'.';
-  }else if(boxTraceFilter==='hacia'&&!selected.visible.length&&summary.recibido){
-    head+='. No figura como origen de un descuento: mirá «Recibidos en esta caja».';
-  }
-  status.textContent=head;
-  status.className='processStatus'+(selected.all.length?' ok':'');
+  status.textContent=boxTraceStatusText(view,selected,summary,stock);
+  const liveState=view.live&&view.live.state;
+  status.className='processStatus'+(selected.all.length?' ok':(liveState==='error'?' bad':''));
   const chips=$('boxTraceChips');
   chips.innerHTML=summary.destinos.length?summary.destinos.map(dest=>{
     const where=boxTraceWhere(stock.locs,dest.caja);
     return '<button type="button" class="boxTraceChip" data-box-trace-open="'+esc(dest.caja)+'" data-box-trace-open-filter="recibido"><b>'+esc(dest.caja)+'</b><small>'+
       dest.lineas.toLocaleString('es-AR')+' línea'+(dest.lineas===1?'':'s')+' · '+boxTraceFmtUnits(dest.unidades)+' u.'+
       (where?' · '+esc(where):'')+'</small></button>';
-  }).join(''):'<span class="boxTraceMuted">Sin cajas destino publicadas para este número.</span>';
+  }).join(''):'<span class="boxTraceMuted">Sin cajas destino para este número.</span>';
   body.innerHTML=selected.visible.map(row=>{
     const desc=stock.desc.get(row.sku)||'';
     const badge=row.kind==='hacia'?'out':row.kind==='recibido'?'in':'other';
     const badgeText=row.kind==='hacia'?'Descontó hacia':row.kind==='recibido'?'Recibió desde':'Otro';
     const user=row.user||'—';
     const userMeta=[row.userId?('ID '+row.userId):'',row.noControl?('Ctrl '+row.noControl):''].filter(Boolean).join(' · ');
-    const source=row.source==='fantasma'?'Cajas fantasma':'Trazabilidad vigente';
     const cell=(label,html)=>'<td data-label="'+esc(label)+'">'+html+'</td>';
     return '<tr>'+
       cell('Fecha y hora',esc(boxTraceFmtFecha(row.fecha)))+
@@ -9035,29 +9105,118 @@ function boxTraceRender(index,query){
       cell('Caja destino',boxTraceBoxButton(row.dest,'recibido',boxTraceWhere(stock.locs,row.dest)))+
       cell('Usuario','<span class="who">'+esc(user)+'</span>'+(userMeta?'<span class="boxTraceMuted">'+esc(userMeta)+'</span>':''))+
       cell('Operación','<span class="boxTraceBadge '+badge+'">'+badgeText+'</span><span class="boxTraceMuted">'+esc(row.estado||'—')+(row.tx?' · '+row.tx:'')+'</span>')+
-      cell('Fuente',esc(source))+
+      cell('Fuente',esc(boxTraceSourceLabel(row.source)))+
     '</tr>';
   }).join('');
   empty.style.display=selected.visible.length?'none':'block';
   if(!selected.visible.length){
+    const filterName=boxTraceFilter==='hacia'?'Hacia otras cajas':boxTraceFilter==='recibido'?'Recibidos en esta caja':boxTraceFilter==='otros'?'Otros movimientos':'Todos';
     empty.textContent=selected.all.length
-      ?'No hay movimientos en «'+(boxTraceFilter==='hacia'?'Hacia otras cajas':boxTraceFilter==='recibido'?'Recibidos en esta caja':boxTraceFilter==='otros'?'Otros movimientos':'Todos')+'».'
-      :'Sin movimientos publicados para esta caja.';
+      ?'No hay movimientos en «'+filterName+'».'
+      :(liveState==='ok'?'Copérnico no devolvió movimientos para esta caja.':'Sin movimientos publicados para esta caja.');
   }
+}
+function boxTraceAuthToken(){
+  try{if(typeof getAuthToken==='function')return getAuthToken()||''}catch(_){}
+  try{return sessionStorage.getItem('ubicaciones_auth_token')||''}catch(_){return ''}
+}
+async function boxTraceReadJson(res){
+  try{return await res.json()}catch(_){return {}}
+}
+async function boxTraceFetchLive(caja){
+  const headers={accept:'application/json'};
+  const token=boxTraceAuthToken();
+  if(token)headers.authorization='Bearer '+token;
+  let message='';
+  let sawRoute=false;
+  for(const base of BOX_TRACE_LIVE_ENDPOINTS){
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),15000);
+    try{
+      const res=await fetch(base+encodeURIComponent(caja),{headers,credentials:'omit',cache:'no-store',signal:controller.signal});
+      const data=await boxTraceReadJson(res);
+      if(res.status===404)continue;
+      sawRoute=true;
+      if(res.status===401)return {state:'auth',message:typeof data.error==='string'?data.error:'Tenés que ingresar al dashboard para consultar Copérnico'};
+      if(!res.ok||data.ok===false){
+        message=typeof data.error==='string'?data.error:('No se pudo consultar la caja (HTTP '+res.status+').');
+        if(res.status===400||res.status===429)return {state:'error',message};
+        continue;
+      }
+      if(!Array.isArray(data.movimientos)){
+        message='La respuesta en vivo no trajo el historial de la caja.';
+        continue;
+      }
+      return {
+        state:'ok',
+        channel:'vivo',
+        payload:data,
+        elapsedMs:data.elapsed_ms,
+        count:data.movimientos.length,
+        warning:data.warning||'',
+        fetchedAt:data.fetched_at||''
+      };
+    }catch(err){
+      message=err?.name==='AbortError'?'La consulta en vivo superó los 15 segundos.':'No se pudo contactar el worker de trazabilidad.';
+    }finally{clearTimeout(timer)}
+  }
+  try{
+    const cached=await receiptPublishedJson('datos/trazabilidad/'+caja+'.json');
+    if(cached&&cached.ok!==false&&Array.isArray(cached.movimientos)&&String(cached.caja||caja)===String(caja)){
+      return {
+        state:'ok',
+        channel:'cache',
+        payload:cached,
+        elapsedMs:cached.elapsed_ms,
+        count:cached.movimientos.length,
+        warning:cached.warning||'',
+        fetchedAt:cached.fetched_at||cached.updated_at||''
+      };
+    }
+  }catch(_){}
+  if(sawRoute&&message)return {state:'error',message};
+  return {state:'miss',message};
+}
+function boxTraceApplyLive(index,query,live){
+  const view={
+    query,
+    events:index.events,
+    updatedAt:index.updatedAt||'',
+    ghostUpdatedAt:index.ghostUpdatedAt||'',
+    live
+  };
+  if(live&&live.state==='ok'&&live.payload){
+    view.events=boxTraceMergeLive(index.events,query,live.payload.movimientos,live.channel==='cache'?'cache':'vivo');
+    view.live={
+      state:'ok',
+      channel:live.channel,
+      elapsedMs:live.elapsedMs,
+      count:live.count,
+      warning:live.warning||'',
+      fetchedAt:live.fetchedAt||''
+    };
+  }
+  return view;
 }
 async function boxTraceRun(force){
   const seq=++boxTraceSeq;
   const query=boxTraceQueryKey($('boxTraceQuery')?.value||'');
   const status=$('boxTraceStatus');
   if(!query){
+    BOX_TRACE_VIEW=null;
     if(status){status.textContent='Ingresá el número de caja.';status.className='processStatus'}
     return;
   }
-  if(status){status.textContent='Buscando movimientos de la caja '+query+'…';status.className='processStatus'}
+  if(status){status.textContent='Consultando Copérnico para la caja '+query+'…';status.className='processStatus'}
   try{
     const index=await loadBoxTraceIndex(!!force);
     if(seq!==boxTraceSeq)return;
-    boxTraceRender(index,query);
+    BOX_TRACE_VIEW=boxTraceApplyLive(index,query,{state:'pending'});
+    boxTraceRender(BOX_TRACE_VIEW);
+    const live=await boxTraceFetchLive(query);
+    if(seq!==boxTraceSeq)return;
+    BOX_TRACE_VIEW=boxTraceApplyLive(index,query,live);
+    boxTraceRender(BOX_TRACE_VIEW);
   }catch(err){
     if(seq!==boxTraceSeq)return;
     if(status){
@@ -9082,7 +9241,8 @@ $('boxTraceFilters')?.addEventListener('click',event=>{
   if(!btn)return;
   boxTraceFilter=btn.dataset.boxTraceFilter||'hacia';
   boxTraceSyncFilters();
-  if(boxTraceQueryKey($('boxTraceQuery')?.value||'')&&BOX_TRACE_INDEX)boxTraceRender(BOX_TRACE_INDEX,$('boxTraceQuery').value);
+  const q=boxTraceQueryKey($('boxTraceQuery')?.value||'');
+  if(BOX_TRACE_VIEW&&BOX_TRACE_VIEW.query===q)boxTraceRender(BOX_TRACE_VIEW);
 });
 $('boxTraceView')?.addEventListener('click',event=>{
   const btn=event.target.closest('[data-box-trace-open]');
@@ -9093,8 +9253,7 @@ $('boxTraceView')?.addEventListener('click',event=>{
   $('boxTraceQuery').value=caja;
   boxTraceFilter=filter;
   boxTraceSyncFilters();
-  if(BOX_TRACE_INDEX)boxTraceRender(BOX_TRACE_INDEX,caja);
-  else boxTraceRun(false);
+  boxTraceRun(false);
 });
 </script>
 

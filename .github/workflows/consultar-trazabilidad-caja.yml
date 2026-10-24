@@ -1,0 +1,52 @@
+name: Consultar trazabilidad de una caja
+
+# Respaldo cuando el worker en vivo no está publicado.
+# La página estática no puede disparar este workflow: no hay token en el frontend.
+# Corre en la misma sesión técnica que el resto de Copérnico, así que espera su turno.
+
+on:
+  workflow_dispatch:
+    inputs:
+      caja:
+        description: Número de caja
+        required: true
+        type: string
+  repository_dispatch:
+    types: [trazabilidad-caja]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: copernico-session
+  cancel-in-progress: false
+
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CAJA: ${{ github.event.inputs.caja || github.event.client_payload.caja }}
+      COPERNICO_EMAIL: ${{ secrets.COPERNICO_EMAIL }}
+      COPERNICO_PASSWORD: ${{ secrets.COPERNICO_PASSWORD }}
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Consultar getmovimientos
+        run: python3 scripts/consultar_caja.py
+
+      - name: Publicar datos/trazabilidad
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          from scripts.stock_refresh import DatasetPublisher
+          caja = re.sub(r"^0+(?=\d)", "", re.sub(r"\D", "", os.environ.get("CAJA", "")))
+          path = f"datos/trazabilidad/{caja}.json"
+          if not re.fullmatch(r"\d{3,12}", caja) or not Path(path).is_file():
+              raise SystemExit(f"No se generó {path}")
+          published = DatasetPublisher().publish_files([path])
+          print("publicado" if published else "sin cambios respecto de main")
+          PY
