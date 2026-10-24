@@ -8,7 +8,7 @@ const block = html.match(/\/\* PREPARED_LINES_LOGIC_START \*\/([\s\S]*?)\/\* PRE
 assert.ok(block, 'Falta el bloque de líneas preparadas');
 const api = new Function(
   block[1] +
-  '\nreturn {preparedLineIsPicked, preparedLineLocation, preparedLineModuleKey, preparedLinesAggregate, layoutCellGridStyle, layoutCellExtent, preparedLegendItems};'
+  '\nreturn {preparedLineIsPicked, preparedLineIsNegated, preparedLineLocation, preparedLineModuleKey, preparedLinesAggregate, layoutCellGridStyle, layoutCellExtent, preparedLegendItems, NEGATED_LINE_STATE};'
 )();
 
 assert.strictEqual(api.preparedLineModuleKey('MFCA0930103'), 'MFCA93');
@@ -20,8 +20,14 @@ assert.strictEqual(api.preparedLineModuleKey('B800101'), 'B80');
 assert.strictEqual(api.preparedLineModuleKey('CAR0340102'), '');
 assert.strictEqual(api.preparedLineModuleKey('A40'), '');
 
+assert.strictEqual(api.NEGATED_LINE_STATE, 'Negada');
 assert.strictEqual(api.preparedLineIsPicked({EstadoDeLinea:'Confirmada'}), true);
 assert.strictEqual(api.preparedLineIsPicked({EstadoDeLinea:'Negada'}), false);
+assert.strictEqual(api.preparedLineIsNegated({EstadoDeLinea:'Negada'}), true);
+assert.strictEqual(api.preparedLineIsNegated({EstadoDeLinea:'negada'}), true);
+assert.strictEqual(api.preparedLineIsNegated({EstadoDeLinea:'Confirmada'}), false);
+assert.strictEqual(api.preparedLineIsNegated({EstadoLineaTsscc:'Negada'}), true);
+assert.strictEqual(api.preparedLineIsNegated({EstadoDeLinea:'Confirmada', EstadoLineaTsscc:'Negada'}), false);
 assert.strictEqual(api.preparedLineIsPicked({EstadoLineaTsscc:'Confirmada', Ubicacion:'MFCA110101'}), true);
 assert.strictEqual(api.preparedLineIsPicked({EstadoDeLinea:'Negada', EstadoLineaTsscc:'Confirmada'}), false);
 assert.strictEqual(api.preparedLineLocation({ubicacion_asig:'A400108', Ubicacion:'MFCA110101'}), 'A400108');
@@ -45,6 +51,8 @@ assert.deepStrictEqual(agg.bins.MFCA11, {MFCA110103:1, MFCA110104:1});
 
 assert.strictEqual(api.layoutCellGridStyle({r:1, c:10}).gridRow, '1');
 assert.strictEqual(api.layoutCellGridStyle({r:1, c:10}).gridColumn, '10');
+assert.strictEqual(api.layoutCellGridStyle({r:1, c:10, label:'A40'}).gridRow, '1 / span 2');
+assert.strictEqual(api.layoutCellGridStyle({r:68, c:10, label:'A96'}).gridRow, '68 / span 2');
 assert.strictEqual(api.layoutCellGridStyle({r:4, c:10, rowSpan:2}).gridRow, '4 / span 2');
 assert.strictEqual(api.layoutCellGridStyle({r:'38 / span 2', c:10}).gridRow, '38 / span 2');
 assert.strictEqual(api.layoutCellGridStyle({r:1, c:10, gridRow:'1 / span 2'}).gridRow, '1 / span 2');
@@ -58,10 +66,19 @@ const legend = api.preparedLegendItems(10);
 assert.deepStrictEqual(legend.map(item => item.cls), ['zero', 'h1', 'h2', 'h3', 'h4', 'h5']);
 assert.strictEqual(api.preparedLegendItems(0)[0].text, '0');
 
-assert.ok(html.includes('id="preparedModeBtn"'), 'falta la pestaña');
-assert.ok(html.includes('id="preparedLinesView"'), 'falta la vista');
-assert.ok(html.includes("mode==='prepared'"), 'setDisplayMode no abre la vista');
-assert.ok(html.includes('preparedLinesView'), 'la vista de usuarios no oculta el mapa');
+assert.ok(html.includes('id="heatMapModeBtn"'), 'falta la pestaña unificada');
+assert.ok(html.includes('>🔥 Mapa de calor<'), 'la pestaña debe llamarse Mapa de calor');
+assert.ok(!html.includes('id="occupancyModeBtn"'), 'sigue la pestaña de ocupación');
+assert.ok(!html.includes('id="preparedModeBtn"'), 'sigue la pestaña de líneas preparadas');
+assert.ok(!html.includes('id="heatModeBtn"'), 'sigue la pestaña de mezcla');
+assert.ok(!html.includes('id="occupancyView"'), 'sigue la vista separada de ocupación');
+assert.ok(!html.includes('id="preparedLinesView"'), 'sigue la vista separada de líneas');
+assert.ok(html.includes('data-heat-metric="occupancy"'));
+assert.ok(html.includes('data-heat-metric="prepared"'));
+assert.ok(html.includes('data-heat-metric="negated"'));
+assert.ok(html.includes('data-heat-metric="mix"'));
+assert.ok(html.includes('id="heatPeriodBar"'), 'falta el filtro de período');
+assert.ok(html.includes("mode==='heatmap'"), 'setDisplayMode no abre el mapa unificado');
 assert.strictEqual((html.match(/const LAYOUT_CELLS=/g) || []).length, 1, 'el layout compartido no debe duplicarse');
 
 const layoutMatch = html.match(/const LAYOUT_CELLS=(\[[\s\S]*?\]);/);
@@ -75,8 +92,28 @@ assert.ok(real.counts.A40 > 0, 'A40 debería tener líneas preparadas');
 assert.ok(real.counts.MFCA11 >= 0);
 assert.ok(real.outside > 0, 'hay líneas de otras zonas que no entran en esta grilla');
 assert.strictEqual(real.ignored, day.rows.length - real.prepared);
+const realNeg = api.preparedLinesAggregate(day.rows, labels, api.preparedLineIsNegated);
+const negatedRows = day.rows.filter(row => row.EstadoDeLinea === 'Negada');
+assert.strictEqual(realNeg.prepared, negatedRows.length);
+assert.ok(realNeg.inLayout > 0, 'el 23/10 tiene líneas negadas dentro del layout');
+assert.strictEqual(realNeg.ignored, day.rows.length - realNeg.prepared);
+assert.ok(realNeg.counts.MFCA11 >= 0);
+const negSample = api.preparedLinesAggregate([
+  {EstadoDeLinea:'Negada', ubicacion_asig:'A400102'},
+  {EstadoDeLinea:'Confirmada', ubicacion_asig:'A400101'},
+  {EstadoDeLinea:'Negada', ubicacion_asig:'CAR010101'}
+], ['A40'], api.preparedLineIsNegated);
+assert.strictEqual(negSample.counts.A40, 1);
+assert.strictEqual(negSample.inLayout, 1);
+assert.strictEqual(negSample.outside, 1);
+assert.strictEqual(negSample.ignored, 1);
+assert.strictEqual(negSample.prepared, 2);
 const placed = cells.map(cell => api.layoutCellGridStyle(cell));
 assert.ok(placed.every(style => /^\d+/.test(style.gridRow) && /^\d+/.test(style.gridColumn)));
+const a40 = cells.find(cell => cell.label === 'A40');
+const a96 = cells.find(cell => cell.label === 'A96');
+assert.ok(a40 && /span 2/.test(api.layoutCellGridStyle(a40).gridRow), 'A40 tiene que ocupar dos filas');
+assert.ok(a96 && /span 2/.test(api.layoutCellGridStyle(a96).gridRow), 'A96 tiene que ocupar dos filas');
 const size = api.layoutCellExtent(cells);
 assert.ok(size.cols >= 10 && size.rows >= 69);
 
@@ -84,6 +121,10 @@ console.log('prepared lines layout ok', {
   inLayout: real.inLayout,
   outside: real.outside,
   ignored: real.ignored,
+  negatedInLayout: realNeg.inLayout,
+  negatedOutside: realNeg.outside,
+  negated: realNeg.prepared,
   modules: labels.length,
-  max: Math.max(...Object.values(real.counts))
+  max: Math.max(...Object.values(real.counts)),
+  negatedMax: Math.max(...Object.values(realNeg.counts))
 });
