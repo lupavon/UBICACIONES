@@ -13,7 +13,8 @@ function json(body, status = 200) {
 globalThis.fetch = async (url, options = {}) => {
   const href = String(url);
   const body = options.body ? String(options.body) : "";
-  calls.push({ href, body, authorization: options.headers?.authorization || "" });
+  const headers = options.headers || {};
+  calls.push({ href, body, authorization: headers.authorization || headers.Authorization || "" });
   if (href.endsWith("/session")) {
     if (globalThis.__session1042) return new Response("error code: 1042", { status: 500 });
     if ((options.headers?.authorization || "") !== dashboard) return json({ error: "No autenticado" }, 401);
@@ -77,7 +78,7 @@ const kv = {
   async put(...args) { puts.push(args); }
 };
 calls.length = 0;
-const reused = await handleCaja(cajaRequest(), { ...env, SESSION: kv });
+const reused = await handleCaja(cajaRequest(), { ...env, COPERNICO_STATE: kv });
 assert.equal(reused.status, 200);
 assert.equal(calls.some(call => call.href.endsWith("/login")), false);
 assert.equal(calls.some(call => call.authorization === "jwt-desde-kv-de-picking"), true);
@@ -87,11 +88,36 @@ resetCajaSession();
 globalThis.__cajaMovements401 = true;
 globalThis.__cajaMovementsRetried = false;
 calls.length = 0;
-const refreshed = await handleCaja(cajaRequest("300300"), { ...env, SESSION: kv });
+const refreshed = await handleCaja(cajaRequest("300300"), { ...env, COPERNICO_STATE: kv });
 assert.equal(refreshed.status, 200);
 assert.equal(calls.filter(call => call.href.endsWith("/login")).length, 1);
 assert.equal(calls.some(call => call.href.includes("/logout")), false);
 assert.equal(puts.length, 0);
+
+resetCajaSession();
+calls.length = 0;
+const ignoredSession = await handleCaja(cajaRequest("610610"), { ...env, SESSION: kv });
+assert.equal(ignoredSession.status, 200);
+assert.equal(calls.some(call => call.href.endsWith("/login")), true, "SESSION no es el KV de la sesión técnica");
+
+resetCajaSession();
+globalThis.__cajaMovements401 = false;
+const depCalls = [];
+const workerSession = { jwt: "jwt-de-la-sesion-del-worker", jar: { capture() { depCalls.push("capture"); } } };
+const cajaDeps = {
+  async login() { depCalls.push("login"); return workerSession; },
+  async logout(current) { depCalls.push("logout:" + current.jwt); },
+  headers(current) { return { Authorization: String(current.jwt) }; },
+  capture(current, response) { current.jar.capture(response); }
+};
+calls.length = 0;
+const viaDeps = await handleCaja(cajaRequest("500500"), env, cajaDeps);
+const viaDepsBody = await viaDeps.json();
+assert.equal(viaDeps.status, 200);
+assert.equal(viaDepsBody.movimientos.length, 1);
+assert.deepEqual(depCalls, ["login", "capture", "logout:" + workerSession.jwt]);
+assert.equal(calls.some(call => call.href.endsWith("/login")), false);
+assert.equal(calls.some(call => call.href.includes("getmovimientos") && call.authorization === workerSession.jwt), true);
 
 const pickingCalls = [];
 const pickingFetch = async () => {

@@ -67,3 +67,139 @@ console.log('test_box_trace ok', {
   destinos221210: summary.destinos.length,
   unidades221210: summary.unidades
 });
+
+const liveEndpoints = new Function(
+  html.match(/const BOX_TRACE_LIVE_ENDPOINTS=\[[\s\S]*?\];/)[0] + '\nreturn BOX_TRACE_LIVE_ENDPOINTS;'
+)();
+assert.strictEqual(liveEndpoints.length, 2);
+assert.ok(liveEndpoints[0].includes('ubicaciones-operacion'));
+assert.ok(liveEndpoints[1].includes('ubicaciones-trazabilidad'));
+
+function loadBoxTraceFetchLive(endpoints, authToken, publishedJson, fetchImpl) {
+  const start = html.indexOf('async function boxTraceReadJson');
+  const end = html.indexOf('function boxTraceApplyLive');
+  assert.ok(start > 0 && end > start, 'No se pudo extraer boxTraceFetchLive');
+  return new Function(
+    'BOX_TRACE_LIVE_ENDPOINTS',
+    'boxTraceAuthToken',
+    'receiptPublishedJson',
+    'fetch',
+    html.slice(start, end) + '\nreturn boxTraceFetchLive;'
+  )(endpoints, authToken, publishedJson, fetchImpl);
+}
+
+function liveResponse(body, status) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
+
+(async () => {
+  const caja = '591435';
+  const cached = { ok: true, caja, movimientos: [{ Fecha: '2026-01-01', EAN: '1', Movimiento: 1 }], fetched_at: '2026-10-01T00:00:00Z' };
+  const noCache = async () => { throw new Error('sin archivo'); };
+
+  const calls503 = [];
+  const on503 = loadBoxTraceFetchLive(liveEndpoints, () => '', noCache, async (url) => {
+    calls503.push(String(url));
+    if (String(url).includes('ubicaciones-operacion')) {
+      return liveResponse({ ok: false, error: 'La sesión técnica de Copérnico está en uso.' }, 503);
+    }
+    return liveResponse({ ok: false, error: 'la ruta no existe' }, 404);
+  });
+  const error503 = await on503(caja);
+  assert.strictEqual(error503.state, 'error');
+  assert.strictEqual(error503.message, 'La sesión técnica de Copérnico está en uso.');
+  assert.strictEqual(calls503.length, 1, 'un 503 con JSON no debe consultar ubicaciones-trazabilidad');
+
+  let cacheOnError = 0;
+  const errorBeatsCache = loadBoxTraceFetchLive(liveEndpoints, () => '', async () => {
+    cacheOnError += 1;
+    return cached;
+  }, async (url) => {
+    if (String(url).includes('ubicaciones-operacion')) {
+      return liveResponse({ ok: false, error: 'Copérnico no devolvió los movimientos de la caja (HTTP 500)' }, 502);
+    }
+    throw new Error('no debería caer al otro worker');
+  });
+  const shown = await errorBeatsCache(caja);
+  assert.strictEqual(shown.state, 'error');
+  assert.strictEqual(shown.message, 'Copérnico no devolvió los movimientos de la caja (HTTP 500)');
+  assert.strictEqual(cacheOnError, 0, 'un error JSON de /caja no se reemplaza por la consulta guardada');
+
+  const calls502 = [];
+  const on502 = loadBoxTraceFetchLive(liveEndpoints, () => 'token', noCache, async (url) => {
+    calls502.push(String(url));
+    return liveResponse({ ok: false, error: 'Copérnico no devolvió los movimientos de la caja (HTTP 500)' }, 502);
+  });
+  const error502 = await on502(caja);
+  assert.strictEqual(error502.state, 'error');
+  assert.strictEqual(error502.message, 'Copérnico no devolvió los movimientos de la caja (HTTP 500)');
+  assert.strictEqual(calls502.length, 1);
+
+  const calls404 = [];
+  const on404 = loadBoxTraceFetchLive(liveEndpoints, () => '', noCache, async (url) => {
+    calls404.push(String(url));
+    return liveResponse({ ok: false, error: 'la ruta no existe' }, 404);
+  });
+  const miss = await on404(caja);
+  assert.strictEqual(miss.state, 'miss');
+  assert.strictEqual(calls404.length, 2);
+
+  const callsNet = [];
+  const onNet = loadBoxTraceFetchLive(liveEndpoints, () => '', noCache, async (url) => {
+    callsNet.push(String(url));
+    if (String(url).includes('ubicaciones-operacion')) throw new TypeError('Failed to fetch');
+    return liveResponse({ ok: false, error: 'la ruta no existe' }, 404);
+  });
+  const network = await onNet(caja);
+  assert.strictEqual(network.state, 'error');
+  assert.strictEqual(network.message, 'No se pudo contactar el worker de trazabilidad.');
+  assert.notStrictEqual(network.state, 'miss');
+
+  const bothDown = loadBoxTraceFetchLive(liveEndpoints, () => '', noCache, async () => {
+    throw new TypeError('Failed to fetch');
+  });
+  const down = await bothDown(caja);
+  assert.strictEqual(down.state, 'error');
+  assert.strictEqual(down.message, 'No se pudo contactar el worker de trazabilidad.');
+
+  let cacheReads = 0;
+  const withCache = loadBoxTraceFetchLive(liveEndpoints, () => '', async (path) => {
+    cacheReads += 1;
+    assert.strictEqual(path, 'datos/trazabilidad/' + caja + '.json');
+    return cached;
+  }, async () => liveResponse({ ok: false, error: 'Endpoint no encontrado' }, 404));
+  const fromCache = await withCache(caja);
+  assert.strictEqual(fromCache.state, 'ok');
+  assert.strictEqual(fromCache.channel, 'cache');
+  assert.strictEqual(fromCache.count, 1);
+  assert.strictEqual(cacheReads, 1);
+
+  const cacheAfterNetwork = loadBoxTraceFetchLive(liveEndpoints, () => '', async () => cached, async () => {
+    throw new TypeError('Failed to fetch');
+  });
+  const cachedNet = await cacheAfterNetwork(caja);
+  assert.strictEqual(cachedNet.state, 'ok');
+  assert.strictEqual(cachedNet.channel, 'cache');
+
+  const callsAuth = [];
+  const onAuth = loadBoxTraceFetchLive(liveEndpoints, () => '', noCache, async (url) => {
+    callsAuth.push(String(url));
+    return liveResponse({ ok: false, error: 'Tenés que ingresar al dashboard para consultar Copérnico' }, 401);
+  });
+  const auth = await onAuth(caja);
+  assert.strictEqual(auth.state, 'auth');
+  assert.strictEqual(callsAuth.length, 1);
+
+  const liveOk = loadBoxTraceFetchLive(liveEndpoints, () => 'abc', async () => { throw new Error('no debería leer cache'); }, async () => {
+    return liveResponse({ ok: true, movimientos: [{ EAN: '9' }], elapsed_ms: 12, warning: '', fetched_at: '2026-10-24T00:00:00Z' }, 200);
+  });
+  const okLive = await liveOk(caja);
+  assert.strictEqual(okLive.state, 'ok');
+  assert.strictEqual(okLive.channel, 'vivo');
+  assert.strictEqual(okLive.count, 1);
+
+  console.log('test_box_trace fetch live ok');
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
