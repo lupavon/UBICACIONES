@@ -87,4 +87,12 @@ const unknown = await worker.fetch(new Request('https://worker.test/otra', {
 }), env);
 assert.equal(unknown.status, 404);
 
+const preflight = await worker.fetch(new Request('https://worker.test/health', {
+  method: 'OPTIONS',
+  headers: { origin: 'https://lupavon.github.io', 'access-control-request-method': 'GET' }
+}), env);
+assert.equal(preflight.status, 204);
+assert.equal(preflight.body, null);
+assert.equal(await preflight.text(), '');
+
 console.log('test_trazabilidad_worker ok');
