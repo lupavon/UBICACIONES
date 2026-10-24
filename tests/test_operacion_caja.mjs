@@ -104,4 +104,18 @@ const cajaViaRoute = await routeOperacion(cajaRequest("400400"), env, pickingFet
 assert.equal(cajaViaRoute.status, 200);
 assert.equal(pickingCalls.length, 1);
 
+const preflight = await handleCaja(new Request("https://ubicaciones-operacion.pavonlucas-m.workers.dev/caja", {
+  method: "OPTIONS",
+  headers: {
+    origin: "https://lupavon.github.io",
+    "access-control-request-method": "GET",
+    "access-control-request-headers": "authorization"
+  }
+}), {});
+assert.equal(preflight.status, 204);
+assert.equal(preflight.body, null);
+assert.equal(await preflight.text(), "");
+assert.equal(preflight.headers.get("access-control-allow-origin"), "https://lupavon.github.io");
+assert.match(preflight.headers.get("access-control-allow-headers") || "", /authorization/i);
+
 console.log("test_operacion_caja ok");
