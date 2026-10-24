@@ -3031,7 +3031,7 @@ body.light-mode .boxTraceBadge.other{color:#52677c;background:#f3f6f9;border-col
     <b>Hacia qué caja se descontó</b>
     <div class="boxTraceChips" id="boxTraceChips"></div>
   </div>
-  <p class="boxTraceNote" id="boxTraceNote">Al buscar, el dashboard pide el historial completo de esa caja a Copérnico (getmovimientos) mediante un worker: la clave queda en el servidor y el navegador solo manda la sesión del dashboard. Hasta que ese worker esté publicado, se ve la trazabilidad vigente (un movimiento por SKU que sigue en la caja destino; RECIBE DESDE Nw es la caja origen) y el relevamiento de cajas fantasma. Una consulta corrida a mano con el workflow queda en datos/trazabilidad/&lt;caja&gt;.json.</p>
+  <p class="boxTraceNote" id="boxTraceNote">Al buscar, el dashboard pide el historial completo de esa caja a Copérnico (getmovimientos) en /caja del worker de operación, el mismo de Picking en curso. La clave queda en ese worker y el navegador solo manda la sesión del dashboard. Hasta que esa ruta esté publicada ahí, se ve la trazabilidad vigente (un movimiento por SKU que sigue en la caja destino; RECIBE DESDE Nw es la caja origen) y el relevamiento de cajas fantasma. Una consulta corrida a mano con el workflow queda en datos/trazabilidad/&lt;caja&gt;.json.</p>
   <div class="processTableWrap boxTraceTableWrap">
     <table class="processTable boxTraceTable">
       <thead>
@@ -8964,6 +8964,7 @@ let BOX_TRACE_VIEW=null;
 let boxTraceFilter='hacia';
 let boxTraceSeq=0;
 const BOX_TRACE_LIVE_ENDPOINTS=[
+  // Primero el worker que ya tiene la sesión de Picking. El segundo solo si esa ruta no existe.
   'https://ubicaciones-operacion.pavonlucas-m.workers.dev/caja?numero=',
   'https://ubicaciones-trazabilidad.pavonlucas-m.workers.dev/caja?numero='
 ];

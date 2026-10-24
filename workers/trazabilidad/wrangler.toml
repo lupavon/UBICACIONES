@@ -5,6 +5,9 @@ workers_dev = true
 
 # No declares el nombre del worker de picking (ubicaciones-operacion):
 # un deploy con ese nombre reemplazaría Picking en curso.
+# La ruta /caja va DENTRO de ese worker, copiando workers/operacion/src/caja.js.
+# Este worker queda solo como respaldo y no debe desplegarse en paralelo:
+# abriría otra sesión técnica.
 # Secrets, los mismos del workflow y sin commitearlos:
 #   wrangler secret put COPERNICO_EMAIL
 #   wrangler secret put COPERNICO_PASSWORD
