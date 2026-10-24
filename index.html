@@ -9127,8 +9127,9 @@ async function boxTraceFetchLive(caja){
   const headers={accept:'application/json'};
   const token=boxTraceAuthToken();
   if(token)headers.authorization='Bearer '+token;
-  let message='';
-  let sawRoute=false;
+  let liveError='';
+  let softError='';
+  let networkError='';
   for(const base of BOX_TRACE_LIVE_ENDPOINTS){
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),15000);
@@ -9136,15 +9137,13 @@ async function boxTraceFetchLive(caja){
       const res=await fetch(base+encodeURIComponent(caja),{headers,credentials:'omit',cache:'no-store',signal:controller.signal});
       const data=await boxTraceReadJson(res);
       if(res.status===404)continue;
-      sawRoute=true;
       if(res.status===401)return {state:'auth',message:typeof data.error==='string'?data.error:'Tenés que ingresar al dashboard para consultar Copérnico'};
       if(!res.ok||data.ok===false){
-        message=typeof data.error==='string'?data.error:('No se pudo consultar la caja (HTTP '+res.status+').');
-        if(res.status===400||res.status===429)return {state:'error',message};
-        continue;
+        liveError=typeof data.error==='string'&&data.error?data.error:('No se pudo consultar la caja (HTTP '+res.status+').');
+        break;
       }
       if(!Array.isArray(data.movimientos)){
-        message='La respuesta en vivo no trajo el historial de la caja.';
+        softError='La respuesta en vivo no trajo el historial de la caja.';
         continue;
       }
       return {
@@ -9157,9 +9156,10 @@ async function boxTraceFetchLive(caja){
         fetchedAt:data.fetched_at||''
       };
     }catch(err){
-      message=err?.name==='AbortError'?'La consulta en vivo superó los 15 segundos.':'No se pudo contactar el worker de trazabilidad.';
+      networkError=err?.name==='AbortError'?'La consulta en vivo superó los 15 segundos.':'No se pudo contactar el worker de trazabilidad.';
     }finally{clearTimeout(timer)}
   }
+  if(liveError)return {state:'error',message:liveError};
   try{
     const cached=await receiptPublishedJson('datos/trazabilidad/'+caja+'.json');
     if(cached&&cached.ok!==false&&Array.isArray(cached.movimientos)&&String(cached.caja||caja)===String(caja)){
@@ -9174,8 +9174,9 @@ async function boxTraceFetchLive(caja){
       };
     }
   }catch(_){}
-  if(sawRoute&&message)return {state:'error',message};
-  return {state:'miss',message};
+  if(networkError)return {state:'error',message:networkError};
+  if(softError)return {state:'error',message:softError};
+  return {state:'miss',message:''};
 }
 function boxTraceApplyLive(index,query,live){
   const view={

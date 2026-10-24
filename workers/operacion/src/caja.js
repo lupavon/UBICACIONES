@@ -7,8 +7,16 @@
  *   1. Copiar este archivo.
  *   2. En fetch(), como PRIMERA decisión, antes del OPTIONS global
  *      (hoy ese OPTIONS solo permite Content-Type; si responde primero,
- *      el browser no puede mandar el Bearer del dashboard):
- *        if (new URL(request.url).pathname === "/caja") return handleCaja(request, env);
+ *      el browser no puede mandar el Bearer del dashboard), pasar login,
+ *      logout, headers y cookies del propio worker:
+ *        if (new URL(request.url).pathname === "/caja") {
+ *          return handleCaja(request, env, {
+ *            login: loginCopernico,
+ *            logout: logoutFinal,
+ *            headers: session => copernicoHeaders(session.jar, { Authorization: String(session.jwt) }),
+ *            capture: (session, response) => session.jar.capture(response)
+ *          });
+ *        }
  *   3. npx wrangler deploy
  * No desplegar este archivo como script completo: /picking dejaría de existir.
  * No hace falta un secret nuevo; el worker ya tiene COPERNICO_EMAIL y COPERNICO_PASSWORD.
@@ -176,15 +184,15 @@ function jwtFrom(value) {
 
 async function readKvJwt(env) {
   if (memory.skipKv || !env) return "";
-  for (const value of Object.values(env)) {
-    if (!value || typeof value.get !== "function") continue;
-    for (const key of JWT_KEYS) {
-      try {
-        const jwt = jwtFrom(await value.get(key));
-        if (jwt) return jwt;
-      } catch {
-        /* Otro binding con get() no es esta sesión. */
-      }
+  // Solo el KV real. Iterar env tocaba el service binding AUTH: stub.get() es una llamada RPC que colgaba ubicaciones-auth.
+  const kv = env.COPERNICO_STATE;
+  if (!kv || typeof kv.get !== "function") return "";
+  for (const key of JWT_KEYS) {
+    try {
+      const jwt = jwtFrom(await kv.get(key));
+      if (jwt) return jwt;
+    } catch {
+      /* sin sesión en KV */
     }
   }
   return "";
@@ -297,7 +305,56 @@ async function loadMovements(env, caja) {
   return { movimientos: normalizeMovimientos(data), elapsedMs: Date.now() - result.started, warning: "" };
 }
 
-export async function handleCaja(request, env) {
+
+async function loadMovementsWithSession(env, caja, deps) {
+  let session = null;
+  try {
+    session = await deps.login(env);
+    const ask = async () => {
+      const started = Date.now();
+      const response = await fetch(MOVEMENTS_URL + "?caja=" + encodeURIComponent(caja), {
+        method: "GET",
+        headers: deps.headers(session)
+      });
+      if (deps.capture) deps.capture(session, response);
+      return { response, started };
+    };
+    let result = await ask();
+    if (result.response.status === 401) {
+      try { await deps.logout(session); } catch (_) {}
+      session = await deps.login(env);
+      result = await ask();
+    }
+    if (result.response.status === 404) {
+      return { movimientos: [], elapsedMs: Date.now() - result.started, warning: "Copérnico no tiene movimientos para esta caja." };
+    }
+    const data = await readJson(result.response);
+    if (!result.response.ok) {
+      console.log("CAJA GETMOVIMIENTOS", caja, result.response.status);
+      const error = new Error("Copérnico no devolvió los movimientos de la caja (HTTP " + result.response.status + ")");
+      error.status = 502;
+      throw error;
+    }
+    return { movimientos: normalizeMovimientos(data), elapsedMs: Date.now() - result.started, warning: "" };
+  } finally {
+    if (session) {
+      try { await deps.logout(session); } catch (e) { console.log("CAJA LOGOUT ERROR", e?.message || e); }
+    }
+  }
+}
+
+export async function handleCaja(request, env, deps) {
+  try {
+    return await handleCajaInner(request, env, deps);
+  } catch (error) {
+    console.error("CAJA ERROR", error?.stack || error?.message || error);
+    let origin = "";
+    try { origin = request.headers.get("origin") || ""; } catch (_) {}
+    return jsonResponse({ ok: false, error: (error && error.message) || "Error interno consultando la caja" }, 502, origin);
+  }
+}
+
+async function handleCajaInner(request, env, deps) {
   const origin = request.headers.get("origin") || "";
   if (origin && !allowOrigin(origin)) return jsonResponse({ ok: false, error: "Origen no permitido" }, 403, origin);
   if (request.method === "OPTIONS") return jsonResponse({ ok: true }, 204, origin);
@@ -311,7 +368,9 @@ export async function handleCaja(request, env) {
     if (!withinRate(clientKey(request, user.username))) {
       return jsonResponse({ ok: false, error: "Demasiadas consultas. Esperá un minuto." }, 429, origin);
     }
-    const loaded = await loadMovements(env, caja);
+    const loaded = deps && typeof deps.login === "function"
+      ? await loadMovementsWithSession(env, caja, deps)
+      : await loadMovements(env, caja);
     return jsonResponse({
       ok: true,
       caja,
@@ -323,6 +382,7 @@ export async function handleCaja(request, env) {
       movimientos: loaded.movimientos
     }, 200, origin);
   } catch (error) {
+    console.error("CAJA FALLO", caja, error?.status || 502, error?.message || error);
     return jsonResponse({ ok: false, error: error.message || "No se pudo consultar la caja" }, error.status || 502, origin);
   }
 }
