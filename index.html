@@ -4116,9 +4116,25 @@ function processVal(r,names){
   }
   return '';
 }
+function processCajaKey(r){
+  const raw=String(processVal(r,['Caja','caja','numeroCaja','NroCaja'])||'').trim();
+  const digits=raw.replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+  return digits||raw;
+}
+function processJoinKey(r){
+  return [processCajaKey(r),String(processVal(r,['EAN','ean','SKU','sku'])||'').trim(),String(processVal(r,['Referencia','referencia'])||'').trim()].join('|');
+}
+function processWhen(value){
+  const s=String(value||'').trim();
+  if(!s)return '';
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(!m)return s;
+  return m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+':'+(m[6]||'00');
+}
 function processField(r,key){
   const map={caja:['Caja','caja'],sku:['EAN','ean','SKU','sku'],desc:['Descripcion','descripcion'],saldo:['Saldo','saldo'],fv:['FV','fv'],origen:['PosicionOrigen','posicion_origen','UbicacionInicial'],maquinista:['Maquinista','maquinista','Nombre_empleado'],id:['Id_maquinista','id_maquinista','Id_empleado'],fecha:['FechaIngresoProceso','fecha_ingreso_proceso','fecha']};
-  return processVal(r,map[key]||[key]);
+  const value=processVal(r,map[key]||[key]);
+  return key==='fecha'?processWhen(value):value;
 }
 
 function renderPalletsProcess(){
@@ -4166,7 +4182,7 @@ function renderPalletsProcess(){
       '<td class="origin">'+esc(origen||'—')+'</td>'+
       '<td class="who">'+esc(maq||'—')+'</td>'+
       '<td>'+esc(id||'—')+'</td>'+
-      '<td>'+esc(fecha||'—')+'</td>'+
+      '<td>'+esc(processWhen(fecha)||'—')+'</td>'+
     '</tr>';
   };
   body.innerHTML=groupedRowsHtml(rows,groupKey,processField,processRowHtml,9,'saldo');
@@ -4198,11 +4214,21 @@ async function buildPalletsProcessPanel(force=false){
       const traceRes=await fetch('./pallets-proceso.json?trace='+Date.now(),{cache:'no-store'});
       if(traceRes.ok){const data=await traceRes.json();traces=Array.isArray(data)?data:(Array.isArray(data?.rows)?data.rows:[]);}
     }catch(_){/* Sin trazabilidad, mostrar igualmente el stock real */}
-    const key=r=>[String(processVal(r,['Caja','caja','numeroCaja','NroCaja'])||'').trim(),String(processVal(r,['EAN','ean','SKU','sku'])||'').trim(),String(processVal(r,['Referencia','referencia'])||'').trim()].join('|');
-    const byExact=new Map(traces.map(r=>[key(r),r]));
+    const byExact=new Map();
+    const byCaja=new Map();
+    traces.forEach(t=>{
+      byExact.set(processJoinKey(t),t);
+      const caja=processCajaKey(t);
+      if(!caja)return;
+      const prev=byCaja.get(caja);
+      const useful=processVal(t,['PosicionOrigen','posicion_origen','UbicacionInicial'])&&processVal(t,['Maquinista','maquinista','Nombre_empleado']);
+      const prevUseful=prev&&processVal(prev,['PosicionOrigen','posicion_origen','UbicacionInicial'])&&processVal(prev,['Maquinista','maquinista','Nombre_empleado']);
+      if(!prev||(useful&&!prevUseful))byCaja.set(caja,t);
+    });
     // Nunca sumar registros del histórico; solo enriquecer las filas actuales.
+    // La traza es de la caja: si el EAN/referencia no coincide exactamente, igual se usa el ingreso de esa caja.
     PROCESS_ROWS=current.map(r=>{
-      const t=byExact.get(key(r));
+      const t=byExact.get(processJoinKey(r))||byCaja.get(processCajaKey(r));
       return {...r,
         Caja:processVal(r,['Caja','caja','numeroCaja','NroCaja']),
         EAN:processVal(r,['EAN','ean','SKU','sku']),
