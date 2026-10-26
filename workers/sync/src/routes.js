@@ -1,3 +1,4 @@
+import { dashboardUser } from "./auth.js";
 import {
   aggregatePicking,
   copernicoEnabled,
@@ -164,8 +165,14 @@ export async function handleFetch(request, env) {
     }, 200, origin);
   }
   if (request.method === "OPTIONS") return jsonResponse({ ok: true }, 204, origin);
-  if (url.pathname === "/caja") return handleCaja(request, env, origin);
-  if (url.pathname === "/pickings" || url.pathname === "/picking") return handlePickings(request, env, origin);
+  if (url.pathname === "/caja" || url.pathname === "/pickings" || url.pathname === "/picking") {
+    let user;
+    try { user = await dashboardUser(request, env); }
+    catch (e) { return jsonResponse({ ok: false, error: e.message }, e.status || 503, origin); }
+    if (!user) return jsonResponse({ ok: false, error: "No autenticado" }, 401, origin);
+    if (url.pathname === "/caja") return handleCaja(request, env, origin);
+    return handlePickings(request, env, origin);
+  }
   if (url.pathname.startsWith("/api/raw/")) {
     const key = decodeURIComponent(url.pathname.slice("/api/raw/".length));
     if (!key || key.includes("..")) return jsonResponse({ ok: false, error: "Clave inválida" }, 400, origin);

@@ -1,8 +1,7 @@
+# Desactivado: migrado a Cloudflare ubicaciones-copernico 26/10/2026
 name: Actualizar operacion Copernico
 
 on:
-  schedule:
-    - cron: "*/3 * * * *"
   workflow_dispatch:
     inputs:
       backfill_days:
