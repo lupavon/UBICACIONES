@@ -1,8 +1,7 @@
+# Desactivado: migrado a Cloudflare ubicaciones-copernico 26/10/2026
 name: Actualizar datos pesados Copernico
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
