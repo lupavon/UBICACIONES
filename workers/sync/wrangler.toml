@@ -1,0 +1,44 @@
+name = "ubicaciones-sync"
+main = "src/index.js"
+compatibility_date = "2026-10-26"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Plan gratuito: no subir cpu_ms. El worker solo baja la respuesta cruda,
+# la comprime y la guarda. La forma final del dashboard la arma el navegador.
+[limits]
+cpu_ms = 10
+subrequests = 50
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 0.01
+
+[triggers]
+crons = ["* * * * *", "*/3 * * * *", "*/10 * * * *"]
+
+[vars]
+# Seguir en "0" hasta terminar secrets y la base. Con otro valor no hay ni login.
+COPERNICO_ENABLED = "0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ubicaciones-datos"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "SESSION"
+class_name = "CopernicoSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CopernicoSession"]

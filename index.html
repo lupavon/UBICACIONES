@@ -2,23 +2,49 @@
 
 <html lang="es">
 <head>
+<script src="workers/sync/browser-transform.js"></script>
 <script>
-/* Operational JSON remains on main; deploying the UI never freezes WMS data. */
+/* Operational JSON remains on main; deploying the UI never freezes WMS data.
+   The raw→dashboard transform runs only when the response says X-Ubic-Raw: 1
+   (workers/sync). GitHub Pages keeps fetching the published JSON. */
 (()=>{
   const original=window.fetch.bind(window);
   const base=new URL('./',document.baseURI);
   const roots=new Set(["avance-pedidos.json", "cajas-fantasma-movimientos.json", "en-recibo.json", "maestro-recibo.json", "negaciones.json", "pallets-proceso.json", "picking-en-curso.json", "stock-sync-status.json", "stock.json", "sync-status.json", "tiempos.json", "trazabilidad-cajas.json"]);
-  window.fetch=(input,options)=>{
+  window.fetch=async (input,options)=>{
     const url=new URL(input instanceof Request?input.url:input,document.baseURI);
     const method=(options?.method||(input instanceof Request?input.method:'GET')).toUpperCase();
     const path=url.pathname.startsWith(base.pathname)?url.pathname.slice(base.pathname.length):'';
-    if(method==='GET'&&url.origin===base.origin&&(roots.has(path)||/^datos\/[a-z-]+\/\d{8}\.json$/.test(path))){
+    const dataset=method==='GET'&&url.origin===base.origin&&(roots.has(path)||/^datos\/[a-z-]+\/\d{8}\.json$/.test(path));
+    const onWorker=String(location.hostname||'').endsWith('.workers.dev');
+    let response;
+    if(dataset&&!onWorker){
       const remote=new URL('https://raw.githubusercontent.com/lupavon/UBICACIONES/main/'+path);
       remote.search=url.search;
-      if(input instanceof Request)return original(remote,{cache:'no-store'});
-      return original(remote,{cache:'no-store'});
+      response=await original(remote,{cache:'no-store'});
+    }else{
+      response=await original(input,options);
     }
-    return original(input,options);
+    if(!dataset||!response||typeof response.headers?.get!=='function'||response.headers.get('X-Ubic-Raw')!=='1'||typeof ubicTransformRaw!=='function') return response;
+    const updatedAt=response.headers.get('X-Ubic-Updated-At')||'';
+    let apiOrigin=url.origin;
+    try{ if(response.url) apiOrigin=new URL(response.url).origin; }catch{}
+    const payload=await response.json();
+    const shaped=await ubicTransformRaw(path,payload,{
+      updatedAt,
+      load:async (key)=>{
+        const rawUrl=new URL('/api/raw/'+encodeURIComponent(key),apiOrigin);
+        const raw=await original(rawUrl,{cache:'no-store'});
+        if(!raw.ok) return null;
+        return raw.json();
+      }
+    });
+    const headers=new Headers(response.headers);
+    headers.delete('content-encoding');
+    headers.delete('content-length');
+    headers.delete('x-ubic-raw');
+    headers.set('content-type','application/json; charset=utf-8');
+    return new Response(JSON.stringify(shaped),{status:response.status,statusText:response.statusText,headers});
   };
 })();
 
