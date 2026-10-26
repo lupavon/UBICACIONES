@@ -1012,13 +1012,27 @@ jobs:
               print("stock.json generado correctamente")
 
               if SYNC_MODE == "fast":
+                  try:
+                      from scripts.pallets_proceso import write_pallets_proceso
+                      write_pallets_proceso(
+                          rows,
+                          lambda caja: caja_api("getubicaciones", caja, jwt),
+                          now_iso,
+                          PALLETS_FILE,
+                      )
+                  except Exception as e:
+                      print(
+                          "AVISO: pallets-proceso no pudo actualizarse. "
+                          "Se conservará el último válido:",
+                          str(e)[:300]
+                      )
                   status.update({
                       "status": "ok", "fail_count": 0, "next_retry_at": None,
                       "last_success_at": now_iso, "last_attempt_at": now_iso,
                       "message": "Stock actualizado correctamente", "http_code": 200, "detail": ""
                   })
                   save_json_file(STATUS_FILE, status)
-                  print("MODO FAST: stock publicado sin ejecutar procesos secundarios")
+                  print("MODO FAST: stock publicado y pallets EN_PROCESO actualizados")
                   raise SystemExit(0)
 
               # Las fuentes de hoy ya fueron publicadas por PickingPulse.
@@ -1666,152 +1680,44 @@ jobs:
                   print("AVISO: Negaciones no pudo actualizarse; se conserva el último válido:", str(e))
 
               if SYNC_MODE == "operational":
+                  try:
+                      from scripts.pallets_proceso import write_pallets_proceso
+                      write_pallets_proceso(
+                          rows,
+                          lambda caja: caja_api("getubicaciones", caja, jwt),
+                          now_iso,
+                          PALLETS_FILE,
+                      )
+                  except Exception as e:
+                      print(
+                          "AVISO: pallets-proceso no pudo actualizarse. "
+                          "Se conservará el último válido:",
+                          str(e)[:300]
+                      )
                   status.update({
                       "status": "ok", "fail_count": 0, "next_retry_at": None,
                       "last_success_at": now_iso, "last_attempt_at": now_iso,
                       "message": "Datos operativos actualizados correctamente", "http_code": 200, "detail": ""
                   })
                   save_json_file(STATUS_FILE, status)
-                  print("MODO OPERATIONAL: fin antes de trazabilidad/pallets/cajas pesadas")
+                  print("MODO OPERATIONAL: fin tras actualizar pallets EN_PROCESO")
                   raise SystemExit(0)
 
               print("=== 3. PALLETS EN PROCESO ===")
 
               try:
-                  process_stock_rows = [
-                      row
-                      for row in rows
-                      if norm_value(
-                          field(row, "Ubicacion", "ubicacion", "Location")
-                      ) == "EN_PROCESO"
-                  ]
-
-                  process_boxes = sorted({
-                      str(
-                          field(
-                              row,
-                              "Caja",
-                              "caja",
-                              "numeroCaja",
-                              "NroCaja"
-                          )
-                      ).strip()
-                      for row in process_stock_rows
-                      if str(
-                          field(
-                              row,
-                              "Caja",
-                              "caja",
-                              "numeroCaja",
-                              "NroCaja"
-                          )
-                      ).strip()
-                  })
-
-                  trace_by_box = {}
-
-                  def trace_process_one(caja):
-                      try:
-                          moves = query_ubicaciones(caja, jwt)
-                          event = latest_move_to_process(moves)
-                          return caja, event, ""
-                      except Exception as e:
-                          return caja, None, str(e)[:300]
-
-                  if process_boxes:
-                      executor = ThreadPoolExecutor(
-                          max_workers=min(8, len(process_boxes))
-                      )
-
-                      futures = {
-                          executor.submit(trace_process_one, caja): caja
-                          for caja in process_boxes
-                      }
-
-                      try:
-                          for future in as_completed(futures, timeout=35):
-                              caja = futures[future]
-                              try:
-                                  caja, event, error = future.result(timeout=1)
-                              except Exception as e:
-                                  event = None
-                                  error = "Error aislado: " + str(e)[:250]
-
-                              trace_by_box[caja] = {
-                                  "event": event,
-                                  "error": error
-                              }
-                      except Exception as e:
-                          print(
-                              "AVISO: trazabilidad EN_PROCESO incompleta:",
-                              str(e)
-                          )
-                      finally:
-                          executor.shutdown(
-                              wait=False,
-                              cancel_futures=True
-                          )
-
-                      for caja in process_boxes:
-                          trace_by_box.setdefault(
-                              caja,
-                              {
-                                  "event": None,
-                                  "error": "Trazabilidad no disponible en este ciclo"
-                              }
-                          )
-
-                  process_rows = []
-
-                  for stock_row in process_stock_rows:
-                      caja = str(
-                          field(
-                              stock_row,
-                              "Caja",
-                              "caja",
-                              "numeroCaja",
-                              "NroCaja"
-                          )
-                      ).strip()
-
-                      trace = trace_by_box.get(caja, {})
-
-                      process_rows.append(
-                          build_process_row(
-                              stock_row,
-                              trace_move=trace.get("event"),
-                              trace_error=trace.get("error", "")
-                          )
-                      )
-
-                  identified = sum(
-                      1
-                      for row in process_rows
-                      if row["PosicionOrigen"] and row["Maquinista"]
-                  )
-
-                  save_json_file(
+                  from scripts.pallets_proceso import write_pallets_proceso
+                  write_pallets_proceso(
+                      rows,
+                      lambda caja: caja_api("getubicaciones", caja, jwt),
+                      now_iso,
                       PALLETS_FILE,
-                      {
-                          "updated_at": now_iso,
-                          "source": (
-                              "Copernico WMS · EN_PROCESO · "
-                              "trazabilidad de ubicaciones"
-                          ),
-                          "total_lineas": len(process_rows),
-                          "total_pallets": len(process_boxes),
-                          "identificados": identified,
-                          "rows": process_rows
-                      }
                   )
-
-                  print("pallets-proceso.json generado correctamente")
-
               except Exception as e:
                   print(
                       "AVISO: pallets-proceso no pudo actualizarse. "
                       "Se conservará el último válido:",
-                      str(e)
+                      str(e)[:300]
                   )
 
               # -----------------------------
@@ -2296,7 +2202,8 @@ jobs:
           roots = ('datos/tiempos/', 'datos/negaciones/', 'datos/lineas-negadas/',
                    'datos/productividad/', 'datos/lineas-picking/', 'datos/productividad-resumen/', 'datos/avance/')
           files = {'negaciones.json', 'avance-pedidos.json', 'picking-en-curso.json',
-                   'tiempos.json', 'sync-status.json', 'picking-sync-status.json'}
+                   'tiempos.json', 'sync-status.json', 'picking-sync-status.json',
+                   'pallets-proceso.json'}
           names = [p for p in sorted(set(tracked + new)) if p in files or p.startswith(roots)]
           DatasetPublisher().publish_files(names)
           PYCODE
