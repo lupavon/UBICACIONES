@@ -3266,8 +3266,11 @@ const SKU_GROUP={"1":"","2":"","3":"","4":"","5":"","1000":"CH1","10000":"SIN GR
 //   FMFCCU2  MFCB 75–132                        (58, era la parte MFCB de FMFCCU)
 //   FMFCUP1  MFCC impares 11–125                (58, era FMFCV)
 //   FMFCUP2  A pares 40–96                      (29, era FMFCV)
-// FMFCV se elimina. Los 16 módulos pares B08–B38 figuraban como FMFCV pero no
-// están en LAYOUT_CELLS ni en ningún conteo nuevo: quedan sin grupo.
+//     A40–A64 son 13 módulos y A66–A96 son 16. Esos 16 de A66 en adelante
+//     reemplazan a la calle B (B08–B38 pares) y siguen en FMFCUP2: el conteo
+//     publicado es 29, así que el rango no se parte ni se alarga más allá de A96.
+// FMFCV se elimina. B08–B38 pares se ignoran por completo: no entran en grupos,
+// saneamiento, KPIs ni destinos. isActiveLayoutModule es el filtro.
 //
 // SKU_GROUP sigue diciendo FMFCUP y FMFCCU, sin el sufijo 1/2. Esos códigos
 // padre cubren los dos subgrupos al validar y al buscar un destino vacío.
@@ -3318,6 +3321,19 @@ function logisticGroupsMatch(skuGroup, locationGroup){
   if(sku===loc) return true;
   const children=LOGISTIC_GROUP_PARENTS[sku];
   return !!(children && children.includes(loc));
+}
+// Calle B histórica (B08–B38 pares). A66–A96 la reemplazó dentro de FMFCUP2.
+function isRetiredCalleB(prefix, mod){
+  prefix=String(prefix||'').toUpperCase();
+  mod=Number(mod);
+  return prefix==='B' && mod>=8 && mod<=38 && mod%2===0;
+}
+function isActiveLayoutModule(prefix, mod){
+  prefix=String(prefix||'').toUpperCase();
+  mod=Number(mod);
+  if(prefix==='B' || isRetiredCalleB(prefix, mod)) return false;
+  if(prefix==='A') return mod>=40 && mod<=96 && mod%2===0;
+  return true;
 }
 /* LOGISTIC_GROUPS_END */
 let view='MFCA-L',query='',selected=null,filter='all';
@@ -3509,8 +3525,7 @@ function allPhysicalSlots(){
     {prefix:'MFCA',zones:['MFCAL','MFCAR'],positions:modulePhysicalPositions('MFCA')},
     {prefix:'MFCB',zones:['MFCBL','MFCBR'],positions:modulePhysicalPositions('MFCB')},
     {prefix:'MFCC',zones:['MFCCL','MFCCR'],positions:modulePhysicalPositions('MFCC')},
-    {prefix:'A',zones:['AR'],positions:modulePhysicalPositions('A')},
-    {prefix:'B',zones:['BR'],positions:modulePhysicalPositions('B')}
+    {prefix:'A',zones:['AR'],positions:modulePhysicalPositions('A')}
   ];
 
   configs.forEach(cfg=>{
@@ -5721,11 +5736,8 @@ function validLayoutModules(){
 
 
 function validABModule(prefix,mod){
-  mod=Number(mod);
-  // Calle A del layout: A40–A64 y, en el tramo que era calle B, A66–A96. Siempre pares.
-  if(prefix==='A') return mod>=40 && mod<=96 && mod%2===0;
-  if(prefix==='B') return mod>=8 && mod<=38 && mod%2===0;
-  return true;
+  // A40–A64 y A66–A96 (el tramo que reemplazó a la calle B). B08–B38 no participan.
+  return isActiveLayoutModule(prefix, mod);
 }
 
 function moduleCapacity(label){
@@ -5899,7 +5911,7 @@ function sanitationSlotMap(){
   allNormalizedRows().forEach(x=>{
     if(['MFCA','MFCB','MFCC'].includes(x.prefix)){
       if(x.sub!=='01'||!validPhysicalPosition(x.prefix,x.pos))return;
-    }else if(x.prefix==='A'||x.prefix==='B'){
+    }else if(x.prefix==='A'){
       if(x.sub!=='01'||x.pos<1||x.pos>8||!validABModule(x.prefix,x.modulo))return;
     }else return;
 
@@ -5914,7 +5926,8 @@ function sanitationSlotMap(){
 function sanitationPhysicalSlots(){
   // Misma capacidad física que usa el productivo para racks / KPIs.
   const slots=allPhysicalSlots().filter(s=>{
-    if(s.prefix==='A'||s.prefix==='B')return validABModule(s.prefix,s.modulo);
+    if(s.prefix==='B' || isRetiredCalleB(s.prefix, s.modulo)) return false;
+    if(s.prefix==='A') return validABModule(s.prefix,s.modulo);
     return true;
   });
   return slots;
